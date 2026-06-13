@@ -1,0 +1,51 @@
+{
+  "name": "cantio",
+  "version": "2.0.0",
+  "description": "Cantio - Professional Church Lyrics Display Software (Electron)",
+  "productName": "Cantio",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.0",
+    "electron-builder": "^25.1.0"
+  },
+  "build": {
+    "appId": "com.cantio.app",
+    "productName": "Cantio",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "display/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "src/assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "src/assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

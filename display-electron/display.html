@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cantio Display</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #bg-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 0;
+    }
+    #bg-image {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 0;
+    }
+    #canvas-prev, #canvas-curr {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+    }
+    #canvas-prev { z-index: 1; }
+    #canvas-curr { z-index: 2; }
+  </style>
+</head>
+<body>
+  <video id="bg-video" autoplay loop muted playsinline></video>
+  <img    id="bg-image" alt="">
+  <canvas id="canvas-prev"></canvas>
+  <canvas id="canvas-curr"></canvas>
+  <script src="display.js"></script>
+</body>
+</html>

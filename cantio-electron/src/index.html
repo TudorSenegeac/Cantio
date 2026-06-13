@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cantio</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="splash">
+    <div class="splash-content">
+      <h1>Cantio</h1>
+      <p class="splash-subtitle">Sistem de afișare versete</p>
+      <div class="splash-loader"><div class="splash-bar"></div></div>
+      <p class="splash-status">Se încarcă...</p>
+    </div>
+  </div>
+  <div id="toast-container"></div>
+  <div id="dialog-overlay"></div>
+
+  <div id="app">
+    <!-- MENUBAR -->
+    <div id="menubar">
+      <div class="menu-item" data-menu="file">📁 Fișier</div>
+      <div class="menu-item" data-menu="service">📋 Serviciu</div>
+      <div class="menu-item" data-menu="remote">📱 Remote</div>
+      <div class="menu-item" data-menu="live">📺 Live</div>
+      <div class="menu-item" data-menu="help">❓ Ajutor</div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div id="toolbar">
+      <span class="tb-title">Cantio</span>
+      <button class="tb-btn tb-profile" id="btn-profile">👤 Default</button>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" data-action="new-song">➕ Nou</button>
+      <div class="tb-spacer"></div>
+      <button class="tb-btn tb-closed" id="btn-display">📺 Display</button>
+      <button class="tb-btn tb-closed" id="btn-stage">🎭 Stage</button>
+      <div class="tb-sep"></div>
+      <span class="tb-label">Trimite la:</span>
+      <select id="send-target" class="tb-combo">
+        <option value="-1">Toate display-urile</option>
+      </select>
+      <div class="tb-sep"></div>
+      <button class="tb-btn" data-action="open-settings">⚙ Setări</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-body">
+
+      <!-- LEFT PANEL -->
+      <div class="panel panel-left">
+        <div class="left-splitter">
+          <!-- Service panel (top) -->
+          <div class="service-panel">
+            <div class="panel-hdr">
+              <span class="hdr-title">SERVICIU</span>
+              <button class="hdr-btn" data-action="save-service" title="Save service">💾</button>
+              <button class="hdr-btn" data-action="load-service" title="Open service">📂</button>
+              <button class="hdr-btn" data-action="clear-service" title="Clear service">✕</button>
+            </div>
+            <div id="service-list" class="service-list"></div>
+            <div class="service-actions">
+              <button class="svc-btn" id="svc-add">+ Adaugă</button>
+              <button class="svc-btn" id="svc-up">▲</button>
+              <button class="svc-btn" id="svc-down">▼</button>
+              <button class="svc-btn" id="svc-remove">Remove</button>
+            </div>
+          </div>
+
+          <!-- Left tabs (bottom) -->
+          <div class="left-tabs">
+            <div class="left-tabbar">
+              <button class="l-tab active" data-ltab="songs">🎵 Cântări</button>
+              <button class="l-tab" data-ltab="bible">📖 Biblie</button>
+              <button class="l-tab" data-ltab="slides">📊 Slide-uri</button>
+            </div>
+            <div id="ltab-songs" class="l-tab-content active">
+              <select id="category-filter" class="l-input">
+                <option value="">Toate categoriile</option>
+              </select>
+              <input type="text" id="search-input" class="l-input" placeholder="Caută cântare...">
+              <div id="song-list" class="song-list"></div>
+              <div class="song-list-actions">
+                <button class="tb-btn" id="sng-edit">Edit</button>
+                <button class="tb-btn" id="sng-delete">Șterge</button>
+                <button class="tb-btn" id="sng-add-svc">+ Serviciu</button>
+              </div>
+            </div>
+            <div id="ltab-bible" class="l-tab-content">
+              <input type="text" id="bible-search" class="l-input" placeholder="Caută în Biblie...">
+              <div id="bible-verses" class="bible-verses"></div>
+            </div>
+            <div id="ltab-slides" class="l-tab-content">
+              <div id="slide-list" class="slide-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER PANEL -->
+      <div class="panel panel-center">
+        <div class="center-splitter">
+          <!-- Song title bar -->
+          <div class="song-title-bar">
+            <input type="text" id="song-title-edit" class="ct-input" placeholder="Titlu cântare...">
+            <button class="tb-btn" id="btn-save-song">💾 Salvează</button>
+            <button class="tb-btn" id="btn-new-slide">+ Slide</button>
+          </div>
+          <!-- Operator notes bar (hidden) -->
+          <div id="notes-bar" class="notes-bar" style="display:none">
+            <span class="notes-icon">📝</span>
+            <span class="notes-label">OPERATOR NOTES</span>
+            <span id="notes-display"></span>
+          </div>
+          <!-- Slides bar -->
+          <div class="slides-bar">
+            <span id="slide-count" class="section-lbl">0 slide-uri</span>
+            <span id="auto-status" style="color:#555;font-size:10px"></span>
+            <span class="thumb-ctrl">
+              <button id="thumb-minus" class="tiny-btn">−</button>
+              <span id="thumb-size" class="thumb-lbl">S</span>
+              <button id="thumb-plus" class="tiny-btn">+</button>
+            </span>
+            <button id="view-toggle" class="tiny-btn" title="Toggle grid/list">☰</button>
+            <button id="btn-reorder" class="tiny-btn" title="Reordonează">⇅</button>
+          </div>
+          <!-- Slides area (stacked: grid/list/placeholder) -->
+          <div id="slides-area" class="slides-area">
+            <div id="slides-grid" class="slides-grid"></div>
+            <div id="slides-list" class="slides-list" style="display:none"></div>
+            <div id="slides-placeholder" class="slides-placeholder">
+              <p>Selectează o cântare</p>
+            </div>
+          </div>
+          <!-- Editor area -->
+          <div class="editor-wrap">
+            <div class="editor-hdr">
+              <span class="section-lbl">EDITOR VERSURI</span>
+              <span class="hint-lbl">Slide-urile se separă cu linie goală</span>
+              <span id="save-indicator"></span>
+              <button id="editor-collapse" class="tiny-btn">▼</button>
+            </div>
+            <!-- Formatting toolbar -->
+            <div class="fmt-toolbar">
+              <button class="fmt-btn" id="fmt-bold" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button class="fmt-btn" id="fmt-italic" title="Italic (Ctrl+I)"><i>I</i></button>
+              <button class="fmt-btn" id="fmt-underline" title="Underline (Ctrl+U)"><u>U</u></button>
+              <button class="fmt-btn" id="fmt-strike" title="Strikethrough"><s>S</s></button>
+              <div class="fmt-sep"></div>
+              <input type="number" id="fmt-size" class="fmt-spin" value="24" min="8" max="120">
+              <div class="fmt-sep"></div>
+              <button class="fmt-btn" id="fmt-color" title="Text color">A</button>
+              <div class="fmt-sep"></div>
+              <button class="fmt-btn" id="fmt-align-left" title="Align left">◧</button>
+              <button class="fmt-btn" id="fmt-align-center" title="Align center">▬</button>
+              <button class="fmt-btn" id="fmt-align-right" title="Align right">◨</button>
+              <div class="fmt-sep"></div>
+              <button class="fmt-btn" id="fmt-undo" title="Undo (Ctrl+Z)">↩</button>
+              <button class="fmt-btn" id="fmt-redo" title="Redo (Ctrl+Y)">↪</button>
+              <button class="fmt-btn" id="fmt-clear" title="Clear formatting">✕</button>
+              <div class="fmt-spacer"></div>
+              <button class="fmt-btn translate-btn" id="fmt-translate" title="Traducere cântare">🌐</button>
+            </div>
+            <!-- Formatting status bar -->
+            <div class="fmt-status">
+              <span id="fmt-status-lbl">Folosește setările globale</span>
+              <button id="fmt-reset" class="fmt-reset-btn" style="display:none">Resetează la global</button>
+            </div>
+            <!-- Lyrics editor -->
+            <textarea id="song-editor" class="song-editor" placeholder="Type or paste lyrics here. Separate slides with a blank line."></textarea>
+            <div class="word-counter" id="word-counter">0 cuvinte • 0 slide-uri</div>
+          </div>
+          <!-- Bottom tabs: Editor | Media | Themes | Control Bible | Overlay -->
+          <div class="center-bottom-tabs">
+            <div class="c-tabbar">
+              <button class="c-tab active" data-ctab="editor">📝 Editor Versuri</button>
+              <button class="c-tab" data-ctab="media">🖼 Media</button>
+              <button class="c-tab" data-ctab="themes">🎨 Teme</button>
+              <button class="c-tab" data-ctab="bible-control">📖 Control Bible</button>
+              <button class="c-tab" data-ctab="overlay">🎭 Overlay</button>
+            </div>
+            <div id="ctab-editor" class="c-tab-content active">
+              <!-- already visible above -->
+            </div>
+            <div id="ctab-media" class="c-tab-content">
+              <div class="media-controls">
+                <button class="tb-btn" data-action="open-media">📁 Fișier video</button>
+                <button class="tb-btn" data-action="open-camera">📷 Cameră</button>
+                <button class="tb-btn" data-action="open-cloud-media">☁ Cloud</button>
+              </div>
+              <div id="media-list" class="media-list"></div>
+            </div>
+            <div id="ctab-themes" class="c-tab-content">
+              <div id="theme-grid" class="theme-grid"></div>
+            </div>
+            <div id="ctab-bible-control" class="c-tab-content">
+              <p class="empty-state">Control Bible — traducere duală, referințe rapide</p>
+            </div>
+            <div id="ctab-overlay" class="c-tab-content">
+              <div class="overlay-controls">
+                <input type="text" id="overlay-ticker-input" class="ct-input" placeholder="Alertă / ticker...">
+                <button class="tb-btn" id="ov-ticker-send">Trimite</button>
+                <button class="tb-btn" id="ov-ticker-clear">✕</button>
+                <button class="tb-btn" id="ov-clock" data-action="toggle-clock">🕐 Ceas</button>
+                <input type="number" id="ov-timer" class="ct-input" value="300" style="width:70px">
+                <button class="tb-btn" id="ov-timer-start">⏱ Start</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="panel panel-right">
+        <!-- Preview header -->
+        <div class="preview-hdr">
+          <span class="section-lbl">PREVIZUALIZARE</span>
+          <span id="live-dot" class="live-dot">●</span>
+        </div>
+        <!-- Preview widget -->
+        <div class="preview-wrap">
+          <canvas id="preview-canvas" class="preview-canvas"></canvas>
+        </div>
+        <div class="panel-divider"></div>
+        <!-- Controls (scrollable) -->
+        <div class="controls-scroll">
+          <div class="controls-inner">
+            <button class="ctrl-btn dual-btn" id="ctrl-dual">🌐 Dual Language</button>
+            <button class="ctrl-btn go-live-btn" id="ctrl-golive">▶ GO LIVE</button>
+            <button class="ctrl-btn black-btn" id="ctrl-black">⬛ Ecran Negru</button>
+            <button class="ctrl-btn clear-btn" id="ctrl-clear">⬜ Clear Text</button>
+            <div class="ctrl-row">
+              <button class="ctrl-btn freeze-btn" id="ctrl-freeze">❄ Freeze</button>
+              <button class="ctrl-btn logo-btn" id="ctrl-logo">🏛 Logo</button>
+            </div>
+            <button class="ctrl-btn preview-toggle" id="ctrl-preview">👁 Preview</button>
+            <div class="ctrl-row">
+              <button class="ctrl-btn nav-btn" id="ctrl-prev">◀ Anterior</button>
+              <button class="ctrl-btn nav-btn" id="ctrl-next">Următor ▶</button>
+            </div>
+            <div class="panel-divider"></div>
+            <span class="section-lbl">AVANS AUTOMAT</span>
+            <div class="ctrl-row">
+              <label class="auto-check"><input type="checkbox" id="auto-check"> la fiecare</label>
+              <input type="number" id="auto-spin" class="auto-spin" value="5" min="1" max="120">
+              <span class="auto-unit">s</span>
+            </div>
+            <div class="panel-divider"></div>
+            <span class="section-lbl">SUPRAFETE</span>
+            <div class="ctrl-row">
+              <input type="text" id="ticker-input" class="ticker-input" placeholder="Alertă / ticker...">
+              <button class="ctrl-btn" id="ticker-send">Trimite</button>
+              <button class="ctrl-btn" id="ticker-clear">✕</button>
+            </div>
+            <div class="ctrl-row">
+              <button class="ctrl-btn" id="ctrl-clock">🕐 Ceas</button>
+              <input type="number" id="countdown-spin" class="auto-spin" value="300" min="10" max="7200">
+              <button class="ctrl-btn" id="countdown-go">⏱ Start</button>
+            </div>
+          </div>
+        </div>
+        <!-- Mini video player (hidden until media selected) -->
+        <div id="mini-player" class="mini-player" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div id="statusbar">
+      <span id="st-live-dot" class="live-dot">●</span>
+      <span id="st-song">Nicio cântare încărcată</span>
+      <span class="st-sep"> │ </span>
+      <span id="st-display">Niciun display deschis</span>
+      <span class="st-sep"> │ </span>
+      <span id="st-stage"></span>
+      <span class="st-sep"> │ </span>
+      <span id="st-mode">⚙ Setări globale</span>
+      <div class="st-right">
+        <span id="st-unsaved"></span>
+        <span class="st-sep"> │ </span>
+        <span id="st-warnings"></span>
+        <span class="st-sep"> │ </span>
+        <span id="st-slide"></span>
+        <span class="st-sep"> │ </span>
+        <span id="st-perf">✓ Hardware: Bun</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/database.js"></script>
+  <script src="js/tabs/songs.js"></script>
+  <script src="js/tabs/bible.js"></script>
+  <script src="js/tabs/slides.js"></script>
+  <script src="js/tabs/themes.js"></script>
+  <script src="js/tabs/media.js"></script>
+  <script src="js/tabs/overlays.js"></script>
+  <script src="js/tabs/online-songs.js"></script>
+  <script src="js/dialogs/settings.js"></script>
+  <script src="js/dialogs/import.js"></script>
+  <script src="js/dialogs/translation.js"></script>
+  <script src="js/dialogs/about.js"></script>
+  <script src="js/dialogs/profile.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

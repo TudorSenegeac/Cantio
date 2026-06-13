@@ -1,0 +1,75 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+
+# PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Installer outputs
+Cantio-Setup-*.exe
+Cantio-*-macOS.dmg
+Cantio-*-Linux.AppImage
+cantio_installer.nsi
+build_mac.sh
+version_info.txt
+
+# Node.js (rebuilt via npm install în Actions)
+display-electron/node_modules/
+cantio-electron/node_modules/
+*/node_modules/
+
+# Electron build outputs
+build/electron-compiled/
+build/electron-display/
+build/dmg_temp/
+
+# Generated icon (recreat din PNG)
+GProICON.ico
+
+# Date utilizator (nu aparțin repo-ului)
+*.db
+*.sqlite
+*.sqlite3
+data/
+cache/
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Env
+.env
+.env.*
+
+# Claude Code (local AI assistant settings)
+.claude/
+
+# Fișiere vechi / dev artifacts
+GlorifyPro.spec
+GlorifyPro.ico
+GlorifyPro_icon.png
+CGlorifyProdisplay-electron/
+BUG_REPORT.md
+TEST_REPORT.txt
+CanteceSelectate.txt
+Referinte.txt
+
+# Fișiere text temporare
+*.txt
+!requirements.txt

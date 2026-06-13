@@ -1,0 +1,38 @@
+appId: com.cantio.display
+productName: CantioDisplay
+copyright: Copyright 2025 Senegeac Tudor
+
+directories:
+  output: ../build/electron-display
+  buildResources: ../assets
+
+files:
+  - main.js
+  - display.html
+  - display.js
+  - package.json
+  - node_modules/**/*
+  - "!node_modules/.cache/**"
+  - "!node_modules/**/test/**"
+  - "!node_modules/**/*.md"
+
+extraResources: []
+
+win:
+  target:
+    - target: dir
+      arch: [x64]
+  icon: ../GProICON.ico
+
+mac:
+  target:
+    - target: dir
+      arch: [x64, arm64]
+  icon: ../GProICON.icns
+  category: public.app-category.music
+
+linux:
+  target:
+    - target: dir
+  icon: ../GProICON.png
+  category: AudioVideo

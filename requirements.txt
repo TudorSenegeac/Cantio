@@ -1,0 +1,38 @@
+# Cantio — Python dependencies
+# Install with: pip install -r requirements.txt
+
+# ── UI framework ───────────────────────────────────────────────────────────────
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+PyQt6-sip>=13.4.0
+
+# ── Remote control web server ──────────────────────────────────────────────────
+flask>=3.0.0
+flask-socketio>=5.3.0
+flask-cors>=4.0.0
+
+# ── HTTP + scraping (online songs, Bible import) ───────────────────────────────
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+
+# ── Document import ─────────────────────────────────────────────────────────────
+striprtf>=0.0.26
+python-docx>=1.0.0
+pypdf>=3.0.0
+
+# ── QR code (Remote Control) ────────────────────────────────────────────────────
+qrcode[pil]>=7.4.2
+Pillow>=10.0.0
+
+# ── WebSocket client (Python ↔ Electron) ───────────────────────────────────────
+websocket-client>=1.7.0
+
+# ── Camera / video backgrounds ──────────────────────────────────────────────────
+opencv-python>=4.8.0
+
+# ── VideoPsalm JSON import ──────────────────────────────────────────────────────
+demjson3>=3.0.6
+
+# ── Build / packaging (dev only) ───────────────────────────────────────────────
+# pyinstaller>=6.0.0
