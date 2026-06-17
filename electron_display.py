@@ -58,6 +58,7 @@ class ElectronDisplayManager:
         self._window_ids: set = set()    # track open window IDs
         self._screen_width  = 1920       # updated by open_display()
         self._screen_height = 1080
+        self._window_ready_callbacks: Dict[int, Any] = {}  # window_id → one-shot callable
 
     # ── Path resolution (dev + PyInstaller) ─────────────────────────────────
 
@@ -691,6 +692,10 @@ class ElectronDisplayManager:
             try: ws.send(json.dumps(cmd))
             except Exception: pass
 
+    def set_window_ready_callback(self, window_id: int, callback) -> None:
+        """Register a one-shot callback fired when Electron reports window_ready."""
+        self._window_ready_callbacks[window_id] = callback
+
     def _on_ws_message(self, ws, raw):
         try:
             msg = json.loads(raw)
@@ -702,6 +707,14 @@ class ElectronDisplayManager:
         elif mtype == "ready":
             self._last_screens = msg.get("screens", [])
             logger.info("[ElectronDisplay] ready, %d screen(s)", len(self._last_screens))
+        elif mtype == "window_ready":
+            wid = msg.get("window_id")
+            cb = self._window_ready_callbacks.pop(wid, None)
+            if cb:
+                try:
+                    cb()
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] window_ready callback error: %s", e)
 
     def _on_ws_error(self, ws, error):
         logger.debug("[ElectronDisplay] WS error: %s", error)

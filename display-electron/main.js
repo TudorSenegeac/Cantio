@@ -219,27 +219,35 @@ function openDisplay(screenIdx, windowId, windowName, isTransparent = false) {
       height: bounds.height,
     });
 
+    win.setOpacity(0);
     win.show();
 
-    // Pe Windows, setFullScreen(true) poate muta fereastra pe monitorul principal
-    // chiar dacă fereastra a fost creată pe un monitor secundar. Fix: nu folosim
-    // setFullScreen — frame:false + alwaysOnTop + setBounds exact = identic vizual,
-    // fără bug-ul de monitor. Re-setăm bounds după show() pentru garanție.
     setTimeout(() => {
       win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
-      console.log(`[Display] bounds finali screenIdx=${screenIdx} @ (${bounds.x},${bounds.y}) ${bounds.width}x${bounds.height}`);
     }, 150);
 
-    // Cubic-eased fade-in over 500 ms
-    win.setOpacity(0);
-    const fadeStart = Date.now();
-    const fadeDur   = 500;
-    const fade = setInterval(() => {
-      const progress = Math.min(1, (Date.now() - fadeStart) / fadeDur);
-      const eased    = 1 - Math.pow(1 - progress, 3);   // easeOutCubic
-      win.setOpacity(eased);
-      if (progress >= 1) clearInterval(fade);
-    }, 16);
+    // Notifică Python că fereastra e gata să primească conținut
+    const readyMsg = JSON.stringify({ type: 'window_ready', window_id: windowId });
+    if (wss) {
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          try { client.send(readyMsg); } catch {}
+        }
+      });
+    }
+
+    // Delay fade-in cu 350 ms — Python primește window_ready și trimite conținut
+    // înainte ca fade-ul să înceapă, astfel încât fade-in-ul revelează conținut, nu negru
+    setTimeout(() => {
+      const fadeStart = Date.now();
+      const fadeDur   = 500;
+      const fade = setInterval(() => {
+        const progress = Math.min(1, (Date.now() - fadeStart) / fadeDur);
+        const eased    = 1 - Math.pow(1 - progress, 3);   // easeOutCubic
+        win.setOpacity(eased);
+        if (progress >= 1) clearInterval(fade);
+      }, 16);
+    }, 350);
   });
 
   win.webContents.on('render-process-gone', () => {});

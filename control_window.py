@@ -5426,6 +5426,38 @@ class ControlWindow(QMainWindow):
                     "(Electron oprit, DisplayWindow lipsă)", window_name)
                 continue
 
+            # Register window_ready callback so content appears as soon as
+            # Electron finishes loading — no fixed delay needed.
+            _ed_ref = getattr(self, "electron_display", None)
+            if _ed_ref is not None and self.current_slide_idx >= 0 and self.current_slides:
+                _capture_idx      = self.current_slide_idx
+                _capture_slides   = list(self.current_slides)
+                _capture_settings = self._resolve_settings(
+                    source="songs", song_id=self.current_song_id)
+                _capture_fmt      = None
+                if (self._current_song_formatting and
+                        self._current_song_formatting.get("use_custom")):
+                    _capture_fmt = dict(self._current_song_formatting)
+                _capture_meta = dict(self._current_metadata or {})
+                _capture_wid  = window_id
+
+                def _on_window_ready(
+                    mgr=_ed_ref, idx=_capture_idx, slides=_capture_slides,
+                    sett=_capture_settings, fmt=_capture_fmt,
+                    meta=_capture_meta, wid=_capture_wid,
+                ):
+                    if 0 <= idx < len(slides) and slides[idx].strip():
+                        mgr._enqueue({"type": "settings", "window_id": wid,
+                                      "settings": sett})
+                        mgr._enqueue({
+                            "type": "show_text", "window_id": wid,
+                            "text": slides[idx], "format": fmt or {},
+                            "transition": "none", "transition_duration": 0,
+                            "metadata": meta,
+                        })
+
+                _ed_ref.set_window_ready_callback(window_id, _on_window_ready)
+
             self.display_windows.append(dw)
 
         n = len(self.display_windows)
@@ -5435,9 +5467,9 @@ class ControlWindow(QMainWindow):
         # Detect screen aspect ratio and update preview + thumbnails
         QTimer.singleShot(100, self._apply_aspect_ratio)
         QTimer.singleShot(150, self._update_preview_aspect)
-        # Push current slide after display finishes loading (1.5 s grace period)
+        # Fallback: push slide after 800 ms in case window_ready was missed
         if self.current_slide_idx >= 0:
-            QTimer.singleShot(1500, self._send_current_slide_on_open)
+            QTimer.singleShot(800, self._push_initial_slide)
         # Notify remote clients that a display is now open
         self._push_remote_state()
 
@@ -5459,17 +5491,33 @@ class ControlWindow(QMainWindow):
         if hasattr(self, 'preview'):
             self.preview.set_aspect_ratio(16 / 9)
 
-    def _send_current_slide_on_open(self):
-        """
-        Push the currently-selected slide to freshly-opened displays.
-        Called 1.5 s after _open_display() so Electron has time to finish loading.
+    def _push_initial_slide(self):
+        """Push the selected slide content to newly-opened displays WITHOUT going live.
+
+        Called either via window_ready callback (immediate) or a fallback timer (800 ms).
+        Does NOT set _is_live, does NOT start the live timer — operator still presses
+        Space/GO LIVE to actually start the session.
         """
         if not self.display_windows or self._is_frozen:
             return
-        if self.current_slide_idx < 0:
+        if self.current_slide_idx < 0 or not self.current_slides:
             return
-        # Re-use the GO LIVE path (handles presentation mode, dual-lang, formatting, etc.)
-        self._go_live()
+        text = self.current_slides[self.current_slide_idx]
+        if not text.strip():
+            return
+
+        _live_fmt = None
+        if (self._current_song_formatting and
+                self._current_song_formatting.get("use_custom")):
+            _live_fmt = dict(self._current_song_formatting)
+            _live_fmt["_slide_idx"] = self.current_slide_idx
+
+        _live_settings = self._resolve_settings(
+            source="songs", song_id=self.current_song_id)
+
+        for dw in self.display_windows:
+            dw.apply_settings(_live_settings)
+            dw.show_text(text, _live_fmt, metadata=self._current_metadata)
 
     # ── Auto-advance ──────────────────────────────────────────────────────────
 
