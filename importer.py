@@ -294,13 +294,60 @@ def _parse_vp_manual(text):
     return result
 
 
+def _vp_to_strict_json(text: str) -> str:
+    """Convert VideoPsalm's relaxed JSON (unquoted keys + literal newlines inside
+    string values) into strict JSON, respecting nesting. Walks char-by-char so a
+    verse text containing "word, other:" is never mistaken for a key."""
+    out = []
+    i, n = 0, len(text)
+    in_str = False
+    esc = False
+    while i < n:
+        ch = text[i]
+        if in_str:
+            if esc:
+                out.append(ch); esc = False
+            elif ch == '\\':
+                out.append(ch); esc = True
+            elif ch == '"':
+                out.append(ch); in_str = False
+            elif ch == '\n':
+                out.append('\\n')
+            elif ch == '\r':
+                out.append('\\r')
+            elif ch == '\t':
+                out.append('\\t')
+            else:
+                out.append(ch)
+            i += 1
+        else:
+            if ch == '"':
+                out.append(ch); in_str = True; i += 1
+            elif ch.isalpha() or ch == '_':
+                j = i
+                while j < n and (text[j].isalnum() or text[j] == '_'):
+                    j += 1
+                word = text[i:j]
+                k = j
+                while k < n and text[k] in ' \t':
+                    k += 1
+                if k < n and text[k] == ':':
+                    out.append('"' + word + '"')   # it's a key → quote it
+                else:
+                    out.append(word)               # bareword value (true/false/null)
+                i = j
+            else:
+                out.append(ch); i += 1
+    return ''.join(out)
+
+
 def import_videopsalm_json(filepath):
     """
     Import a VideoPsalm JSON collection with potentially unquoted keys.
-    Format: {Abbreviation: "AL", Songs: [{ID:1, Reference:"1", Verses:[{Text:"..."}]}]}
+    Format: {Abbreviation: "AL", Songs: [{ID:1, Reference:"1", Verses:[{Text:"..."}], Text:"Title"}]}
 
     Attempts:
-      1. Regex-fix unquoted keys → json.loads()
+      1. Robust relaxed→strict JSON parser (_vp_to_strict_json) → json.loads()
       2. demjson3.decode()
       3. Manual regex parser (_parse_vp_manual)
     """
@@ -317,15 +364,11 @@ def import_videopsalm_json(filepath):
 
     data = None
 
-    # 1. Fix unquoted keys with regex; also collapse literal newlines inside
-    #    string values so json.loads doesn't choke on them.
+    # 1. Robust relaxed→strict conversion (handles nesting + multiline strings).
     try:
-        fixed = re.sub(r'([{,\[]\s*)([A-Za-z_]\w*)\s*:', r'\1"\2":', text)
-        # Replace bare (unescaped) newlines that are inside a JSON string
-        fixed = re.sub(r'(?<=[^\\])\n(?=[^"]*")', r'\\n', fixed)
-        data = json.loads(fixed)
-    except Exception:
-        pass
+        data = json.loads(_vp_to_strict_json(text))
+    except Exception as _e:
+        print(f"[VP] strict-convert failed: {_e}")
 
     # 2. demjson3
     if data is None:
@@ -369,14 +412,13 @@ def import_videopsalm_json(filepath):
         if not slides:
             continue
 
-        # Title: prefer explicit Title/Reference field; fall back to first
-        # line of the first verse text (the typical VideoPsalm convention).
-        raw_title = (song.get("Title") or "").strip()
-        if not raw_title:
-            raw_title = (song.get("Reference") or "").strip()
+        # Title: VideoPsalm stores the song title in the song-level "Text" field
+        # (a sibling of "Verses"). Prefer Title/Text; Reference is just an index
+        # ("1","2"…) so it's a last resort; else the first verse line.
+        raw_title = (song.get("Title") or song.get("Text") or "").strip()
         if not raw_title:
             first_line = slides[0].split("\n")[0].strip()
-            raw_title = first_line or f"Cântare {song.get('ID', '')}"
+            raw_title = first_line or (song.get("Reference") or "").strip() or f"Cântare {song.get('ID', '')}"
 
         results.append({
             "title":    raw_title,

@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from translations import t
 from PyQt6.QtWidgets import QWidget, QSizePolicy
-from PyQt6.QtCore import Qt, QSize, QRect, QPointF
+from PyQt6.QtCore import Qt, QSize, QRect, QPointF, QTimer, QThread, pyqtSignal
 from PyQt6.QtGui import (
     QPainter, QFont, QColor, QPen, QPixmap, QBrush,
     QLinearGradient, QRadialGradient, QPainterPath, QFontMetrics,
@@ -304,44 +304,36 @@ def render_text_box_on_painter(
     cur_size_px: int,
     fm: QFontMetrics,
 ) -> None:
-    """Draw semi-transparent rounded rects behind each text line (FreeShow-style)."""
+    """Draw the text-box background behind each line (multiple styles)."""
     tb = s.get("text_box") if isinstance(s.get("text_box"), dict) else {}
-    box_color = QColor(str(tb.get("color", s.get("text_box_color", "#000000")) or "#000000"))
-    opacity   = float(tb.get("opacity", s.get("text_box_opacity", 0.6)) or 0.6)
-    pad_h     = int(tb.get("padding_h", s.get("text_box_padding_h", 20)) or 20)
-    pad_v     = int(tb.get("padding_v", s.get("text_box_padding_v", 12)) or 12)
-    radius    = int(tb.get("radius", s.get("text_box_radius", 8)) or 8)
-    fit       = str(tb.get("fit", s.get("text_box_fit", "per_line")) or "per_line")
-
-    box_color.setAlphaF(max(0.0, min(1.0, opacity)))
+    box_color  = QColor(str(tb.get("color", s.get("text_box_color", "#000000")) or "#000000"))
+    box_color2 = QColor(str(tb.get("color2", s.get("text_box_color2", "#1a1a1a")) or "#1a1a1a"))
+    opacity    = float(tb.get("opacity", s.get("text_box_opacity", 0.6)) or 0.6)
+    pad_h      = int(tb.get("padding_h", s.get("text_box_padding_h", 20)) or 20)
+    pad_v      = int(tb.get("padding_v", s.get("text_box_padding_v", 12)) or 12)
+    radius     = int(tb.get("radius", s.get("text_box_radius", 8)) or 8)
+    fit        = str(tb.get("fit", s.get("text_box_fit", "per_line")) or "per_line")
+    style      = str(tb.get("style", s.get("text_box_style", "solid")) or "solid")
     ascent = round(cur_size_px * 0.85)
+
+    def paint(x, y, bw, bh, r):
+        _paint_box_rect_pw(p, x, y, bw, bh, r, style, box_color, box_color2, opacity)
 
     p.save()
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QBrush(box_color))
-
     if fit == 'full_block':
         max_lw = max((fm.horizontalAdvance(ln) for ln in lines if ln), default=0)
         bx = (base_x - pad_h if align_str == 'left'
               else base_x - max_lw - pad_h if align_str == 'right'
               else base_x - max_lw // 2 - pad_h)
         by = start_y - ascent - pad_v
-        bw = max_lw + pad_h * 2
-        bh = line_h * len(lines) + pad_v * 2
-        path = QPainterPath()
-        path.addRoundedRect(float(bx), float(by), float(bw), float(bh),
-                            float(radius), float(radius))
-        p.fillPath(path, p.brush())
-
+        paint(bx, by, max_lw + pad_h * 2, line_h * len(lines) + pad_v * 2, radius)
     elif fit == 'full_width':
         for i, line in enumerate(lines):
             if not line:
                 continue
             by = start_y + i * line_h - ascent - pad_v
-            bh = cur_size_px + pad_v * 2
-            p.fillRect(QRect(0, by, w, bh), box_color)
-
+            paint(0, by, w, cur_size_px + pad_v * 2, 0)
     else:  # per_line
         for i, line in enumerate(lines):
             if not line:
@@ -351,13 +343,100 @@ def render_text_box_on_painter(
                   else base_x - lw - pad_h if align_str == 'right'
                   else base_x - lw // 2 - pad_h)
             by = start_y + i * line_h - ascent - pad_v
-            bw = lw + pad_h * 2
-            bh = cur_size_px + pad_v * 2
-            path = QPainterPath()
-            path.addRoundedRect(float(bx), float(by), float(bw), float(bh),
-                                float(radius), float(radius))
-            p.fillPath(path, p.brush())
+            paint(bx, by, lw + pad_h * 2, cur_size_px + pad_v * 2, radius)
+    p.restore()
 
+
+def _paint_box_rect_pw(p, x, y, w, h, radius, style, color, color2, opacity):
+    """Paint one text-box rect in the chosen style (operator preview)."""
+    from PyQt6.QtCore import QRectF
+    p.save()
+    p.setOpacity(opacity)
+    rect = QRectF(float(x), float(y), float(w), float(h))
+    if style == "gradient":
+        g = QLinearGradient(x, y, x, y + h)
+        g.setColorAt(0, color); g.setColorAt(1, color2)
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(g))
+        p.drawRoundedRect(rect, radius, radius)
+    elif style == "outline":
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(color, max(2.0, h * 0.045)))
+        p.drawRoundedRect(rect, radius, radius)
+    elif style == "frosted":
+        p.setOpacity(opacity * 0.5)
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(color))
+        p.drawRoundedRect(rect, radius, radius)
+        p.setOpacity(opacity * 0.9)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor(255, 255, 255, 90), max(1.0, h * 0.02)))
+        p.drawRoundedRect(rect, radius, radius)
+    elif style == "shadow":
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(QColor(0, 0, 0, 140)))
+        p.drawRoundedRect(QRectF(float(x), float(y + h * 0.06), float(w), float(h)), radius, radius)
+        p.setBrush(QBrush(color)); p.drawRoundedRect(rect, radius, radius)
+    elif style == "underline":
+        bh = max(3.0, h * 0.10)
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(color))
+        p.drawRoundedRect(QRectF(float(x), float(y + h - bh), float(w), float(bh)), bh / 2, bh / 2)
+    elif style == "sketch":
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        pen = QPen(color, max(2.0, h * 0.04)); pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        p.setPen(pen); p.drawRoundedRect(rect, radius, radius)
+        p.setOpacity(opacity * 0.6)
+        p.drawRoundedRect(QRectF(float(x + 2.5), float(y - 2), float(w), float(h)),
+                          radius + 3, radius + 3)
+    else:  # solid
+        p.setPen(Qt.PenStyle.NoPen); p.setBrush(QBrush(color))
+        p.drawRoundedRect(rect, radius, radius)
+    p.restore()
+
+
+def _blit_video_frame(p: QPainter, frame, w: int, h: int,
+                      opacity: float = 1.0) -> bool:
+    """Draw a downscaled RGB numpy frame as a cover-scaled background.
+    Returns True on success."""
+    try:
+        from PyQt6.QtGui import QImage
+        fh, fw = frame.shape[:2]
+        img = QImage(frame.data, fw, fh, fw * 3, QImage.Format.Format_RGB888)
+        pm  = QPixmap.fromImage(img).scaled(
+            w, h,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        ox = (w - pm.width())  // 2
+        oy = (h - pm.height()) // 2
+        p.setOpacity(max(0.0, min(1.0, opacity)))
+        p.drawPixmap(ox, oy, pm)
+        p.setOpacity(1.0)
+        return True
+    except Exception:
+        return False
+
+
+def render_animated_gradient_on_painter(p: QPainter, w: int, h: int,
+                                        colors: list, phase: float) -> None:
+    """Animated multi-radial gradient — mirrors display.js renderAnimatedGradient.
+    `phase` is accumulated time (seconds × speed)."""
+    import math
+    from PyQt6.QtGui import QPainter as _QP
+    if not colors:
+        colors = ['#1a237e', '#6a1b9a', '#0d47a1']
+    p.fillRect(0, 0, w, h, QColor("#000000"))
+    p.save()
+    p.setCompositionMode(_QP.CompositionMode.CompositionMode_Screen)
+    n = max(1, len(colors))
+    for idx, col in enumerate(colors):
+        ph = phase + idx * (math.pi * 2 / n)
+        cx = w * (0.3 + 0.4 * math.sin(ph * 0.7))
+        cy = h * (0.3 + 0.4 * math.cos(ph * 0.5))
+        radius = max(w, h) * (0.4 + 0.2 * math.sin(ph * 1.3))
+        grad = QRadialGradient(cx, cy, max(1.0, radius))
+        c0 = QColor(str(col))
+        c1 = QColor(str(col)); c1.setAlpha(0)
+        grad.setColorAt(0, c0)
+        grad.setColorAt(1, c1)
+        p.fillRect(0, 0, w, h, QBrush(grad))
     p.restore()
 
 
@@ -368,6 +447,7 @@ def render_background_on_painter(
     s: dict,
     bg_pixmap: "QPixmap | None" = None,
     video_frame=None,
+    anim_phase: "float | None" = None,
 ) -> None:
     """
     Draw the background onto painter *p* at canvas size (w × h) using settings *s*.
@@ -400,15 +480,24 @@ def render_background_on_painter(
         return
 
     if bg_type == "animated_gradient":
-        # Static preview using the configured colors
-        colors_raw = s.get("bg_colors", s.get("anim_colors", ["#000033", "#0066aa"]))
+        # key sent by control_window is `anim_grad_colors`; fall back to legacy
+        colors_raw = s.get("anim_grad_colors",
+                     s.get("bg_colors",
+                     s.get("anim_colors", ["#000033", "#0066aa"])))
         if not isinstance(colors_raw, list) or len(colors_raw) < 2:
             colors_raw = ["#000033", "#0066aa"]
-        grad_a = QLinearGradient(0, 0, w, h)
-        for idx, c in enumerate(colors_raw):
-            pos = idx / max(1, len(colors_raw) - 1)
-            grad_a.setColorAt(pos, QColor(str(c)))
-        p.fillRect(0, 0, w, h, QBrush(grad_a))
+        if anim_phase is not None:
+            # Live animated rendering (moving radials, like the projector)
+            speed = float(s.get("anim_grad_speed", 0.5) or 0.5)
+            render_animated_gradient_on_painter(
+                p, w, h, colors_raw, anim_phase * speed)
+        else:
+            # Static snapshot (thumbnails / theme cards)
+            grad_a = QLinearGradient(0, 0, w, h)
+            for idx, c in enumerate(colors_raw):
+                pos = idx / max(1, len(colors_raw) - 1)
+                grad_a.setColorAt(pos, QColor(str(c)))
+            p.fillRect(0, 0, w, h, QBrush(grad_a))
         return
 
     if bg_type == "transparent":
@@ -420,31 +509,51 @@ def render_background_on_painter(
                            QColor("#888888" if light else "#666666"))
         return
 
-    # Image / video / camera
+    # Camera (live frame from the background feed thread when available).
+    # For camera_gradient also paint the tinted gradient overlay so it matches
+    # what the projector shows on top of the camera feed.
+    if bg_type in ("camera", "camera_gradient"):
+        has_frame = video_frame is not None and _blit_video_frame(
+            p, video_frame, w, h, float(s.get("bg_opacity", 1.0) or 1.0))
+        if not has_frame:
+            p.fillRect(0, 0, w, h, QColor("#0c0c12"))
+        if bg_type == "camera_gradient":
+            gc  = QColor(str(s.get("bg_grad_c1", "#000033")))
+            op  = float(s.get("bg_grad_opacity", 0.5) or 0.5)
+            dir_ = str(s.get("bg_grad_dir", "Radial") or "Radial")
+            if "Stânga" in dir_ or "Dreapta" in dir_:
+                grad_c = QLinearGradient(0, 0, w, 0)
+            elif "Sus" in dir_ or "Jos" in dir_:
+                grad_c = QLinearGradient(0, 0, 0, h)
+            else:
+                grad_c = QRadialGradient(w / 2, h / 2, max(w, h) / 2)
+            c0 = QColor(gc); c0.setAlphaF(max(0.0, min(1.0, op)))
+            c1 = QColor(gc); c1.setAlpha(0)
+            grad_c.setColorAt(0, c0)
+            grad_c.setColorAt(1, c1)
+            p.fillRect(0, 0, w, h, QBrush(grad_c))
+        if not has_frame:
+            p.setPen(QColor("#6c7086"))
+            _f = QFont("Arial")
+            _f.setPixelSize(max(8, int(min(w, h) * 0.09)))
+            p.setFont(_f)
+            p.drawText(QRect(0, 0, w, h), Qt.AlignmentFlag.AlignCenter, "📷")
+        return
+
+    # Image / video
     bg_path = str(s.get("bg_image", "") or "")
 
+    # Live video frame from the feed thread → cover-scale it
     if video_frame is not None:
-        try:
-            fh, fw = video_frame.shape[:2]
-            from PyQt6.QtGui import QImage
-            img = QImage(video_frame.data, fw, fh, fw * 3, QImage.Format.Format_RGB888)
-            op = float(s.get("bg_opacity", 1.0) or 1.0)
-            p.setOpacity(op)
-            p.drawPixmap(0, 0, QPixmap.fromImage(img).scaled(
-                w, h,
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.FastTransformation,
-            ))
-            p.setOpacity(1.0)
-        except Exception as _e:
-            pass
-        return
+        if _blit_video_frame(p, video_frame, w, h,
+                             float(s.get("bg_opacity", 1.0) or 1.0)):
+            return
 
     if bg_path and os.path.exists(bg_path):
         ext = bg_path.rsplit(".", 1)[-1].lower()
         is_video = ext in {"mp4", "mov", "avi", "mkv", "webm"}
         if is_video:
-            # Show placeholder
+            # No frame yet (feed still opening) → placeholder
             p.fillRect(0, 0, w, h, QColor("#0d0d1a"))
             p.setPen(QColor("#6c7086"))
             _f = QFont("Arial")
@@ -590,6 +699,84 @@ def _draw_copyright_on_painter(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Background video / camera feed (decodes off the UI thread)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _VideoFeedThread(QThread):
+    """Decodes a video file or camera in a background thread and emits
+    downscaled RGB frames, so the operator preview never blocks the UI thread.
+
+    Frames are capped in size and rate to keep CPU usage low.
+    """
+    frame_ready = pyqtSignal(object)
+
+    def __init__(self, source, is_camera: bool,
+                 max_w: int = 480, fps: int = 20, parent=None):
+        super().__init__(parent)
+        self._source    = source
+        self._is_camera = is_camera
+        self._max_w     = max(160, int(max_w))
+        self._interval  = 1.0 / max(1, fps)
+        self._running   = True
+
+    def run(self):
+        try:
+            import cv2, numpy as np, time
+        except Exception:
+            return
+        cap = None
+        try:
+            if self._is_camera:
+                idx = int(self._source) if str(self._source).isdigit() else 0
+                cap = cv2.VideoCapture(idx)
+            else:
+                cap = cv2.VideoCapture(str(self._source))
+            if cap is None or not cap.isOpened():
+                return
+
+            while self._running:
+                t0 = time.monotonic()
+                ok, frame = cap.read()
+                if not ok or frame is None:
+                    if self._is_camera:
+                        break                                   # camera lost
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)         # loop video file
+                    ok, frame = cap.read()
+                    if not ok or frame is None:
+                        break
+
+                fh, fw = frame.shape[:2]
+                if fw > self._max_w:
+                    nh = max(1, int(fh * self._max_w / fw))
+                    frame = cv2.resize(frame, (self._max_w, nh),
+                                       interpolation=cv2.INTER_AREA)
+                rgb = np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                if self._running:
+                    self.frame_ready.emit(rgb)
+
+                sleep = self._interval - (time.monotonic() - t0)
+                if sleep > 0:
+                    time.sleep(sleep)
+        except Exception:
+            pass
+        finally:
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+
+    def request_stop(self):
+        """Ask the thread to finish — returns immediately (non-blocking)."""
+        self._running = False
+
+    def stop(self):
+        """Stop and block until the thread exits (use only off the hot path)."""
+        self._running = False
+        self.wait(1500)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  PreviewWidget
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -627,9 +814,109 @@ class PreviewWidget(QWidget):
         self._target_w: int = 1920
         self._target_h: int = 1080
 
+        # ── Animated-gradient ticker (drives continuous repaint) ──────────────
+        self._anim_phase: float = 0.0
+        self._anim_timer = QTimer(self)
+        self._anim_timer.setInterval(33)          # ~30 fps
+        self._anim_timer.timeout.connect(self._on_anim_tick)
+
+        # ── Async video / camera feed (decoded on a background thread) ────────
+        self._video_frame = None
+        self._feed: "_VideoFeedThread | None" = None
+        self._feed_source: str | None = None
+        self._retiring: list = []          # feeds shutting down (kept alive til done)
+        try:
+            from PyQt6.QtWidgets import QApplication
+            _app = QApplication.instance()
+            if _app is not None:
+                _app.aboutToQuit.connect(self._shutdown_feeds)
+        except Exception:
+            pass
+
         # Subscribe to LiveState for fallback rendering
         from live_state import get_state
         get_state().add_observer(self._on_state_changed)
+
+    # ── Async video / camera feed management ──────────────────────────────────
+
+    def _feed_key(self, s: dict) -> str | None:
+        bt = str(s.get("bg_type", "") or "")
+        if bt in ("video", "camera", "camera_gradient"):
+            return f"{bt}:{s.get('bg_image', '')}"
+        return None
+
+    def _sync_video_feed(self, s: dict) -> None:
+        """Start/stop the background decode thread when the source changes."""
+        key = self._feed_key(s)
+        if key == self._feed_source:
+            return
+        self._stop_feed()
+        self._feed_source = key
+        self._video_frame = None
+        if not key:
+            return
+        bt     = str(s.get("bg_type", "") or "")
+        src    = s.get("bg_image", "")
+        is_cam = bt in ("camera", "camera_gradient")
+        if not is_cam and not (src and os.path.exists(str(src))):
+            return                                   # video file missing
+        try:
+            self._feed = _VideoFeedThread(
+                src, is_cam, max_w=max(320, (self.width() or 320)))
+            self._feed.frame_ready.connect(self._on_video_frame)
+            self._feed.start()
+        except Exception:
+            self._feed = None
+
+    def _on_video_frame(self, frame) -> None:
+        self._video_frame = frame
+        if self._engine_pixmap is None:          # internal renderer is active
+            self.update()
+
+    # ── Animated gradient ticker ──────────────────────────────────────────────
+
+    def _sync_anim_timer(self, s: dict) -> None:
+        is_anim = str(s.get("bg_type", "") or "") == "animated_gradient"
+        if is_anim and self._engine_pixmap is None:
+            if not self._anim_timer.isActive():
+                self._anim_timer.start()
+        elif self._anim_timer.isActive():
+            self._anim_timer.stop()
+
+    def _on_anim_tick(self) -> None:
+        self._anim_phase += 0.033
+        if self._engine_pixmap is None and not self._frozen:
+            self.update()
+
+    def _stop_feed(self) -> None:
+        """Signal the active feed to stop WITHOUT blocking the UI thread.
+        The thread finishes on its own; we keep a reference until then so it
+        isn't garbage-collected mid-run (which would crash)."""
+        f = self._feed
+        self._feed = None
+        if f is None:
+            return
+        try:
+            f.frame_ready.disconnect(self._on_video_frame)
+        except Exception:
+            pass
+        f.request_stop()                     # non-blocking
+        self._retiring.append(f)
+        def _cleanup(_f=f):
+            if _f in self._retiring:
+                self._retiring.remove(_f)
+        f.finished.connect(_cleanup)
+
+    def _shutdown_feeds(self) -> None:
+        """Called on app quit — stop everything and wait briefly (safe to block)."""
+        self._stop_feed()
+        for f in list(self._retiring):
+            try:
+                f.request_stop()
+                f.wait(800)
+            except Exception:
+                pass
+        self._retiring.clear()
 
     # ── RenderEngine push-mode API ────────────────────────────────────────────
 
@@ -727,8 +1014,15 @@ class PreviewWidget(QWidget):
     # ── LiveState observer ────────────────────────────────────────────────────
 
     def _on_state_changed(self) -> None:
-        if not self._frozen and self._engine_pixmap is None:
-            self.update()
+        from live_state import get_state
+        state = get_state()
+        s = state.settings or self._settings_ref or {}
+        # Keep the background video/camera feed + animation ticker in sync
+        self._sync_video_feed(s)
+        self._sync_anim_timer(s)
+        if self._frozen or self._engine_pixmap is not None:
+            return
+        self.update()
 
     # ── Size management ───────────────────────────────────────────────────────
 
@@ -779,7 +1073,9 @@ class PreviewWidget(QWidget):
 
         # ── Background (shared renderer) ──────────────────────────────────────
         bg_pix = state.bg_pixmap or self._bg_pixmap
-        render_background_on_painter(p, w, h, s, bg_pixmap=bg_pix)
+        render_background_on_painter(p, w, h, s, bg_pixmap=bg_pix,
+                                     video_frame=self._video_frame,
+                                     anim_phase=self._anim_phase)
 
         # ── Text ──────────────────────────────────────────────────────────────
         text = state.current_text or self._current_text or ""
@@ -799,23 +1095,8 @@ class PreviewWidget(QWidget):
             if ref:
                 _draw_reference_on_painter(p, ref, w, h, s, scale)
 
-        # ── Logo (top-left) ───────────────────────────────────────────────────
-        if state.logo_active and state.logo_pixmap and not state.logo_pixmap.isNull():
-            max_logo_w = round(w * 0.15)
-            max_logo_h = round(h * 0.12)
-            logo_scaled = state.logo_pixmap.scaled(
-                max_logo_w, max_logo_h,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            pad = round(h * 0.02)
-            p.setOpacity(0.85)
-            p.drawPixmap(pad, pad, logo_scaled)
-            p.setOpacity(1.0)
-
-        # ── Copyright / watermark ─────────────────────────────────────────────
-        meta = getattr(state, "_metadata", {}) or {}
-        _draw_copyright_on_painter(p, s, meta, w, h, scale)
+        # ── Overlays: logo + clock + ticker + copyright watermark ─────────────
+        self._draw_overlays(p, w, h, state, scale)
 
     def _draw_overlays(self, p: QPainter, w: int, h: int, state, scale: float) -> None:
         """Draw logo / clock / ticker / copyright on top of a RenderEngine frame."""

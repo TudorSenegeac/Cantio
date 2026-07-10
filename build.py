@@ -301,7 +301,7 @@ def build_installer_windows():
 ; Genererat automat de build.py
 
 !define APP_NAME "Cantio"
-!define APP_VERSION "1.0.0"
+!define APP_VERSION "1.5.0"
 !define APP_PUBLISHER "Senegeac Tudor"
 !define APP_URL "https://cantioapp.com"
 !define APP_EXE "Cantio.exe"
@@ -424,7 +424,7 @@ def build_installer_mac():
     script = """\
 #!/bin/bash
 APP_NAME="Cantio"
-VERSION="1.0.0"
+VERSION="1.5.0"
 DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
 APP_PATH="dist/${APP_NAME}.app"
 DMG_DIR="build/dmg_temp"
@@ -489,11 +489,24 @@ def build_installer_linux():
 """)
         return
 
-    run(["appimagetool", str(appdir), "Cantio-v1.0.0-Linux.AppImage"])
+    run(["appimagetool", str(appdir), "Cantio-v1.5.0-Linux.AppImage"])
     print("  ✅ AppImage Linux creat!")
 
 
 # ── Icon helper ───────────────────────────────────────────────────────────────
+
+def ensure_icon_icns():
+    """Convertește GProICON.png → GProICON.icns dacă .icns lipsește (pentru macOS
+    bundle icon). Rulează pe CI-ul macOS ca să nu depindem de un fișier comis."""
+    if os.path.exists("GProICON.icns") or not os.path.exists("GProICON.png"):
+        return
+    try:
+        from PIL import Image
+        Image.open("GProICON.png").convert("RGBA").save("GProICON.icns", format="ICNS")
+        print("  ✅ GProICON.icns generat din PNG")
+    except Exception as e:
+        print(f"  ⚠ GProICON.icns nu a fost generat: {e}")
+
 
 def ensure_icon_ico():
     """Convertește GProICON.png → GProICON.ico dacă .ico lipsește."""
@@ -519,7 +532,7 @@ def ensure_icon_ico():
 
 def main():
     print("=" * 60)
-    print("CANTIO BUILD SYSTEM v1.0.0")
+    print("CANTIO BUILD SYSTEM v1.5.0")
     print(f"Platformă: {platform.system()} {platform.machine()}")
     print(f"Python: {sys.version.split()[0]}")
     print("=" * 60)
@@ -569,9 +582,11 @@ Ce vrei să buildezi?
         clean_build()
         action = 'all'
 
-    # Generează icon .ico dacă lipsește (necesar pe Windows)
+    # Generează icon-ul potrivit platformei dacă lipsește
     if sys.platform == "win32":
         ensure_icon_ico()
+    elif sys.platform == "darwin":
+        ensure_icon_icns()
 
     if action in ('all', 'electron'):
         build_electron_display()

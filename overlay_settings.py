@@ -12,8 +12,98 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QSlider, QColorDialog, QSizePolicy,
     QFileDialog, QLineEdit,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QRectF, QPointF
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush, QFontMetricsF
+
+
+class ClockPositionPicker(QWidget):
+    """16:9 mini-preview where the operator drags the clock to its position."""
+    positionChanged = pyqtSignal(float, float)  # x_pct (0–1), y_pct (0–1)
+
+    _CLOCK_W = 380
+    _CLOCK_H = 214  # 16:9
+
+    def __init__(self, x_pct: float = 0.85, y_pct: float = 0.05, parent=None):
+        super().__init__(parent)
+        self._x = max(0.0, min(1.0, float(x_pct)))
+        self._y = max(0.0, min(1.0, float(y_pct)))
+        self._dragging = False
+        self.setFixedSize(self._CLOCK_W, self._CLOCK_H)
+        self.setMouseTracking(True)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        self.setToolTip("Trage ceasul pentru a-l poziția pe ecran")
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        W, H = self.width(), self.height()
+
+        # Background
+        p.fillRect(self.rect(), QColor(10, 10, 10))
+
+        # Grid (rule-of-thirds)
+        p.setPen(QPen(QColor(40, 40, 40), 1))
+        for i in (1, 2):
+            p.drawLine(W * i // 3, 0, W * i // 3, H)
+            p.drawLine(0, H * i // 3, W, H * i // 3)
+
+        # Border
+        p.setPen(QPen(QColor(60, 60, 60), 1))
+        p.drawRect(0, 0, W - 1, H - 1)
+
+        # Clock label
+        cx = int(self._x * W)
+        cy = int(self._y * H)
+        label = "23:45:01"
+        f = QFont("Consolas", 10, QFont.Weight.Bold)
+        p.setFont(f)
+        fm = QFontMetricsF(f)
+        tw = fm.horizontalAdvance(label)
+        th = fm.height()
+
+        # Clock pill background
+        pill = QRectF(cx - 4, cy - th, tw + 8, th + 6)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(0, 0, 0, 160)))
+        p.drawRoundedRect(pill, 3, 3)
+
+        # Clock text
+        p.setPen(QPen(QColor(255, 255, 255)))
+        p.drawText(QPointF(cx, cy), label)
+
+        # Drag handle dot
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(QColor(82, 148, 226)))
+        p.drawEllipse(QPointF(cx, cy - th / 2), 5, 5)
+
+        # Hint text
+        p.setPen(QPen(QColor(80, 80, 80)))
+        p.setFont(QFont("Segoe UI", 7))
+        p.drawText(4, H - 4, "click / drag pentru poziționare")
+
+        p.end()
+
+    def mousePressEvent(self, e):
+        self._dragging = True
+        self._update_from_pos(e.position())
+
+    def mouseMoveEvent(self, e):
+        if self._dragging:
+            self._update_from_pos(e.position())
+
+    def mouseReleaseEvent(self, e):
+        self._dragging = False
+
+    def _update_from_pos(self, pos):
+        self._x = max(0.01, min(0.99, pos.x() / self.width()))
+        self._y = max(0.01, min(0.99, pos.y() / self.height()))
+        self.update()
+        self.positionChanged.emit(self._x, self._y)
+
+    def set_pos(self, x_pct: float, y_pct: float):
+        self._x = max(0.0, min(1.0, float(x_pct)))
+        self._y = max(0.0, min(1.0, float(y_pct)))
+        self.update()
 
 
 _OVERLAY_DEFAULTS = {
@@ -47,6 +137,8 @@ _OVERLAY_DEFAULTS = {
         "border_radius": 4,
         "shadow": True,
         "size_pct": 8,
+        "x_pct": None,
+        "y_pct": None,
     },
     "timer": {
         "font_family": "Segoe UI",
@@ -264,10 +356,11 @@ class OverlaySettingsWidget(QWidget):
         self._ck_pos = QComboBox()
         self._ck_pos.addItems([
             "top_right", "top_left", "bottom_right", "bottom_left",
-            "center_top", "center_bottom",
+            "center_top", "center_bottom", "custom",
         ])
-        self._ck_pos.setCurrentText(ck["position"])
-        gf.addRow("Poziție:", self._ck_pos)
+        self._ck_pos.setCurrentText(ck["position"] if ck.get("position") != "custom" else "custom")
+        self._ck_pos.currentTextChanged.connect(self._on_clock_pos_combo)
+        gf.addRow("Poziție predefinită:", self._ck_pos)
 
         self._ck_padding = QSpinBox()
         self._ck_padding.setRange(0, 40)
@@ -290,6 +383,25 @@ class OverlaySettingsWidget(QWidget):
         gf.addRow("Dimensiune relativă:", self._ck_size_pct)
 
         l.addWidget(grp_format)
+
+        # ── Drag-to-position picker ───────────────────────────────────────────
+        grp_drag = QGroupBox("Poziționare liberă pe ecran (drag)")
+        grp_drag.setStyleSheet("QGroupBox { color: #5294e2; }")
+        drag_l = QVBoxLayout(grp_drag)
+        drag_lbl = QLabel(
+            "Fă click sau trage ceasul în miniatura de mai jos\n"
+            "pentru a-l poziționa oriunde pe ecranul live."
+        )
+        drag_lbl.setStyleSheet("color: #888; font-size: 10px;")
+        drag_l.addWidget(drag_lbl)
+
+        x_init = ck.get("x_pct") or 0.85
+        y_init = ck.get("y_pct") or 0.05
+        self._ck_pos_picker = ClockPositionPicker(float(x_init), float(y_init))
+        self._ck_pos_picker.positionChanged.connect(self._on_clock_drag)
+        drag_l.addWidget(self._ck_pos_picker, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        l.addWidget(grp_drag)
         l.addStretch()
         return w
 
@@ -393,6 +505,20 @@ class OverlaySettingsWidget(QWidget):
     def _set_timer_preset(self, seconds: int):
         self.changed.emit({"_timer_preset_seconds": seconds})
 
+    def _on_clock_drag(self, x_pct: float, y_pct: float):
+        """Drag position update → switch combo to 'custom' and store coordinates."""
+        self._overlays["clock"]["x_pct"] = x_pct
+        self._overlays["clock"]["y_pct"] = y_pct
+        self._ck_pos.blockSignals(True)
+        self._ck_pos.setCurrentText("custom")
+        self._ck_pos.blockSignals(False)
+
+    def _on_clock_pos_combo(self, text: str):
+        """When a named position is chosen, clear custom x/y so named takes effect."""
+        if text != "custom":
+            self._overlays["clock"]["x_pct"] = None
+            self._overlays["clock"]["y_pct"] = None
+
     def _show_preview(self):
         """Open a simple 16:9 preview window showing overlay demo."""
         from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel
@@ -443,6 +569,14 @@ class OverlaySettingsWidget(QWidget):
         ck["border_radius"] = self._ck_radius.value()
         ck["shadow"] = self._ck_shadow.isChecked()
         ck["size_pct"] = self._ck_size_pct.value()
+        # Drag-positioned coordinates (None if a named position is used)
+        picker = getattr(self, "_ck_pos_picker", None)
+        if picker is not None and ck["position"] == "custom":
+            ck["x_pct"] = picker._x
+            ck["y_pct"] = picker._y
+        else:
+            ck["x_pct"] = None
+            ck["y_pct"] = None
 
         tm = self._overlays["timer"]
         tm["font_family"] = self._tm_font.currentFont().family()

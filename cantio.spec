@@ -14,7 +14,8 @@ is_linux = sys.platform.startswith('linux')
 # ── Data files ────────────────────────────────────────────────────────────────
 datas = []
 
-for asset in ('GProICON.png', 'SplashScreen.png'):
+for asset in ('GProICON.png', 'GProICON.ico', 'GProICON.icns',
+              'SplashScreen.png', 'LICENSE', 'THIRD-PARTY-NOTICES.md'):
     if os.path.exists(asset):
         datas.append((asset, '.'))
 
@@ -163,8 +164,8 @@ if is_mac:
                 'Cantio folosește camera pentru fundal video live.',
             'NSMicrophoneUsageDescription':
                 'Cantio poate accesa microfonul pentru audio.',
-            'CFBundleShortVersionString': '1.0.0',
-            'CFBundleVersion': '1',
+            'CFBundleShortVersionString': '1.5.0',
+            'CFBundleVersion': '1.5.0',
             'LSMinimumSystemVersion': '10.14',
         },
     )

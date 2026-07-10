@@ -65,11 +65,22 @@ GlorifyPro.spec
 GlorifyPro.ico
 GlorifyPro_icon.png
 CGlorifyProdisplay-electron/
-BUG_REPORT.md
-TEST_REPORT.txt
 CanteceSelectate.txt
 Referinte.txt
+
+# Documente interne de orientare (NU se publică pe GitHub)
+AUDIT_FUNCTII.md
+BUG_REPORT.md
+TEST_CHECKLIST.md
+TEST_REPORT.txt
+CANTIO_BLUEPRINT.md
+
+# Fișiere de prezentare / test (date, nu cod)
+*.gps
 
 # Fișiere text temporare
 *.txt
 !requirements.txt
+
+# Folder cu nume invalid (orice variantă de nume corupt)
+*GlorifyProdisplay-electron*

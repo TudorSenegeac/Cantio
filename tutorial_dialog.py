@@ -77,6 +77,60 @@ _STEPS = [
         ),
     },
     {
+        "icon":  "🎨",
+        "title": "Teme & Looks",
+        "text": (
+            "• Tab <b>🎨 Teme</b> — creează teme (culori, fundal, efecte text:\n"
+            "  ecou, cascadă, gradient, glow, haotic)\n"
+            "• Setează o temă implicită sau <b>pe categorie</b>\n"
+            "• <b>🎨 Look</b> (toolbar) — schimbă tema activă <b>live, cu un click</b>\n"
+            "  pe tot ce e afișat (cântări + Biblie)"
+        ),
+    },
+    {
+        "icon":  "🖼",
+        "title": "Fundaluri & Editor avansat",
+        "text": (
+            "• Tab <b>🖼 Media</b> ▸ <b>Fundal</b> — fundaluri animate (gradient,\n"
+            "  particule, forme, imagini, video, ceas)\n"
+            "• Butonul <b>Editor avansat</b> pe o cântare — design multi-slide\n"
+            "  (text real editabil, fundal per slide, tranziții de concert)\n"
+            "• Butonul <b>🎨 Fundal</b> din editor — alege un fundal salvat"
+        ),
+    },
+    {
+        "icon":  "🎚",
+        "title": "Mixer, Layere & Macros",
+        "text": (
+            "• Tab <b>🧱 Layere</b> — aprinde/stinge <b>independent</b> fundalul,\n"
+            "  textul, logo-ul, Black (fundalul rămâne când stingi textul)\n"
+            "• Tab <b>🎚 Mixer</b> — manete manuale, tranziție fundal, <b>Audio Bin</b>,\n"
+            "  <b>MIDI</b> (mapează un controller la acțiuni)\n"
+            "• Tab <b>⚙ Macros</b> — un click = mai multe acțiuni în ordine"
+        ),
+    },
+    {
+        "icon":  "⚡",
+        "title": "Prezentări dinamice (BETA)",
+        "text": (
+            "• Butonul <b>⚡ Dinamic</b> (toolbar) — dintr-un MP3 + versuri\n"
+            "  generează o prezentare cu <b>fundal reactiv la muzică</b>\n"
+            "• Versurile apar cuvânt-cu-cuvânt, slide-urile se schimbă automat\n"
+            "• ⚠ <b>Funcție BETA</b> — verifică rezultatul înainte de serviciu\n"
+            "• Se salvează în Cântări cu semn ⚡ și e editabilă"
+        ),
+    },
+    {
+        "icon":  "📖",
+        "title": "Biblie & Telecomandă",
+        "text": (
+            "• Tab <b>Biblie</b> — caută rapid: <b>„ps23 3\"</b>, <b>„Ioan 3:16\"</b>\n"
+            "• Layout referință: sus/jos, verset care nu acoperă referința\n"
+            "• <b>Aranjamente</b> — reordonează strofele (Refren/Strofă) live\n"
+            "• <b>Remote</b> — scanează QR-ul și controlezi de pe telefon"
+        ),
+    },
+    {
         "icon":  "✅",
         "title": "Ești gata!",
         "text": (

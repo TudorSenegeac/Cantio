@@ -513,11 +513,14 @@ class SettingsDialog(QDialog):
         tf = QFormLayout(trans_group)
         self.transition_combo = QComboBox()
         self.transition_combo.addItems([
-            "fade",        # fade out → swap → fade in
-            "crossfade",   # dissolve: old fades out while new fades in
-            "slide_left",  # old exits left, new enters from right
-            "zoom_in",     # new scales up + fades in
-            "instant",     # no animation
+            "fade", "crossfade", "fade_black", "fade_white", "dissolve",
+            "slide_left", "slide_right", "slide_up", "slide_down",
+            "push_left", "push_right", "push_up", "push_down",
+            "reveal_left", "reveal_right", "reveal_up", "reveal_down",
+            "wipe_left", "wipe_right", "wipe_up", "wipe_down", "wipe_diag",
+            "zoom_in", "zoom_out", "iris_open", "iris_close",
+            "flip_h", "flip_v", "spin", "squeeze_h", "squeeze_v",
+            "bars_v", "bars_h", "checkerboard", "blur", "instant",
         ])
         tf.addRow(t("effect") + ":", self.transition_combo)
 
@@ -648,6 +651,7 @@ class SettingsDialog(QDialog):
         return self._scrollable(w)
 
     def _tab_overlays(self):
+        s = self.s
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -756,6 +760,49 @@ class SettingsDialog(QDialog):
 
         crf.addLayout(cr_form)
         layout.addWidget(cr_group)
+
+        # ── Bible reference style (displayed when sending Bible verses) ───────
+        br_group = QGroupBox("Stil referință Biblică (Mod Setări)")
+        brf = QFormLayout(br_group)
+        brf.setSpacing(6)
+
+        br_lbl = QLabel(
+            "Aceste setări controlează cum apare referința (ex: Ioan 3:16) pe ecranul live\n"
+            "când modul de afișare este Setări (nu teme)."
+        )
+        br_lbl.setWordWrap(True)
+        br_lbl.setStyleSheet("color: #888; font-size: 10px;")
+        brf.addRow(br_lbl)
+
+        self.br_font_size = QSpinBox()
+        self.br_font_size.setRange(8, 60)
+        self.br_font_size.setValue(int(s.get("ref_font_size", 24)))
+        brf.addRow("Dimensiune font:", self.br_font_size)
+
+        self.br_color = ColorButton(s.get("ref_color", "#aaaaaa"))
+        brf.addRow("Culoare:", self.br_color)
+
+        self.br_italic = QCheckBox("Italic")
+        self.br_italic.setChecked(s.get("ref_italic", "true") == "true")
+        brf.addRow("Stil:", self.br_italic)
+
+        self.br_position = QComboBox()
+        self.br_position.addItems([
+            "Dreapta-jos (verset sus)",
+            "Stânga-jos (verset sus)",
+            "Centru-jos (verset sus)",
+            "Dreapta-sus (verset jos)",
+            "Stânga-sus (verset jos)",
+            "Centru-sus (verset jos)",
+        ])
+        _br_pos_map = {
+            "bottom_right": 0, "bottom_left": 1, "bottom_center": 2,
+            "top_right": 3, "top_left": 4, "top_center": 5,
+        }
+        self.br_position.setCurrentIndex(_br_pos_map.get(s.get("ref_position", "bottom_right"), 0))
+        brf.addRow("Layout Biblie:", self.br_position)
+
+        layout.addWidget(br_group)
 
         # ── Advanced overlay personalization ──────────────────────────────────
         adv_lbl = QLabel("PERSONALIZARE AVANSATĂ OVERLAY-URI")
@@ -1866,6 +1913,11 @@ class SettingsDialog(QDialog):
             "sacred_words": self._get_sacred_words_str(),
             "language": self.lang_combo.currentData() if hasattr(self, 'lang_combo') else get_language(),
             "copyright": self._collect_copyright(),
+            "ref_font_size":  str(self.br_font_size.value()) if hasattr(self, 'br_font_size') else "24",
+            "ref_color":      self.br_color.color()          if hasattr(self, 'br_color')     else "#aaaaaa",
+            "ref_italic":     "true" if (hasattr(self, 'br_italic') and self.br_italic.isChecked()) else "false",
+            "ref_position":   ["bottom_right", "bottom_left", "bottom_center", "top_right", "top_left", "top_center"][
+                               self.br_position.currentIndex()] if hasattr(self, 'br_position') else "bottom_right",
         }
 
     def _collect_copyright(self) -> str:

@@ -322,6 +322,155 @@ class ElectronDisplayManager:
                        "screen_index": screen_index,
                        "window_name": window_name})
 
+    def open_bg_editor(self, file_path: str):
+        """Open the Electron background editor window for the given .json file."""
+        self._enqueue({"type": "open_bg_editor", "file": file_path})
+
+    def open_preview(self):
+        """Open the operator-preview window (mirrors live content, same Chromium)."""
+        self._enqueue({"type": "open_preview"})
+
+    def close_preview(self):
+        self._enqueue({"type": "close_preview"})
+
+    def show_background(self, background: dict, window_id: int = 0,
+                        transition: str = ""):
+        """Show a custom animated background (bg-engine JSON) on the display."""
+        self._enqueue({"type": "show_background", "window_id": window_id,
+                       "background": background, "transition": transition})
+
+    def clear_background(self, window_id: int = 0):
+        self._enqueue({"type": "clear_background", "window_id": window_id})
+
+    def dim(self, target: str, value: float, window_id: int = 0):
+        """Manual mixer fader — target = black|text|logo, value 0..1."""
+        self._enqueue({"type": "dim", "window_id": window_id,
+                       "target": target, "value": value})
+
+    def manual_prep(self, text: str, transition: str, window_id: int = 0):
+        self._enqueue({"type": "manual_prep", "window_id": window_id,
+                       "text": text, "transition": transition})
+
+    def manual_set(self, p: float, window_id: int = 0):
+        self._enqueue({"type": "manual_set", "window_id": window_id, "p": p})
+
+    def manual_end(self, commit: bool, window_id: int = 0):
+        self._enqueue({"type": "manual_end", "window_id": window_id, "commit": commit})
+
+    # ── Dynamic presentation (audio-reactive) ───────────────────────────────
+    def dynamic_play(self, slides: list, audio: str, reveal: bool = True,
+                     transition: str = "fade", window_id: int = 0,
+                     weights=None, times=None):
+        self._enqueue({"type": "dynamic_play", "window_id": window_id,
+                       "slides": slides, "audio": audio,
+                       "reveal": reveal, "transition": transition,
+                       "weights": weights or [], "times": times or []})
+
+    def dynamic_stop(self, window_id: int = 0):
+        self._enqueue({"type": "dynamic_stop", "window_id": window_id})
+
+    def audio_pause(self, window_id: int = 0):
+        self._enqueue({"type": "audio_pause", "window_id": window_id})
+
+    def audio_resume(self, window_id: int = 0):
+        self._enqueue({"type": "audio_resume", "window_id": window_id})
+
+    def audio_volume(self, value: float, window_id: int = 0):
+        self._enqueue({"type": "audio_volume", "window_id": window_id, "value": value})
+
+    def audio_seek(self, p: float, window_id: int = 0):
+        self._enqueue({"type": "audio_seek", "window_id": window_id, "p": p})
+
+    # ── Audio Bin (background music, independent of presentations) ──────────
+    def audio_bin_play(self, src: str, loop: bool = False, window_id: int = 0):
+        self._enqueue({"type": "audio_bin_play", "window_id": window_id,
+                       "src": src, "loop": loop})
+
+    def audio_bin_pause(self, window_id: int = 0):
+        self._enqueue({"type": "audio_bin_pause", "window_id": window_id})
+
+    def audio_bin_resume(self, window_id: int = 0):
+        self._enqueue({"type": "audio_bin_resume", "window_id": window_id})
+
+    def audio_bin_stop(self, window_id: int = 0):
+        self._enqueue({"type": "audio_bin_stop", "window_id": window_id})
+
+    def audio_bin_volume(self, value: float, window_id: int = 0):
+        self._enqueue({"type": "audio_bin_volume", "window_id": window_id, "value": value})
+
+    def render_thumb(self, doc: dict, w: int, h: int, req_id: str, window_id: int = 0):
+        """Request a WYSIWYG thumbnail render of a bg-engine slide doc. The result
+        comes back asynchronously via the thumb callback (set_thumb_callback)."""
+        self._enqueue({"type": "render_thumb", "window_id": window_id,
+                       "doc": doc, "w": int(w), "h": int(h), "id": req_id})
+
+    def open_bg_editor_process(self, file_path: str) -> bool:
+        """Launch the background editor as a DEDICATED Electron process.
+
+        This is independent of the live-display process, so it always loads the
+        current main.js from disk (no stale/orphaned-process issues) and never
+        collides on the WebSocket port (main.js skips the WS server when invoked
+        with --bg-editor). Returns True if a process was spawned.
+        """
+        mode, exe_path = self._get_electron_executable()
+        arg = f"--bg-editor={file_path}"
+        if mode == 'compiled':
+            cmd = [exe_path, arg]; cwd = os.path.dirname(exe_path)
+        elif mode == 'source':
+            cwd = self._electron_dir or self._get_electron_dir()
+            cmd = [exe_path, '.', arg]
+        else:
+            # Fallback: electron.cmd from node_modules/.bin
+            cwd = self._electron_dir or self._get_electron_dir()
+            if not cwd:
+                return False
+            bin_name = 'electron.cmd' if sys.platform == 'win32' else 'electron'
+            exe = os.path.join(cwd, 'node_modules', '.bin', bin_name)
+            if not os.path.exists(exe):
+                return False
+            cmd = [exe, '.', arg]
+        # Verify the executable actually exists (clear failure otherwise)
+        if not exe_path or not os.path.exists(exe_path):
+            print(f"[Display] [X] Electron exe negasit: {exe_path} (mode={mode})")
+            return False
+        if not cwd or not os.path.isdir(cwd):
+            print(f"[Display] [X] display-electron dir invalid: {cwd}")
+            return False
+
+        # Capture the editor process output to a log so crashes are diagnosable.
+        log_path = os.path.join(os.path.expanduser("~"), "Cantio", "bg_editor.log")
+        try:
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            log_f = open(log_path, "w", encoding="utf-8")
+        except Exception:
+            log_f = None
+
+        print(f"[Display] Lansez editor fundal: {cmd} (cwd={cwd})")
+        try:
+            if sys.platform == 'win32':
+                _si = subprocess.STARTUPINFO()
+                _si.dwFlags    |= subprocess.STARTF_USESHOWWINDOW
+                _si.wShowWindow = subprocess.SW_HIDE
+                proc = subprocess.Popen(
+                    cmd, cwd=cwd, startupinfo=_si,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                    stdout=(log_f or subprocess.DEVNULL),
+                    stderr=subprocess.STDOUT)
+            else:
+                proc = subprocess.Popen(
+                    cmd, cwd=cwd,
+                    stdout=(log_f or subprocess.DEVNULL),
+                    stderr=subprocess.STDOUT)
+            print(f"[Display] [OK] Editor fundal PID={proc.pid} | log={log_path}")
+            return True
+        except Exception as e:
+            logger.error("[ElectronDisplay] bg editor launch failed: %s", e)
+            try:
+                print(f"[Display] [X] Editor fundal esuat: {e}")
+            except Exception:
+                pass
+            return False
+
     def close_display(self, window_id: int = 0):
         self._window_ids.discard(window_id)
         self._enqueue({"type": "close", "window_id": window_id})
@@ -696,6 +845,21 @@ class ElectronDisplayManager:
         """Register a one-shot callback fired when Electron reports window_ready."""
         self._window_ready_callbacks[window_id] = callback
 
+    def set_preview_hwnd_callback(self, callback) -> None:
+        """Register a callback(hwnd:int) fired when the preview window reports its
+        native handle (for embedding into the PyQt UI)."""
+        self._preview_hwnd_cb = callback
+
+    def set_dynamic_slide_callback(self, callback) -> None:
+        """Register a callback(index:int) fired when a dynamic presentation
+        auto-advances to a new slide (so the UI can follow it)."""
+        self._dynamic_slide_cb = callback
+
+    def set_thumb_callback(self, callback) -> None:
+        """Register a callback(req_id:str, data_url:str) fired when a WYSIWYG
+        thumbnail render is ready."""
+        self._thumb_cb = callback
+
     def _on_ws_message(self, ws, raw):
         try:
             msg = json.loads(raw)
@@ -715,6 +879,27 @@ class ElectronDisplayManager:
                     cb()
                 except Exception as e:
                     logger.debug("[ElectronDisplay] window_ready callback error: %s", e)
+        elif mtype == "preview_hwnd":
+            cb = getattr(self, "_preview_hwnd_cb", None)
+            if cb:
+                try:
+                    cb(int(msg.get("hwnd")))
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] preview_hwnd callback error: %s", e)
+        elif mtype == "dynamic_slide":
+            cb = getattr(self, "_dynamic_slide_cb", None)
+            if cb:
+                try:
+                    cb(int(msg.get("index")))
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] dynamic_slide callback error: %s", e)
+        elif mtype == "thumb_result":
+            cb = getattr(self, "_thumb_cb", None)
+            if cb:
+                try:
+                    cb(msg.get("id", ""), msg.get("dataURL", ""))
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] thumb_result callback error: %s", e)
 
     def _on_ws_error(self, ws, error):
         logger.debug("[ElectronDisplay] WS error: %s", error)
@@ -893,6 +1078,24 @@ class ElectronDisplayProxy:
             transition_duration = int(self.settings.get("transition_duration", 400)),
             metadata   = metadata,
         )
+
+    def show_background(self, background: dict, transition: str = ""):
+        self._mgr.show_background(background, self._window_id, transition)
+
+    def clear_background(self):
+        self._mgr.clear_background(self._window_id)
+
+    def dim(self, target: str, value: float):
+        self._mgr.dim(target, value, self._window_id)
+
+    def manual_prep(self, text: str, transition: str):
+        self._mgr.manual_prep(text, transition, self._window_id)
+
+    def manual_set(self, p: float):
+        self._mgr.manual_set(p, self._window_id)
+
+    def manual_end(self, commit: bool):
+        self._mgr.manual_end(commit, self._window_id)
 
     def black_screen(self):
         self._mgr.black_screen(self._window_id)

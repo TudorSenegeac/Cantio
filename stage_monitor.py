@@ -800,7 +800,14 @@ class StageEditorWindow(QMainWindow):
 
         self._build_toolbar()
         self._build_ui()
-        self._load_layout()
+        self._refresh_layout_combo()
+        # Apply the saved active named layout if there is one, else the default.
+        _active = self._settings.get("stage_active_layout", "")
+        _layouts = self._named_layouts()
+        if _active and _active in _layouts:
+            self.canvas.set_widgets(_layouts[_active])
+        else:
+            self._load_layout()
 
     # ── Toolbar ───────────────────────────────────────────────────────────────
 
@@ -834,6 +841,20 @@ class StageEditorWindow(QMainWindow):
 
         tbtn(f"💾 {t('save')}", self._save_layout)
         tbtn(f"📂 {t('open_service')}", self._load_layout_file)
+        tb.addSeparator()
+
+        # Named layouts (switchable live, ProPresenter-style)
+        from PyQt6.QtWidgets import QComboBox
+        lay_lbl = QLabel("  Layout: ")
+        lay_lbl.setStyleSheet("color:#888; font-size:11px;")
+        tb.addWidget(lay_lbl)
+        self._layout_combo = QComboBox()
+        self._layout_combo.setStyleSheet(
+            "QComboBox { background:#151515; color:#ddd; border:1px solid #262626; "
+            "border-radius:4px; padding:4px 8px; font-size:11px; min-width:120px; }")
+        self._layout_combo.currentIndexChanged.connect(self._on_layout_combo)
+        tb.addWidget(self._layout_combo)
+        tbtn("💾+ Salvează ca…", self._save_layout_as)
         tb.addSeparator()
         tbtn(f"🗑 {t('clear_all')}", self._clear_all)
         tb.addSeparator()
@@ -1005,13 +1026,77 @@ class StageEditorWindow(QMainWindow):
 
     # ── Layout save/load ──────────────────────────────────────────────────────
 
+    def _current_widgets_data(self):
+        return [{k: v for k, v in w.items() if not k.startswith("_")}
+                for w in self.canvas.widgets]
+
+    def _named_layouts(self):
+        try:
+            d = json.loads(self._settings.get("stage_layouts", "{}") or "{}")
+            return d if isinstance(d, dict) else {}
+        except Exception:
+            return {}
+
+    def _save_named_layouts(self, layouts):
+        s = json.dumps(layouts)
+        db.save_setting("stage_layouts", s)
+        self._settings["stage_layouts"] = s
+
+    def _refresh_layout_combo(self):
+        cmb = getattr(self, "_layout_combo", None)
+        if cmb is None:
+            return
+        layouts = self._named_layouts()
+        active = self._settings.get("stage_active_layout", "")
+        cmb.blockSignals(True)
+        cmb.clear()
+        cmb.addItem("(implicit)")
+        for n in layouts.keys():
+            cmb.addItem(n)
+        if active and active in layouts:
+            cmb.setCurrentIndex(list(layouts.keys()).index(active) + 1)
+        cmb.blockSignals(False)
+
+    def _on_layout_combo(self, i):
+        if i <= 0:
+            db.save_setting("stage_active_layout", "")
+            self._settings["stage_active_layout"] = ""
+            self._load_layout()
+            return
+        name = self._layout_combo.itemText(i)
+        layouts = self._named_layouts()
+        if name in layouts:
+            self.canvas.set_widgets(layouts[name])
+            self._sync_output()
+            db.save_setting("stage_active_layout", name)
+            self._settings["stage_active_layout"] = name
+            self.status.showMessage(f"Layout: {name}")
+
+    def _save_layout_as(self):
+        from PyQt6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "Salvează layout", "Nume layout:")
+        name = (name or "").strip()
+        if not (ok and name):
+            return
+        layouts = self._named_layouts()
+        layouts[name] = self._current_widgets_data()
+        self._save_named_layouts(layouts)
+        db.save_setting("stage_active_layout", name)
+        self._settings["stage_active_layout"] = name
+        self._refresh_layout_combo()
+        self.status.showMessage(f"Layout «{name}» salvat")
+
     def _save_layout(self):
-        layout_data = [
-            {k: v for k, v in w.items() if not k.startswith("_")}
-            for w in self.canvas.widgets
-        ]
-        db.save_setting("stage_layout", json.dumps(layout_data))
-        self.status.showMessage(f"Layout saved ({len(layout_data)} widgets)")
+        layout_data = self._current_widgets_data()
+        active = self._settings.get("stage_active_layout", "")
+        if active:
+            layouts = self._named_layouts()
+            layouts[active] = layout_data
+            self._save_named_layouts(layouts)
+            self.status.showMessage(f"Layout «{active}» salvat ({len(layout_data)} widgets)")
+        else:
+            db.save_setting("stage_layout", json.dumps(layout_data))
+            self.status.showMessage(f"Layout saved ({len(layout_data)} widgets)")
 
     def _load_layout(self):
         raw = self._settings.get("stage_layout", "[]")

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Cantio — Editor Fundal</title>
+  <link rel="stylesheet" href="background-editor.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <div class="topbar">
+      <span class="title">🎨 Editor Fundal</span>
+      <input class="name" id="bgName" type="text" placeholder="Nume fundal">
+      <select id="formatSel">
+        <option value="1920x1080">16:9 — 1920×1080</option>
+        <option value="1280x720">16:9 — 1280×720</option>
+        <option value="1920x1200">16:10 — 1920×1200</option>
+        <option value="1024x768">4:3 — 1024×768</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <input id="customW" type="number" value="1920" style="width:70px;display:none">
+      <input id="customH" type="number" value="1080" style="width:70px;display:none">
+      <div class="spacer"></div>
+      <button class="btn" id="rulerBtn" title="Rigle & ghidaje de centrare">📏</button>
+      <button class="btn" id="playBtn" title="Pauză/Redă animația">⏸</button>
+      <button class="btn primary" id="saveBtn">💾 Salvează</button>
+      <button class="btn" id="closeBtn">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="body" id="body">
+      <!-- Slides rail (multi-slide / song mode only) -->
+      <div class="slides-rail" id="slidesRail" style="display:none">
+        <div class="rail-head">SLIDE-URI</div>
+        <div class="rail-list" id="slideList"></div>
+        <button class="btn" id="addSlideBtn" style="margin:6px">+ Slide</button>
+      </div>
+
+      <div class="stage">
+        <div class="canvas-wrap" id="canvasWrap">
+          <canvas id="preview" width="1920" height="1080"></canvas>
+        </div>
+        <div class="res-label" id="resLabel">1920×1080</div>
+      </div>
+
+      <div class="sidebar">
+        <div class="add-bar">
+          <button class="btn primary" id="bgPickerBtn" title="Alege un fundal salvat sau pune un gradient/culoare de bază">🎨 Fundal</button>
+          <button class="btn" data-add="gradient">+ Gradient</button>
+          <button class="btn" data-add="particles">+ Particule</button>
+          <button class="btn" data-add="shape">+ Formă</button>
+          <button class="btn" data-add="text">+ Text</button>
+          <button class="btn" data-add="clock">+ Ceas</button>
+          <button class="btn" data-add="lyrics">+ Versuri</button>
+          <button class="btn" data-add="image">+ Imagine</button>
+          <button class="btn" data-add="video">+ Video</button>
+        </div>
+
+        <div class="section-h">Layere</div>
+        <div class="layers" id="layersList"></div>
+
+        <div class="section-h">Proprietăți</div>
+        <div class="props" id="propsPanel">
+          <div class="empty">Selectează un layer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="fonts.js"></script>
+  <script src="bg-engine.js"></script>
+  <script>if (window.CantioFonts) CantioFonts.loadGoogleFonts(document);</script>
+  <script src="background-editor.js"></script>
+</body>
+</html>

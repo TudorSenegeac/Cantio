@@ -1376,49 +1376,38 @@ def search_songs_fast(query: str, limit: int = 200, category: str = "") -> list[
             # Build a SQL expression that normalises the content column at query time.
             # Applies the same transforms as normalize_search_query():
             #   lowercase → diacritic replacements → hyphens/dashes → spaces
-            _content_norm = (
-                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
-                "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
-                "LOWER(content),"
-                "  'ș','s'),'ş','s'),'ț','t'),'ţ','t'),"
-                "  'î','i'),'ă','a'),'â','a'),"
-                "  '-',' '),'—',' '),'–',' '),"
-                "  '.',' '),',',' '),'!',' ')"
+            # Normalize a column INLINE (diacritics + punctuation → space) so
+            # search works even if the precomputed *_normalized columns are stale
+            # or malformed. Searches title, author AND all verses (content).
+            def _norm(col):
+                return (
+                    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
+                    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE("
+                    f"LOWER({col}),"
+                    "  'ș','s'),'ş','s'),'ț','t'),'ţ','t'),"
+                    "  'î','i'),'ă','a'),'â','a'),"
+                    "  '-',' '),'—',' '),'–',' '),"
+                    "  '.',' '),',',' '),'!',' ')"
+                )
+            _where = (
+                f"{_norm('title')} LIKE ? OR {_norm('author')} LIKE ? OR "
+                f"{_norm('content')} LIKE ? OR "
+                "LOWER(title) LIKE ? OR LOWER(author) LIKE ? OR content LIKE ?"
             )
-
+            _wp = [like_smart, like_smart, like_smart, like_orig, like_orig, like_orig]
             if cat_filter:
                 rows = conn.execute(
                     "SELECT id, title, author, category FROM songs"
-                    " WHERE category = ? AND ("
-                    "   LOWER(title)           LIKE ? OR"
-                    "   title_normalized        LIKE ? OR"
-                    "   title_normalized        LIKE ? OR"
-                    "   LOWER(author)           LIKE ? OR"
-                    "   author_normalized       LIKE ? OR"
-                    "   author_normalized       LIKE ? OR"
-                    "   content                 LIKE ? OR"
-                    f"  {_content_norm}         LIKE ?)"
+                    f" WHERE category = ? AND ({_where})"
                     " ORDER BY title COLLATE NOCASE LIMIT ?",
-                    (category,
-                     like_orig, like_norm, like_smart,
-                     like_orig, like_norm, like_smart,
-                     like_orig, like_smart, limit)
+                    tuple([category] + _wp + [limit])
                 ).fetchall()
             else:
                 rows = conn.execute(
                     "SELECT id, title, author, category FROM songs"
-                    " WHERE LOWER(title)           LIKE ?"
-                    "    OR title_normalized        LIKE ?"
-                    "    OR title_normalized        LIKE ?"
-                    "    OR LOWER(author)           LIKE ?"
-                    "    OR author_normalized       LIKE ?"
-                    "    OR author_normalized       LIKE ?"
-                    "    OR content                 LIKE ?"
-                    f"   OR {_content_norm}         LIKE ?"
+                    f" WHERE {_where}"
                     " ORDER BY title COLLATE NOCASE LIMIT ?",
-                    (like_orig, like_norm, like_smart,
-                     like_orig, like_norm, like_smart,
-                     like_orig, like_smart, limit)
+                    tuple(_wp + [limit])
                 ).fetchall()
             results = [dict(r) for r in rows]
         except Exception as e_like:

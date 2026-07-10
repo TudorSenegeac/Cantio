@@ -535,6 +535,7 @@ body {
         <button class="ctrl-btn btn-live"    onclick="cmd('go_live')">▶ GO LIVE</button>
         <button class="ctrl-btn btn-black"   onclick="cmd('black_screen')">⬛<span>Ecran Negru</span></button>
         <button class="ctrl-btn btn-clear"   onclick="cmd('clear_text')">⬜<span>Clear Text</span></button>
+        <button class="ctrl-btn btn-clear"   onclick="cmd('logo')">🏛<span>Logo</span></button>
         <button class="ctrl-btn btn-freeze"  id="freezeBtn" onclick="toggleFreeze()">❄<span>Freeze</span></button>
         <button class="ctrl-btn btn-display" id="displayBtn" onclick="toggleDisplay()">📺<span id="displayBtnText">Display OFF</span></button>
     </div>
@@ -612,12 +613,16 @@ function updateStatus(connected) {
 }
 
 function updateUI() {
-    // Live preview
+    // Live preview — approximate the projector using the active theme colours
     const text = state.live_text || state.current_text || ''
-    document.getElementById('liveText').textContent = text || 'Niciun slide activ'
+    const liveTextEl = document.getElementById('liveText')
+    liveTextEl.textContent = text || 'Niciun slide activ'
     const isLive = (state.is_live && text)
     document.getElementById('liveBadge').style.display = isLive ? 'block' : 'none'
-    document.getElementById('livePreview').className = 'live-preview' + (isLive ? ' active' : '')
+    const lp = document.getElementById('livePreview')
+    lp.className = 'live-preview' + (isLive ? ' active' : '')
+    if (state.theme_bg)   lp.style.background = state.theme_bg
+    if (state.theme_text) liveTextEl.style.color = state.theme_text
 
     // Song info
     const si = document.getElementById('currentSongInfo')
@@ -656,11 +661,14 @@ function updateSlidesGrid() {
         grid.innerHTML = '<div style="color:var(--subtext);text-align:center;grid-column:1/-1;padding:20px;">Selectează o cântare</div>'
         return
     }
+    const bg = state.theme_bg || '#000'
+    const tc = state.theme_text || '#fff'
     grid.innerHTML = slides.map((s, i) => `
         <div class="slide-thumb ${i===curIdx?'current':''} ${i===curIdx&&state.is_live?'live':''}"
-             onclick="sendSlide(${i})">
+             style="background:${bg}" onclick="sendSlide(${i})">
             <span class="slide-num">${i+1}</span>
-            <div class="slide-thumb-text">${escHtml(s.text || '')}</div>
+            ${s.label ? `<span class="slide-num" style="left:auto;right:4px;color:var(--accent)">${escHtml(s.label)}</span>` : ''}
+            <div class="slide-thumb-text" style="color:${tc}">${escHtml(s.text || '')}</div>
         </div>`).join('')
 }
 

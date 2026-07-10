@@ -15,8 +15,13 @@ from PyQt6.QtWidgets import (
     QLabel, QScrollArea, QGridLayout, QFileDialog, QProgressBar,
     QSizePolicy, QFrame, QMenu,
 )
-from PyQt6.QtCore import Qt, QSize, QTimer, QUrl, QThread, pyqtSignal
-from PyQt6.QtGui import QPixmap, QImage, QColor, QFont, QPainter, QPen
+from PyQt6.QtCore import (
+    Qt, QSize, QTimer, QUrl, QThread, pyqtSignal, QMimeData, QPoint,
+    QFileSystemWatcher,
+)
+from PyQt6.QtGui import (
+    QPixmap, QImage, QColor, QFont, QPainter, QPen, QLinearGradient, QBrush, QDrag,
+)
 
 from lazy_imports import cv2_available as _cv2_available
 HAS_CV2 = _cv2_available()
@@ -416,10 +421,19 @@ class MediaTab(QWidget):
             "QTabBar::tab:hover { color: #aaa; }"
             "QTabWidget::pane { border: none; }"
         )
-        self._subtabs.addTab(self._build_local_tab(),  "💻 Local")
-        self._subtabs.addTab(self._build_feeds_tab(),  "📷 Feeds")
-        self._subtabs.addTab(self._build_cloud_tab(),  "☁ Cloud")
+        self._subtabs.addTab(self._build_local_tab(),      "💻 Local")
+        self._subtabs.addTab(self._build_feeds_tab(),      "📷 Feeds")
+        self._subtabs.addTab(self._build_cloud_tab(),      "☁ Cloud")
+        self._bg_tab_index = self._subtabs.addTab(
+            self._build_background_tab(), "🎨 Fundal")
+        self._subtabs.currentChanged.connect(self._on_subtab_changed)
         layout.addWidget(self._subtabs)
+
+    def _on_subtab_changed(self, idx: int):
+        # Refresh background thumbnails when entering the Fundal tab (picks up
+        # new previews saved by the editor).
+        if idx == getattr(self, "_bg_tab_index", -1):
+            self._bg_refresh_list()
 
     # ── HELPERS ───────────────────────────────────────────────────────────────
 
@@ -492,6 +506,435 @@ class MediaTab(QWidget):
             return
         for dw in self._control.display_windows:
             dw.show_slide_image(pix)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # BACKGROUND TAB  (gol deocamdată — conținutul vine ulterior)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _build_background_tab(self) -> QWidget:
+        w = QWidget()
+        w.setStyleSheet("background: #181818;")
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        # Top bar: Create / Import / Delete
+        top = QHBoxLayout()
+        top.addWidget(self._section_lbl("FUNDALURI"))
+        top.addStretch()
+
+        new_btn = self._accent_btn("＋ Creează")
+        new_btn.clicked.connect(self._bg_create)
+        top.addWidget(new_btn)
+
+        imp_btn = QPushButton("📥 Import")
+        imp_btn.setStyleSheet(
+            "QPushButton { background: #1c1c1c; color: #aaa; border: 1px solid #2a2a2a; "
+            "border-radius: 4px; padding: 5px 12px; font-size: 11px; }"
+            "QPushButton:hover { background: #252525; color: #fff; }"
+        )
+        imp_btn.clicked.connect(self._bg_import)
+        top.addWidget(imp_btn)
+
+        del_btn = QPushButton("🗑 Șterge")
+        del_btn.setStyleSheet(
+            "QPushButton { background: #2a1a1a; color: #f44336; border: 1px solid #3a2020; "
+            "border-radius: 4px; padding: 5px 12px; font-size: 11px; }"
+            "QPushButton:hover { background: #3a2020; }"
+        )
+        del_btn.clicked.connect(self._bg_delete)
+        top.addWidget(del_btn)
+        layout.addLayout(top)
+
+        # Grid of background cards (with thumbnail previews)
+        self._bg_selected_path_val = None
+        self._bg_scroll = QScrollArea()
+        self._bg_scroll.setWidgetResizable(True)
+        self._bg_scroll.setStyleSheet("QScrollArea { border: none; background: #111; }")
+        self._bg_grid_container = QWidget()
+        self._bg_grid_container.setStyleSheet("background: #111;")
+        self._bg_grid = QGridLayout(self._bg_grid_container)
+        self._bg_grid.setContentsMargins(8, 8, 8, 8)
+        self._bg_grid.setSpacing(8)
+        self._bg_grid.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self._bg_scroll.setWidget(self._bg_grid_container)
+        layout.addWidget(self._bg_scroll, 1)
+
+        hint = QLabel("Click = trimite live  •  Dublu-click = editează  •  Trage în serviciu")
+        hint.setStyleSheet("color: #555; font-size: 10px;")
+        layout.addWidget(hint)
+
+        self._bg_cards = {}
+        self._bg_pending_live = None
+        self._bg_click_timer = QTimer(self)
+        self._bg_click_timer.setSingleShot(True)
+        self._bg_click_timer.timeout.connect(self._bg_click_fire)
+
+        # Auto-refresh the grid when the editor saves (thumbnail .jpg appears).
+        self._bg_watcher = QFileSystemWatcher(self)
+        try:
+            self._bg_watcher.addPath(self._bg_dir())
+        except Exception:
+            pass
+        self._bg_watch_timer = QTimer(self)
+        self._bg_watch_timer.setSingleShot(True)
+        self._bg_watch_timer.timeout.connect(self._bg_refresh_list)
+        self._bg_watcher.directoryChanged.connect(
+            lambda _p: self._bg_watch_timer.start(350))
+        self._bg_watcher.fileChanged.connect(
+            lambda _p: self._bg_watch_timer.start(350))
+
+        QTimer.singleShot(0, self._bg_refresh_list)
+        return w
+
+    def _bg_click_fire(self):
+        """Single-click (no double-click followed) → send the background live."""
+        p = self._bg_pending_live
+        self._bg_pending_live = None
+        if p and self._control and hasattr(self._control, "_send_background_live"):
+            self._control._send_background_live(p)
+
+    # ── Background helpers ──────────────────────────────────────────────────────
+
+    def _bg_dir(self) -> str:
+        # Per-profile so backgrounds created in one profile don't leak into others.
+        try:
+            import database as _db
+            prof = _db.get_active_profile() or "Default"
+        except Exception:
+            prof = "Default"
+        base = os.path.join(os.path.expanduser("~"), "Cantio", "profiles", prof, "backgrounds")
+        os.makedirs(base, exist_ok=True)
+        # One-time migration: move any legacy global backgrounds into the active
+        # profile the first time this runs (so existing designs aren't lost).
+        legacy = os.path.join(os.path.expanduser("~"), "Cantio", "backgrounds")
+        try:
+            if os.path.isdir(legacy) and not os.listdir(base):
+                import shutil
+                for fn in os.listdir(legacy):
+                    src = os.path.join(legacy, fn)
+                    if os.path.isfile(src):
+                        try: shutil.move(src, os.path.join(base, fn))
+                        except Exception: pass
+        except Exception:
+            pass
+        return base
+
+    _BG_CARD_W = 200
+    _BG_THUMB_W = 192
+    _BG_THUMB_H = 108   # 16:9
+    _BG_COLS = 3
+
+    def _bg_refresh_list(self):
+        if not hasattr(self, "_bg_grid"):
+            return
+        # Clear old cards
+        while self._bg_grid.count():
+            it = self._bg_grid.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        self._bg_cards = {}
+
+        paths = []
+        try:
+            for fn in sorted(os.listdir(self._bg_dir())):
+                if fn.lower().endswith(".json"):
+                    paths.append(os.path.join(self._bg_dir(), fn))
+        except Exception:
+            pass
+
+        if not paths:
+            empty = QLabel("Niciun fundal. Apasă «＋ Creează».")
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty.setStyleSheet("color: #444; font-size: 12px; padding: 30px;")
+            self._bg_grid.addWidget(empty, 0, 0, 1, self._BG_COLS)
+            return
+
+        # Keep the file watcher in sync (covers thumbnail overwrites of
+        # existing backgrounds, which don't trigger directoryChanged).
+        if hasattr(self, "_bg_watcher"):
+            try:
+                watched = self._bg_watcher.files()
+                if watched:
+                    self._bg_watcher.removePaths(watched)
+                jpgs = [p[:-5] + ".jpg" for p in paths if os.path.exists(p[:-5] + ".jpg")]
+                if jpgs:
+                    self._bg_watcher.addPaths(jpgs)
+                if self._bg_dir() not in self._bg_watcher.directories():
+                    self._bg_watcher.addPath(self._bg_dir())
+            except Exception:
+                pass
+
+        for pos, path in enumerate(paths):
+            card = self._bg_make_card(path)
+            self._bg_cards[path] = card
+            self._bg_grid.addWidget(card, pos // self._BG_COLS, pos % self._BG_COLS)
+
+        # Keep selection highlight if still present
+        if self._bg_selected_path_val in self._bg_cards:
+            self._bg_highlight(self._bg_selected_path_val)
+
+    def _bg_make_card(self, path: str):
+        name = os.path.basename(path)[:-5]
+        data = {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            name = data.get("name", name)
+        except Exception:
+            pass
+
+        card = QFrame()
+        card.setFixedSize(self._BG_CARD_W, self._BG_THUMB_H + 38)
+        card.setProperty("bgpath", path)
+        card.setStyleSheet(
+            "QFrame { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; }"
+            "QFrame:hover { border-color: #5294e2; }"
+        )
+        card.setCursor(Qt.CursorShape.PointingHandCursor)
+        vl = QVBoxLayout(card)
+        vl.setContentsMargins(4, 4, 4, 4)
+        vl.setSpacing(3)
+
+        thumb = QLabel()
+        thumb.setFixedSize(self._BG_THUMB_W, self._BG_THUMB_H)
+        thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        thumb.setStyleSheet("background: #0d0d0d; border-radius: 3px;")
+        thumb.setPixmap(self._bg_thumb_pixmap(path, data))
+        vl.addWidget(thumb)
+
+        name_lbl = QLabel(name)
+        name_lbl.setStyleSheet(
+            "color: #ccc; font-size: 11px; background: transparent; border: none;")
+        name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        vl.addWidget(name_lbl)
+
+        card._press_pos = None
+
+        def _press(e, p=path, c=card):
+            if e.button() != Qt.MouseButton.LeftButton:
+                return
+            c._press_pos = (e.position().toPoint() if hasattr(e, "position") else e.pos())
+            self._bg_select(p)
+            # Defer "send live" so a double-click (edit) can cancel it.
+            self._bg_pending_live = p
+            self._bg_click_timer.start(260)
+
+        def _move(e, p=path, c=card):
+            if not (e.buttons() & Qt.MouseButton.LeftButton) or c._press_pos is None:
+                return
+            now = (e.position().toPoint() if hasattr(e, "position") else e.pos())
+            if (now - c._press_pos).manhattanLength() < 12:
+                return
+            # Movement → start a drag (cancel the pending live-send)
+            self._bg_click_timer.stop()
+            self._bg_pending_live = None
+            c._press_pos = None
+            drag = QDrag(c)
+            mime = QMimeData()
+            mime.setText(f"CANTIO_BG:{p}")
+            drag.setMimeData(mime)
+            try:
+                pm = c.grab().scaled(160, 90, Qt.AspectRatioMode.KeepAspectRatio,
+                                     Qt.TransformationMode.SmoothTransformation)
+                drag.setPixmap(pm)
+                drag.setHotSpot(QPoint(pm.width() // 2, pm.height() // 2))
+            except Exception:
+                pass
+            drag.exec(Qt.DropAction.CopyAction)
+
+        def _dbl(e, p=path):
+            self._bg_click_timer.stop()
+            self._bg_pending_live = None
+            self._bg_select(p)
+            self._bg_open_editor(p)
+
+        card.mousePressEvent = _press
+        card.mouseMoveEvent = _move
+        card.mouseDoubleClickEvent = _dbl
+        return card
+
+    def _bg_thumb_pixmap(self, path: str, data: dict) -> QPixmap:
+        """Return the saved .jpg thumbnail, or a generated gradient preview."""
+        jpg = path[:-5] + ".jpg"
+        if os.path.exists(jpg):
+            pix = QPixmap(jpg)
+            if not pix.isNull():
+                return pix.scaled(
+                    self._BG_THUMB_W, self._BG_THUMB_H,
+                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                    Qt.TransformationMode.SmoothTransformation)
+        return self._bg_make_placeholder(data)
+
+    def _bg_make_placeholder(self, data: dict) -> QPixmap:
+        """Render a quick gradient preview from the first gradient layer."""
+        w, h = self._BG_THUMB_W, self._BG_THUMB_H
+        pix = QPixmap(w, h)
+        pix.fill(QColor("#0d0d0d"))
+        p = QPainter(pix)
+        try:
+            grad_layer = None
+            for L in data.get("layers", []):
+                if L.get("type") == "gradient" and L.get("visible", True):
+                    grad_layer = L
+                    break
+            if grad_layer:
+                stops = grad_layer.get("stops", [])
+                angle = grad_layer.get("angle", 135)
+                import math
+                rad = math.radians(angle)
+                dx, dy = math.cos(rad) * w / 2, math.sin(rad) * h / 2
+                g = QLinearGradient(w / 2 - dx, h / 2 - dy, w / 2 + dx, h / 2 + dy)
+                if stops:
+                    for s in stops:
+                        try:
+                            g.setColorAt(max(0.0, min(1.0, s.get("pos", 0))),
+                                         QColor(s.get("color", "#000")))
+                        except Exception:
+                            pass
+                else:
+                    g.setColorAt(0, QColor("#1a237e"))
+                    g.setColorAt(1, QColor("#0d47a1"))
+                p.fillRect(0, 0, w, h, QBrush(g))
+            else:
+                p.setPen(QColor("#555"))
+                p.setFont(QFont("Segoe UI", 22))
+                p.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "🎨")
+        finally:
+            p.end()
+        return pix
+
+    def _bg_select(self, path: str):
+        self._bg_selected_path_val = path
+        self._bg_highlight(path)
+
+    def _bg_highlight(self, path: str):
+        for p, card in self._bg_cards.items():
+            if p == path:
+                card.setStyleSheet(
+                    "QFrame { background: #1c3a5a; border: 2px solid #5294e2; border-radius: 6px; }")
+            else:
+                card.setStyleSheet(
+                    "QFrame { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; }"
+                    "QFrame:hover { border-color: #5294e2; }")
+
+    def _bg_selected_path(self):
+        return getattr(self, "_bg_selected_path_val", None)
+
+    def _bg_create(self):
+        from PyQt6.QtWidgets import QInputDialog
+        name, ok = QInputDialog.getText(self, "Fundal nou", "Nume fundal:")
+        if not ok or not name.strip():
+            return
+        safe = "".join(c for c in name.strip() if c.isalnum() or c in " -_").strip()
+        if not safe:
+            safe = "fundal"
+        path = os.path.join(self._bg_dir(), f"{safe}.json")
+        i = 1
+        while os.path.exists(path):
+            path = os.path.join(self._bg_dir(), f"{safe}_{i}.json")
+            i += 1
+        # Minimal default background document
+        default = {
+            "name": name.strip(),
+            "format": {"w": 1920, "h": 1080},
+            "transition": {"in": "fade", "out": "fade", "duration": 600},
+            "layers": [{
+                "id": "l_grad", "type": "gradient", "visible": True, "opacity": 1,
+                "x": 0.5, "y": 0.5, "w": 1, "h": 1, "rotation": 0,
+                "gradientType": "linear", "angle": 135,
+                "stops": [{"pos": 0, "color": "#1a237e"},
+                          {"pos": 0.5, "color": "#3949ab"},
+                          {"pos": 1, "color": "#0d47a1"}],
+                "animate": {"mode": "none", "speed": 0.4},
+                "shadow": {"enabled": False, "color": "#000000", "blur": 18, "x": 0, "y": 8},
+                "blur": 0, "anim": {},
+            }],
+        }
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(default, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Eroare", f"Nu am putut crea fundalul:\n{e}")
+            return
+        self._bg_refresh_list()
+        self._bg_open_editor(path)
+
+    def _bg_edit(self):
+        path = self._bg_selected_path()
+        if path:
+            self._bg_open_editor(path)
+
+    def _bg_open_editor(self, path: str):
+        mgr = getattr(self._control, "electron_display", None) if self._control else None
+        if mgr is None:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, "Editor indisponibil",
+                "Subsistemul Electron nu este disponibil.")
+            return
+        def _toast(msg, kind="info"):
+            try:
+                from toast_notifications import show_toast
+                show_toast(msg, kind)
+            except Exception:
+                pass
+        try:
+            # Launch the editor as a dedicated Electron process. This always
+            # loads the current on-disk main.js (no stale-process issues) and is
+            # independent of whether a live display is open.
+            ok = False
+            if hasattr(mgr, "open_bg_editor_process"):
+                ok = mgr.open_bg_editor_process(path)
+            if ok:
+                _toast("🎨 Se deschide editorul de fundal…", "info")
+                return
+            # Fallback: command the running live-display process (works if
+            # it is running a fresh main.js).
+            if hasattr(mgr, "is_running") and not mgr.is_running():
+                mgr.start()
+            mgr.open_bg_editor(path)
+            _toast("Editor lansat prin procesul live (verifică ferestrele)", "warning")
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Eroare", f"Nu am putut deschide editorul:\n{e}")
+
+    def _bg_import(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import fundal", "", "Fundal Cantio (*.json)")
+        if not path:
+            return
+        try:
+            import shutil
+            with open(path, "r", encoding="utf-8") as f:
+                json.load(f)   # validate
+            dest = os.path.join(self._bg_dir(), os.path.basename(path))
+            i = 1
+            base, ext = os.path.splitext(os.path.basename(path))
+            while os.path.exists(dest):
+                dest = os.path.join(self._bg_dir(), f"{base}_{i}{ext}")
+                i += 1
+            shutil.copy2(path, dest)
+            self._bg_refresh_list()
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Eroare import", str(e))
+
+    def _bg_delete(self):
+        path = self._bg_selected_path()
+        if not path:
+            return
+        from PyQt6.QtWidgets import QMessageBox
+        if QMessageBox.question(
+                self, "Confirmare",
+                f"Ștergi fundalul?\n{os.path.basename(path)}") != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            os.remove(path)
+        except Exception:
+            pass
+        self._bg_refresh_list()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # LOCAL TAB

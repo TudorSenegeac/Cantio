@@ -35,7 +35,7 @@ from translations import t, set_language
 
 # Initialise structured logging as early as possible
 _logger = setup_logger()
-_logger.info("Cantio pornit (v1.0.0)")
+_logger.info("Cantio pornit (v1.5.0)")
 
 
 def _global_exception_handler(exc_type, exc_value, exc_tb):
@@ -78,7 +78,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Cantio")
     app.setOrganizationName("Cantio")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion("1.5.0")
 
     # Prevent Qt from quitting automatically when the splash (or any dialog)
     # closes before the main window is visible — fixes the race condition where
@@ -105,11 +105,26 @@ def main():
     _dlg_holder = [None]   # mutable ref so the close-splash timer can reach the dialog
 
     def _launch(splash):
-        # Profile selection (quick — splash still visible)
-        dlg = pm.ProfileSelectDialog()
-        _dlg_holder[0] = dlg   # expose to the timer below
-        dlg.exec()
-        profile = dlg.selected_profile or "Default"
+        # If we were relaunched by a profile switch, open that profile directly
+        # (skip the selection dialog).
+        _pending = None
+        try:
+            _flag = os.path.join(os.path.expanduser("~"), "Cantio", ".pending_profile")
+            if os.path.exists(_flag):
+                with open(_flag, encoding="utf-8") as f:
+                    _pending = f.read().strip()
+                os.remove(_flag)
+        except Exception:
+            _pending = None
+
+        if _pending:
+            profile = _pending
+        else:
+            # Profile selection (quick — splash still visible)
+            dlg = pm.ProfileSelectDialog()
+            _dlg_holder[0] = dlg   # expose to the timer below
+            dlg.exec()
+            profile = dlg.selected_profile or "Default"
 
         pm.create_profile(profile)
         db.set_active_profile(profile)

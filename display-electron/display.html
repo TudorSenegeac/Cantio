@@ -18,6 +18,7 @@
       object-fit: cover;
       display: none;
       z-index: 0;
+      transition: opacity 0.45s ease;
     }
     #bg-image {
       position: absolute; inset: 0;
@@ -25,12 +26,14 @@
       object-fit: cover;
       display: none;
       z-index: 0;
+      transition: opacity 0.45s ease;
     }
-    #canvas-prev, #canvas-curr {
+    #canvas-bg, #canvas-bg2, #canvas-prev, #canvas-curr {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
-      z-index: 1;
     }
+    #canvas-bg   { z-index: 0; display: none; }
+    #canvas-bg2  { z-index: 0; display: none; }  /* old-bg snapshot for transitions */
     #canvas-prev { z-index: 1; }
     #canvas-curr { z-index: 2; }
   </style>
@@ -38,8 +41,13 @@
 <body>
   <video id="bg-video" autoplay loop muted playsinline></video>
   <img    id="bg-image" alt="">
+  <canvas id="canvas-bg"></canvas>
+  <canvas id="canvas-bg2"></canvas>
   <canvas id="canvas-prev"></canvas>
   <canvas id="canvas-curr"></canvas>
+  <script src="fonts.js"></script>
+  <script src="bg-engine.js"></script>
   <script src="display.js"></script>
+  <script>if (window.CantioFonts) CantioFonts.loadGoogleFonts(document);</script>
 </body>
 </html>
