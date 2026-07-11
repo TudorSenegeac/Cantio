@@ -1505,8 +1505,19 @@ class SlideListDelegate(QStyledItemDelegate):
     _PADDING  = 12      # top + bottom padding inside row
     _NUM_W    = 32      # width reserved for the slide number column
 
+    @staticmethod
+    def _safe_text(index):
+        """Coerce model data to a plain string. Slides may be stored as dicts
+        ({'text': ...}) when they carry labels, or as lists — never assume str."""
+        data = index.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, dict):
+            return str(data.get("text", "") or "")
+        if isinstance(data, (list, tuple)):
+            return "\n".join(str(x) for x in data)
+        return str(data) if data is not None else ""
+
     def sizeHint(self, option, index):
-        text = index.data(Qt.ItemDataRole.UserRole) or ""
+        text = self._safe_text(index)
         lines = max(1, text.count("\n") + 1)
         return QSize(option.rect.width(),
                      max(44, lines * self._LINE_H + self._PADDING * 2))
@@ -1514,7 +1525,7 @@ class SlideListDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         painter.save()
 
-        text    = index.data(Qt.ItemDataRole.UserRole) or ""
+        text    = self._safe_text(index)
         num     = index.data(Qt.ItemDataRole.UserRole + 1)
         num_str = str(num) if num is not None else ""
 
@@ -7177,7 +7188,8 @@ class ControlWindow(QMainWindow):
         self._slide_list_widget.clear()
         for i, slide in enumerate(slides):
             item = QListWidgetItem()          # delegate does all painting
-            item.setData(Qt.ItemDataRole.UserRole, slide)       # full text
+            item.setData(Qt.ItemDataRole.UserRole,
+                         self._slide_text(slide))               # full text (never a dict)
             item.setData(Qt.ItemDataRole.UserRole + 1, i + 1)   # 1-based number
             self._slide_list_widget.addItem(item)
 
