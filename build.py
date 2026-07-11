@@ -301,7 +301,7 @@ def build_installer_windows():
 ; Genererat automat de build.py
 
 !define APP_NAME "Cantio"
-!define APP_VERSION "1.5.0"
+!define APP_VERSION "1.5.1"
 !define APP_PUBLISHER "Senegeac Tudor"
 !define APP_URL "https://cantioapp.com"
 !define APP_EXE "Cantio.exe"
@@ -424,7 +424,7 @@ def build_installer_mac():
     script = """\
 #!/bin/bash
 APP_NAME="Cantio"
-VERSION="1.5.0"
+VERSION="1.5.1"
 DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
 APP_PATH="dist/${APP_NAME}.app"
 DMG_DIR="build/dmg_temp"
@@ -489,7 +489,7 @@ def build_installer_linux():
 """)
         return
 
-    run(["appimagetool", str(appdir), "Cantio-v1.5.0-Linux.AppImage"])
+    run(["appimagetool", str(appdir), "Cantio-v1.5.1-Linux.AppImage"])
     print("  ✅ AppImage Linux creat!")
 
 
@@ -532,7 +532,7 @@ def ensure_icon_ico():
 
 def main():
     print("=" * 60)
-    print("CANTIO BUILD SYSTEM v1.5.0")
+    print("CANTIO BUILD SYSTEM v1.5.1")
     print(f"Platformă: {platform.system()} {platform.machine()}")
     print(f"Python: {sys.version.split()[0]}")
     print("=" * 60)

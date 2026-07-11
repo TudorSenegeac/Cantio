@@ -171,7 +171,7 @@ class AboutDialog(QDialog):
         name_lbl.setStyleSheet("color: #cba6f7;")
         title_v.addWidget(name_lbl)
 
-        ver_lbl = QLabel("Versiunea 1.5.0 Stable")
+        ver_lbl = QLabel("Versiunea 1.5.1 Stable")
         ver_lbl.setStyleSheet("color: #6c7086; font-size: 12px;")
         title_v.addWidget(ver_lbl)
 

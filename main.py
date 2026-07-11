@@ -35,7 +35,7 @@ from translations import t, set_language
 
 # Initialise structured logging as early as possible
 _logger = setup_logger()
-_logger.info("Cantio pornit (v1.5.0)")
+_logger.info("Cantio pornit (v1.5.1)")
 
 
 def _global_exception_handler(exc_type, exc_value, exc_tb):
@@ -78,7 +78,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("Cantio")
     app.setOrganizationName("Cantio")
-    app.setApplicationVersion("1.5.0")
+    app.setApplicationVersion("1.5.1")
 
     # Prevent Qt from quitting automatically when the splash (or any dialog)
     # closes before the main window is visible — fixes the race condition where
