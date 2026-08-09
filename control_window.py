@@ -647,6 +647,7 @@ class SlideThumbnail(QWidget):
         self.slide_index = index
         self.settings = settings or {}
         self._selected = False
+        self._sel_active = True    # True = blue (slides have focus), False = grey
         self._hovered = False
         self.thumb_w = thumb_w
         self.thumb_h = thumb_h
@@ -665,6 +666,19 @@ class SlideThumbnail(QWidget):
         if self._selected != val:
             self._selected = val
             self.mark_dirty()
+
+    def set_selection_active(self, active: bool):
+        """Blue (active) when the slides panel has focus; grey (inactive) when
+        focus moved to the song/service list — a visual cue that keyboard slide
+        navigation targets the slides only while this is blue."""
+        active = bool(active)
+        if self._sel_active != active:
+            self._sel_active = active
+            if self._selected:      # only the selected thumb shows the colour
+                self.mark_dirty()
+
+    def _sel_color(self):
+        return QColor("#5294e2") if self._sel_active else QColor("#585863")
 
     def mark_dirty(self):
         """Invalidate cached pixmap; schedules a repaint."""
@@ -777,7 +791,7 @@ class SlideThumbnail(QWidget):
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation))
             if self._selected:
-                pen = p.pen(); pen.setColor(QColor("#5294e2")); pen.setWidth(3); p.setPen(pen)
+                pen = p.pen(); pen.setColor(self._sel_color()); pen.setWidth(3); p.setPen(pen)
                 p.drawRect(1, 1, self.thumb_w - 2, self.thumb_h - 2)
             if self.label:
                 p.fillRect(0, self.thumb_h, self.thumb_w, 22, QColor("#141414"))
@@ -902,11 +916,14 @@ class SlideThumbnail(QWidget):
                 render_text_on_painter(p, self.slide_text, tw3, th3, s, scale3)
 
         # ── Label bar ─────────────────────────────────────────────────────────
-        bar_color = QColor("#1a3355" if self._selected else "#161616")
+        if self._selected:
+            bar_color = QColor("#1a3355" if self._sel_active else "#2b2b33")
+        else:
+            bar_color = QColor("#161616")
         p.fillRect(label_rect, bar_color)
 
         # Number badge
-        badge_color = QColor("#5294e2") if self._selected else QColor("#2a2a2a")
+        badge_color = self._sel_color() if self._selected else QColor("#2a2a2a")
         badge_rect  = QRect(4 * SS, th3 + 4 * SS, 22 * SS, 14 * SS)
         p.setBrush(QBrush(badge_color))
         p.setPen(Qt.PenStyle.NoPen)
@@ -932,7 +949,7 @@ class SlideThumbnail(QWidget):
 
         # Border
         if self._selected:
-            pen = QPen(QColor("#5294e2"))
+            pen = QPen(self._sel_color())
             pen.setWidth(2 * SS)
         elif self._hovered:
             pen = QPen(QColor("#3a3a3a"))
@@ -2004,6 +2021,14 @@ class ControlWindow(QMainWindow):
         self._build_statusbar()
         self._load_library()
         self._setup_shortcuts()
+
+        # Track focus so the selected slide shows blue (active) when the slides
+        # panel drives the keyboard, and grey (inactive) once focus moves to the
+        # song or service list — so the operator always knows what Page Up/Down hit.
+        try:
+            QApplication.instance().focusChanged.connect(self._on_focus_changed)
+        except Exception:
+            pass
 
         # Toast notification manager (must be created after window is built)
         self._toasts = ToastManager(self)
@@ -7594,6 +7619,31 @@ class ControlWindow(QMainWindow):
         self._slide_list_widget.blockSignals(True)
         self._slide_list_widget.setCurrentRow(idx)
         self._slide_list_widget.blockSignals(False)
+
+    # ── Slide-selection focus state (blue = active, grey = inactive) ────────────
+    @staticmethod
+    def _widget_is_in(w, container):
+        """True if w is container or a descendant of it."""
+        if container is None or w is None:
+            return False
+        while w is not None:
+            if w is container:
+                return True
+            w = w.parentWidget()
+        return False
+
+    def _set_slides_selection_active(self, active: bool):
+        for thumb in getattr(self, "_thumbnails", []):
+            try: thumb.set_selection_active(active)
+            except Exception: pass
+
+    def _on_focus_changed(self, old, new):
+        """Grey the slide selection when focus moves to the song/service list."""
+        if new is None:
+            return
+        inactive = (self._widget_is_in(new, getattr(self, "song_list", None)) or
+                    self._widget_is_in(new, getattr(self, "_service_list", None)))
+        self._set_slides_selection_active(not inactive)
 
     def _track_song_modification(self):
         """Record that the current song has been modified (captures old_content once)."""
