@@ -10085,9 +10085,14 @@ class ControlWindow(QMainWindow):
         if getattr(self, "_embed_container", None) is not None:
             try: self._fit_embed()
             except Exception: pass
-        # Rebuild thumbnails with new ratio
+        # Rebuild thumbnails with new ratio — but PRESERVE the operator's selected
+        # slide (_set_slides always re-selects slide 0). Without this, opening the
+        # Display re-lays-out the thumbnails and would reset the selection to slide 1.
         if self.current_slides:
+            _keep = self.current_slide_idx
             self._set_slides(self.current_slides)
+            if 0 <= _keep < len(self.current_slides):
+                self._select_slide_silent(_keep)
 
     def _get_display_screen_size(self) -> tuple[int, int]:
         """Return (width, height) of the display screen in pixels.
