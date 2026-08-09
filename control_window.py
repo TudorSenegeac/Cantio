@@ -7670,12 +7670,16 @@ class ControlWindow(QMainWindow):
             except Exception: pass
 
     def _on_focus_changed(self, old, new):
-        """Grey the slide selection when focus moves to the song/service list."""
-        if new is None:
+        """Slide selection is blue only while the slides are the active target.
+        Selecting a slide sets it active; focus landing on ANY other control (live
+        buttons like Clear Text / Black, lists, editor, combos) greys it out."""
+        if new is None or new is self:
+            return   # main window itself (e.g. right after selecting a slide)
+        # Focus inside the slides area (thumbnail grid / list view) keeps it active.
+        if self._widget_is_in(new, getattr(self, "_slides_stack", None)):
             return
-        inactive = (self._widget_is_in(new, getattr(self, "song_list", None)) or
-                    self._widget_is_in(new, getattr(self, "_service_list", None)))
-        self._set_slides_selection_active(not inactive)
+        # Anywhere else → the slides are no longer the active target.
+        self._set_slides_selection_active(False)
 
     def _track_song_modification(self):
         """Record that the current song has been modified (captures old_content once)."""
@@ -8694,6 +8698,7 @@ class ControlWindow(QMainWindow):
                 dw.canvas.set_frame(pixmap)   # no-op in v4 DisplayCanvas
 
     def _black_screen(self):
+        self._set_slides_selection_active(False)   # live command → slides not the target
         for dw in self.display_windows:
             dw.black_screen()
         self._preview_cmd("black_screen")
@@ -10631,6 +10636,7 @@ class ControlWindow(QMainWindow):
 
     def _clear_text(self):
         """Clear text from all displays without affecting background."""
+        self._set_slides_selection_active(False)   # live command → slides not the target
         for dw in self.display_windows:
             if hasattr(dw, "clear_text"):
                 dw.clear_text()
@@ -10646,6 +10652,7 @@ class ControlWindow(QMainWindow):
         self._update_status(slide_msg="Text cleared")
 
     def _toggle_freeze(self, checked):
+        self._set_slides_selection_active(False)   # live command → slides not the target
         self._is_frozen = checked
         for dw in self.display_windows:
             if checked:
@@ -10682,6 +10689,7 @@ class ControlWindow(QMainWindow):
         self._push_remote_state()
 
     def _toggle_logo(self, checked):
+        self._set_slides_selection_active(False)   # live command → slides not the target
         if checked:
             if self._logo_pixmap is None:
                 path, _ = QFileDialog.getOpenFileName(
