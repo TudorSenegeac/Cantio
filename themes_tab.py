@@ -760,6 +760,34 @@ class ThemesTab(QWidget):
         self._save_themes(themes)
         show_toast(f"✅ '{theme_name}' → {category}", "success")
 
+    def _set_for_song(self, theme_name: str):
+        """Save the theme as the CURRENT song's theme (song_themes[song_id]) and
+        apply it live. Switching to another song then auto-uses that song's theme,
+        falling back to its category default (unless it too has its own theme)."""
+        pc = self.parent_control
+        song_id = getattr(pc, "current_song_id", None) if pc else None
+        if song_id is None:
+            show_toast("Încarcă o cântare mai întâi", "warning")
+            return
+        themes = self._load_themes()
+        themes.setdefault("song_themes", {})[str(song_id)] = theme_name
+        self._save_themes(themes)
+        # Per-song themes only resolve in "themes" mode — turn it on so it takes effect.
+        try:
+            if pc.settings.get("display_mode") != "themes":
+                pc.settings["display_mode"] = "themes"
+                import database as _db
+                _db.save_setting("display_mode", "themes")
+        except Exception:
+            pass
+        # Apply to preview + thumbnails + any live display immediately.
+        try: pc._apply_current_song_theme_live()
+        except Exception: pass
+        title = ""
+        try: title = (pc._current_metadata or {}).get("title", "")
+        except Exception: pass
+        show_toast(f"🎵 '{theme_name}' → «{title or 'cântarea curentă'}»", "success")
+
     # ── Context menus ─────────────────────────────────────────────────────────
 
     def _context_menu_for(self, theme_name: str, event):
@@ -778,6 +806,16 @@ class ThemesTab(QWidget):
         menu.addAction("✏ Redenumește").triggered.connect(
             lambda: self._rename_theme(theme_name))
         menu.addSeparator()
+        # Per-song assignment (only meaningful when a song is loaded)
+        song_title = ""
+        try:
+            song_title = (self.parent_control._current_metadata or {}).get("title", "")
+        except Exception:
+            pass
+        if getattr(self.parent_control, "current_song_id", None) is not None:
+            label = f"🎵 Aplică pe «{song_title}»" if song_title else "🎵 Aplică pe cântarea curentă"
+            menu.addAction(label).triggered.connect(
+                lambda: self._set_for_song(theme_name))
         menu.addAction("★ Setează ca default").triggered.connect(
             lambda: self._set_default(theme_name))
 
@@ -960,12 +998,16 @@ class ThemesTab(QWidget):
         self._open_visual_editor(self._current_theme)
 
     def _apply_selected_theme(self):
-        """Set the selected theme as the default for its type."""
+        """Apply the selected theme. If a song is loaded, assign it to THAT song
+        (per-song theme); otherwise set it as the global default for its type."""
         name = self._current_theme
         if not name:
             show_toast("Selectează o temă mai întâi", "warning")
             return
-        self._set_default(name)
+        if getattr(self.parent_control, "current_song_id", None) is not None:
+            self._set_for_song(name)
+        else:
+            self._set_default(name)
 
     def _duplicate_selected(self):
         """Duplicate the selected theme."""

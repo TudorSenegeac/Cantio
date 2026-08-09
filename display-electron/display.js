@@ -581,12 +581,23 @@ function handleMessage(msg) {
       state.settings = { ...state.settings, ...incoming };
       const _bgSigAfter = _bgSignature(state.settings);
       applyBackground(state.settings);
-      // Fade the canvas-drawn background (colour/gradient) when it actually
-      // changes; the DOM image/video fades via CSS. Avoid a transition on every
-      // settings packet (those arrive on each slide) — only when bg changed.
+      // Transition the background when it actually changes (e.g. switching to a
+      // song with a different theme). Use the theme's configured transition so it
+      // is settable from the Theme editor. Avoid transitioning on every settings
+      // packet (those arrive on each slide) — only when the bg signature changed.
       if (_bgSigBefore !== _bgSigAfter && !transition.active) {
         capturePrev();
-        startTransition('fade', 450);
+        const bgTType = state.settings.bg_transition
+                      || state.settings.transition
+                      || 'fade';
+        const bgTDur  = parseInt(state.settings.bg_transition_duration
+                      || state.settings.transition_duration
+                      || 450, 10);
+        if (bgTType === 'instant' || bgTType === 'none') {
+          renderCurrent();
+        } else {
+          startTransition(bgTType, bgTDur);
+        }
       } else {
         renderCurrent();
       }

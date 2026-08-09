@@ -5205,6 +5205,20 @@ class ControlWindow(QMainWindow):
             elif hasattr(thumb, "apply_settings"):
                 thumb.apply_settings(s)
 
+    def _apply_current_song_theme_live(self):
+        """Re-resolve the current song's theme and push it to preview, thumbnails
+        and any live display — so assigning/switching a per-song theme changes the
+        background immediately (with the theme's transition on the live output)."""
+        s = self._resolve_settings(source="songs", song_id=self.current_song_id)
+        try: self.preview.apply_settings(s)
+        except Exception: pass
+        self._refresh_thumbnails_with_theme(self.current_song_id)
+        # Only touch the live output when it's actually showing content.
+        if self.display_windows and getattr(self, "_live_armed", False):
+            for dw in self.display_windows:
+                try: dw.apply_settings(s)
+                except Exception: pass
+
     def _update_notes_bar(self, notes):
         self.current_song_notes = notes
         if notes.strip():
