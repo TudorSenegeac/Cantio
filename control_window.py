@@ -1989,6 +1989,7 @@ class ControlWindow(QMainWindow):
         # A freshly opened Display stays black until this is armed — but a slide
         # selected BEFORE opening still shows, because we don't reset it on open.
         self._live_armed = False
+        self._slide_just_selected = False
         self._is_frozen = False
         self._logo_pixmap = None
         self._stage_editor = None
@@ -7631,6 +7632,11 @@ class ControlWindow(QMainWindow):
         self._push_stage_state()
         # Selecting a slide makes the slides the active target → blue selection.
         self._set_slides_selection_active(True)
+        # Ignore the focus churn that follows (activateWindow + the thumbnail's
+        # caret-restore to the editor) for a moment, so the selection stays blue
+        # even when the caret is returned to the lyrics editor after the click.
+        self._slide_just_selected = True
+        QTimer.singleShot(120, lambda: setattr(self, "_slide_just_selected", False))
         # Return keyboard focus to the main window so arrow keys work immediately
         self.setFocus()
         self.activateWindow()
@@ -7675,6 +7681,10 @@ class ControlWindow(QMainWindow):
         buttons like Clear Text / Black, lists, editor, combos) greys it out."""
         if new is None or new is self:
             return   # main window itself (e.g. right after selecting a slide)
+        # A slide was just selected → ignore the brief focus churn (the caret is
+        # restored to the editor) so the selection stays blue.
+        if getattr(self, "_slide_just_selected", False):
+            return
         # Focus inside the slides area (thumbnail grid / list view) keeps it active.
         if self._widget_is_in(new, getattr(self, "_slides_stack", None)):
             return
