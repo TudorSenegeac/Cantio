@@ -848,11 +848,23 @@ function handleMessage(msg) {
 function _bgSignature(s) {
   if (!s) return '';
   return [s.bg_type, s.bg_color, s.bg_image, s.bg_grad_c1, s.bg_grad_c2,
-          s.bg_grad_dir, s.bg_fundal_file, s.bg_transparent].join('|');
+          s.bg_grad_dir, s.bg_fundal_file, s.bg_transparent, s.bg_opacity].join('|');
 }
+
+// Last background actually loaded into the DOM. Used to avoid restarting a video
+// or camera stream on every slide change — the text and the background are
+// independent, so navigating text must NOT reload unchanged background media.
+let _lastAppliedBgSig = null;
 
 function applyBackground(s) {
   if (!s) return;
+
+  // Skip the (expensive) media reload when the background is unchanged. Without
+  // this, each show_text/settings packet on slide navigation would re-run
+  // getUserMedia (camera) or reset video.src (video) — freezing the background.
+  const _sig = _bgSignature(s);
+  if (_sig === _lastAppliedBgSig) return;
+  _lastAppliedBgSig = _sig;
 
   const bg       = (s.bg_image || '').trim();
   const bgType   = s.bg_type   || 'color';
