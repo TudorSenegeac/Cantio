@@ -697,16 +697,10 @@ class SlideThumbnail(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Restore focus ONLY to a text editor (lyrics/title), so clicking a
-            # slide never steals the caret while typing. Do NOT restore focus to
-            # lists (song/service) — that would keep the slide selection greyed out
-            # even though the operator just picked a slide.
-            prev_focus = QApplication.focusWidget()
-            from PyQt6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit
-            restore = isinstance(prev_focus, (QLineEdit, QTextEdit, QPlainTextEdit))
+            # Clicking a slide moves the operator's attention to the slides — focus
+            # handling (leaving the editor so Page Up/Down navigate slides) is done
+            # in _select_slide. We deliberately do NOT restore the editor caret here.
             self.clicked.emit(self.slide_index)
-            if restore and prev_focus is not self:
-                QTimer.singleShot(0, prev_focus.setFocus)
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -7632,13 +7626,16 @@ class ControlWindow(QMainWindow):
         self._push_stage_state()
         # Selecting a slide makes the slides the active target → blue selection.
         self._set_slides_selection_active(True)
-        # Ignore the focus churn that follows (activateWindow + the thumbnail's
-        # caret-restore to the editor) for a moment, so the selection stays blue
-        # even when the caret is returned to the lyrics editor after the click.
+        # Take keyboard focus AWAY from the lyrics editor so Page Up/Down and the
+        # arrow keys navigate slides (handled in keyPressEvent) instead of moving
+        # the text caret. Clearing focus routes key events to the main window.
+        fw = QApplication.focusWidget()
+        from PyQt6.QtWidgets import QLineEdit as _QLE, QTextEdit as _QTE, QPlainTextEdit as _QPTE
+        if isinstance(fw, (_QLE, _QTE, _QPTE)):
+            fw.clearFocus()
+        # Ignore the brief focus churn that follows so the selection stays blue.
         self._slide_just_selected = True
         QTimer.singleShot(120, lambda: setattr(self, "_slide_just_selected", False))
-        # Return keyboard focus to the main window so arrow keys work immediately
-        self.setFocus()
         self.activateWindow()
 
     def _select_slide_silent(self, idx: int):
@@ -11372,13 +11369,13 @@ class ControlWindow(QMainWindow):
 
         if key in (Qt.Key.Key_Space, Qt.Key.Key_Return):
             self._go_live()
-        elif key in (Qt.Key.Key_Right, Qt.Key.Key_Down):
+        elif key in (Qt.Key.Key_Right, Qt.Key.Key_Down, Qt.Key.Key_PageDown):
             # Next slide + send live
             if self.current_slide_idx < len(self.current_slides) - 1:
                 self._select_slide(self.current_slide_idx + 1)
                 if self._is_live or self.display_windows:
                     self._go_live()
-        elif key in (Qt.Key.Key_Left, Qt.Key.Key_Up):
+        elif key in (Qt.Key.Key_Left, Qt.Key.Key_Up, Qt.Key.Key_PageUp):
             # Prev slide + send live
             if self.current_slide_idx > 0:
                 self._select_slide(self.current_slide_idx - 1)
