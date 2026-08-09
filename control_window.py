@@ -697,12 +697,15 @@ class SlideThumbnail(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Save whatever widget had focus (typically the lyrics editor) so we
-            # can restore it after the click handler runs.  This prevents the
-            # thumbnail from stealing the caret while the user is typing.
+            # Restore focus ONLY to a text editor (lyrics/title), so clicking a
+            # slide never steals the caret while typing. Do NOT restore focus to
+            # lists (song/service) — that would keep the slide selection greyed out
+            # even though the operator just picked a slide.
             prev_focus = QApplication.focusWidget()
+            from PyQt6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit
+            restore = isinstance(prev_focus, (QLineEdit, QTextEdit, QPlainTextEdit))
             self.clicked.emit(self.slide_index)
-            if prev_focus is not None and prev_focus is not self:
+            if restore and prev_focus is not self:
                 QTimer.singleShot(0, prev_focus.setFocus)
 
     def mouseDoubleClickEvent(self, event):
@@ -4110,19 +4113,25 @@ class ControlWindow(QMainWindow):
                         if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
                             key = f"note:{msg.note}"
                         elif msg.type == "control_change":
-                            # Faders/knobs stream many values as they move. Fire the
-                            # mapped action ONCE when the control sweeps up past a high
-                            # threshold, and re-arm only after it drops back low — so a
-                            # fader behaves like a button (also handles CC buttons that
-                            # send 127 on press / 0 on release).
                             ctrl = msg.control
                             val  = getattr(msg, "value", 0)
-                            if val >= 90:
-                                if self._midi_cc_armed.get(ctrl, True):
-                                    self._midi_cc_armed[ctrl] = False
+                            if self._midi_learn_cb is not None:
+                                # LEARN mode: capture on any noticeable movement so
+                                # faders/knobs/buttons are all easy to teach.
+                                if val > 0:
                                     key = f"cc:{ctrl}"
-                            elif val <= 20:
-                                self._midi_cc_armed[ctrl] = True
+                            else:
+                                # Normal mode: faders/knobs stream many values. Fire
+                                # the mapped action ONCE when the control sweeps up
+                                # past a threshold, re-arming only after it drops back
+                                # low — so a fader behaves like a button (also handles
+                                # CC buttons that send 127 on press / 0 on release).
+                                if val >= 64:
+                                    if self._midi_cc_armed.get(ctrl, True):
+                                        self._midi_cc_armed[ctrl] = False
+                                        key = f"cc:{ctrl}"
+                                elif val <= 20:
+                                    self._midi_cc_armed[ctrl] = True
                         if key:
                             self._midi_received.emit(key)
                     time.sleep(0.005)
@@ -7620,6 +7629,8 @@ class ControlWindow(QMainWindow):
         self._slide_list_widget.setCurrentRow(idx)
         self._slide_list_widget.blockSignals(False)
         self._push_stage_state()
+        # Selecting a slide makes the slides the active target → blue selection.
+        self._set_slides_selection_active(True)
         # Return keyboard focus to the main window so arrow keys work immediately
         self.setFocus()
         self.activateWindow()
