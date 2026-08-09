@@ -1982,6 +1982,10 @@ class ControlWindow(QMainWindow):
         self._thumbnails: list[SlideThumbnail] = []
         self._current_metadata: dict | None = None   # copyright / metadata overlay
         self._is_live = False
+        # True once the operator has EXPLICITLY picked a slide (click/arrows/GO LIVE).
+        # A freshly opened Display stays black until this is armed — but a slide
+        # selected BEFORE opening still shows, because we don't reset it on open.
+        self._live_armed = False
         self._is_frozen = False
         self._logo_pixmap = None
         self._stage_editor = None
@@ -5126,6 +5130,9 @@ class ControlWindow(QMainWindow):
     def _load_song_by_id(self, song_id):
         """Core song-load logic (used by both QListView index and QListWidgetItem)."""
         import gc
+        # A new song's default slide isn't an explicit pick → if a Display is
+        # (re)opened now it should stay black until the operator chooses a slide.
+        self._live_armed = False
         # Release previous song thumbnails before loading new ones
         self.current_slides = []
         self._thumbnails.clear()
@@ -8431,6 +8438,8 @@ class ControlWindow(QMainWindow):
         """
         if not (0 <= idx < len(self.current_slides)):
             return
+        # Explicit operator choice → a Display opened from now on shows this slide.
+        self._live_armed = True
         # During a dynamic presentation, clicking a slide SEEKS the audio there
         # (operator intervention) instead of pushing a static slide.
         if getattr(self, "_dynamic_active", False):
@@ -8586,6 +8595,7 @@ class ControlWindow(QMainWindow):
         if self.current_slide_idx < 0:
             self._toasts.warning("Nu există slide selectat.")
             return
+        self._live_armed = True   # explicit go-live → Display shows content
         targets = self._target_windows()
         if self._in_pres_mode and self._pres_slides_data:
             idx = self.current_slide_idx
@@ -8827,6 +8837,12 @@ class ControlWindow(QMainWindow):
                     mgr=_ed_ref, sett=_capture_settings, fmt=_capture_fmt,
                     meta=_capture_meta, wid=_capture_wid,
                 ):
+                    # The Display stays BLACK until the operator explicitly picks a
+                    # slide (self._live_armed). A slide chosen BEFORE opening still
+                    # shows, because _live_armed isn't reset on open.
+                    if not getattr(self, "_live_armed", False):
+                        mgr._enqueue({"type": "black", "window_id": wid})
+                        return
                     # Use the CURRENTLY selected slide at fire time (not a stale
                     # captured index) so opening the display shows exactly the
                     # slide the operator picked — never jumps back to slide 1.
@@ -8872,6 +8888,7 @@ class ControlWindow(QMainWindow):
             dw.close()
         self.display_windows.clear()
         self._is_live = False
+        self._live_armed = False   # next open starts black until a slide is picked
         self._live_timer.stop()
         self._auto_timer.stop()
         self.auto_check.setChecked(False)
@@ -8893,6 +8910,9 @@ class ControlWindow(QMainWindow):
         Space/GO LIVE to actually start the session.
         """
         if not self.display_windows or self._is_frozen:
+            return
+        # Display stays black until the operator explicitly picks a slide.
+        if not getattr(self, "_live_armed", False):
             return
         if self._is_bible_mode():
             return
