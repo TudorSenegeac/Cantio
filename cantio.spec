@@ -164,8 +164,8 @@ if is_mac:
                 'Cantio folosește camera pentru fundal video live.',
             'NSMicrophoneUsageDescription':
                 'Cantio poate accesa microfonul pentru audio.',
-            'CFBundleShortVersionString': '1.5.1',
-            'CFBundleVersion': '1.5.1',
+            'CFBundleShortVersionString': '1.5.2',
+            'CFBundleVersion': '1.5.2',
             'LSMinimumSystemVersion': '10.14',
         },
     )

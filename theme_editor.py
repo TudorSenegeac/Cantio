@@ -1450,10 +1450,31 @@ class ThemeVisualEditor(QMainWindow):
         return w
 
     def _fundal_dir(self) -> str:
+        # Per-profile — must match media_tab._bg_dir() and background-editor.js
+        # _bgFolder(), otherwise in-app backgrounds don't show up in this list.
         import os
-        d = os.path.join(os.path.expanduser("~"), "Cantio", "backgrounds")
-        os.makedirs(d, exist_ok=True)
-        return d
+        try:
+            import database as _db
+            prof = _db.get_active_profile() or "Default"
+        except Exception:
+            prof = "Default"
+        base = os.path.join(os.path.expanduser("~"), "Cantio",
+                            "profiles", prof, "backgrounds")
+        os.makedirs(base, exist_ok=True)
+        # One-time migration of any legacy global backgrounds into the active
+        # profile (same guard as media_tab, safe if it already ran there).
+        legacy = os.path.join(os.path.expanduser("~"), "Cantio", "backgrounds")
+        try:
+            if os.path.isdir(legacy) and not os.listdir(base):
+                import shutil
+                for fn in os.listdir(legacy):
+                    src = os.path.join(legacy, fn)
+                    if os.path.isfile(src):
+                        try: shutil.move(src, os.path.join(base, fn))
+                        except Exception: pass
+        except Exception:
+            pass
+        return base
 
     def _reload_fundal_list(self):
         import os, json as _json

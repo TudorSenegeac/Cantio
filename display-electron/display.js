@@ -489,6 +489,12 @@ function handleMessage(msg) {
       state.lines    = [];
       state.metadata = {};
       state.isBlack  = false;
+      // Clear the bible reference too — it lives on settings (source/bible_reference)
+      // and would otherwise stay on screen after the verse text is gone.
+      if (state.settings) {
+        state.settings.source         = '';
+        state.settings.bible_reference = '';
+      }
       const clearTType = state.settings.transition || 'fade';
       const clearTDur  = parseInt(state.settings.transition_duration || 350, 10);
       if (clearTType === 'instant' || clearTType === 'none') {
