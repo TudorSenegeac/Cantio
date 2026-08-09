@@ -3355,13 +3355,12 @@ class ControlWindow(QMainWindow):
             self._bible_control_tab = None
             print(f"[BIBLE CONTROL TAB] init failed: {_e}")
 
-        try:
-            from overlay_tab import OverlayTab
-            self._overlay_tab = OverlayTab(parent_control=self)
-            self._center_tab_widget.addTab(self._overlay_tab, t("tab_overlay_lbl"))
-        except Exception as _e:
-            self._overlay_tab = None
-            print(f"[OVERLAY TAB] init failed: {_e}")
+        # Tab-ul "Overlay" avansat a fost DEZACTIVAT în 1.5.2: cauza un crash brusc
+        # al aplicației (segfault la nivel Qt/C++, fără excepție Python în log).
+        # Funcțiile de overlay (ticker, logo, ceas) rămân disponibile în panoul din
+        # dreapta și în tab-ul Overlay-uri din Setări. overlay_tab.py e păstrat în
+        # repo pentru o eventuală reactivare după ce crash-ul e diagnosticat.
+        self._overlay_tab = None
 
         # ── Tab sync: Left Biblie ↔ Center Control Bible ──────────────────────
         self._center_tab_widget.currentChanged.connect(
