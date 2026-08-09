@@ -1929,6 +1929,8 @@ class ControlWindow(QMainWindow):
         self._midi_received.connect(self._on_midi_event)
         self._midi_running = False
         self._midi_learn_cb = None
+        self._midi_cc_armed = {}   # per-CC hysteresis so a fader/knob fires ONCE
+                                   # per up-sweep (like a button), not continuously
         self._wysiwyg_token = 0
         self._dyn_audio_ready.connect(self._on_dyn_audio_ready)
         self._dyn_audio_error.connect(self._on_dyn_audio_error)
@@ -4079,8 +4081,20 @@ class ControlWindow(QMainWindow):
                         key = None
                         if msg.type == "note_on" and getattr(msg, "velocity", 0) > 0:
                             key = f"note:{msg.note}"
-                        elif msg.type == "control_change" and getattr(msg, "value", 0) > 0:
-                            key = f"cc:{msg.control}"
+                        elif msg.type == "control_change":
+                            # Faders/knobs stream many values as they move. Fire the
+                            # mapped action ONCE when the control sweeps up past a high
+                            # threshold, and re-arm only after it drops back low — so a
+                            # fader behaves like a button (also handles CC buttons that
+                            # send 127 on press / 0 on release).
+                            ctrl = msg.control
+                            val  = getattr(msg, "value", 0)
+                            if val >= 90:
+                                if self._midi_cc_armed.get(ctrl, True):
+                                    self._midi_cc_armed[ctrl] = False
+                                    key = f"cc:{ctrl}"
+                            elif val <= 20:
+                                self._midi_cc_armed[ctrl] = True
                         if key:
                             self._midi_received.emit(key)
                     time.sleep(0.005)
