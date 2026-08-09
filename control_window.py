@@ -8792,6 +8792,11 @@ class ControlWindow(QMainWindow):
         # Detect screen aspect ratio and update preview + thumbnails
         QTimer.singleShot(100, self._apply_aspect_ratio)
         QTimer.singleShot(150, self._update_preview_aspect)
+        # The Electron display needs a moment to land on its target monitor before
+        # its real screen geometry is readable — re-detect once it has settled so
+        # the HD preview + thumbnails match a non-16:9 projector/TV correctly.
+        QTimer.singleShot(700, self._apply_aspect_ratio)
+        QTimer.singleShot(1400, self._apply_aspect_ratio)
         # Fallback: push slide after 800 ms in case window_ready was missed.
         # Skip in Bible mode (bible content is handled by _send_bible_verse_live).
         if self.current_slide_idx >= 0 and not self._is_bible_mode():
@@ -9934,16 +9939,14 @@ class ControlWindow(QMainWindow):
         Falls back to settings key 'display_aspect' then 16:9.
         Common ratios: 16/9=1.777, 4/3=1.333, 16/10=1.6, 21/9=2.333
         """
-        if self.display_windows:
-            try:
-                dw = self.display_windows[0]
-                scr = dw.screen()
-                if scr:
-                    g = scr.geometry()
-                    if g.height() > 0:
-                        return g.width() / g.height()
-            except Exception:
-                pass
+        # Use the robust screen-size getter (handles Electron proxies, whose
+        # .screen() is unreliable, by falling back to the non-primary monitor).
+        try:
+            sw, sh = self._get_display_screen_size()
+            if sw > 0 and sh > 0:
+                return sw / sh
+        except Exception:
+            pass
         # Fallback: settings key or 16:9
         try:
             return float(self.settings.get("display_aspect", 16 / 9))
@@ -9969,6 +9972,11 @@ class ControlWindow(QMainWindow):
             ph = self.preview.height()
             if pw > 0 and ph > 0:
                 self.render_engine.set_preview_size(pw, ph)
+        # Reshape the embedded Electron HD preview to the new aspect (it reads
+        # self._display_aspect to drive its height from its width).
+        if getattr(self, "_embed_container", None) is not None:
+            try: self._fit_embed()
+            except Exception: pass
         # Rebuild thumbnails with new ratio
         if self.current_slides:
             self._set_slides(self.current_slides)
