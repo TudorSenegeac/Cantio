@@ -698,6 +698,32 @@ function handleMessage(msg) {
       break;
     }
 
+    case 'show_web': {
+      // Display an online page (e.g. a YouTube video) in a full-screen iframe.
+      let url = _toEmbedUrl(msg.url || '');
+      if (!url) break;
+      let f = document.getElementById('web-frame');
+      if (!f) {
+        f = document.createElement('iframe');
+        f.id = 'web-frame';
+        f.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;'
+                        + 'border:0;z-index:9999;background:#000;';
+        f.setAttribute('allow', 'autoplay; encrypted-media; fullscreen; picture-in-picture');
+        f.setAttribute('allowfullscreen', 'true');
+        document.body.appendChild(f);
+      }
+      f.src = url;
+      f.style.display = 'block';
+      console.log('[Display.js] show_web:', url);
+      break;
+    }
+
+    case 'hide_web': {
+      const f = document.getElementById('web-frame');
+      if (f) { f.src = 'about:blank'; f.style.display = 'none'; }
+      break;
+    }
+
     case 'transparent': {
       // msg.value == true → transparent mode; false → opaque
       const wantTrans = msg.value === true || msg.value === 'true';
@@ -856,6 +882,18 @@ function handleMessage(msg) {
 // ── Background ────────────────────────────────────────────────────────────────
 
 // Signature of all background-relevant settings — used to detect bg changes.
+function _toEmbedUrl(url) {
+  // YouTube watch/short links → embed URL with autoplay so it plays on the wall.
+  try {
+    if (!url) return '';
+    url = url.trim();
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+    if (m) return 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&rel=0&modestbranding=1';
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    return url;   // any other link loads as-is
+  } catch (e) { return url; }
+}
+
 function _bgSignature(s) {
   if (!s) return '';
   return [s.bg_type, s.bg_color, s.bg_image, s.bg_grad_c1, s.bg_grad_c2,

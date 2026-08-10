@@ -13,7 +13,7 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QPushButton,
     QLabel, QScrollArea, QGridLayout, QFileDialog, QProgressBar,
-    QSizePolicy, QFrame, QMenu,
+    QSizePolicy, QFrame, QMenu, QLineEdit, QListWidget, QListWidgetItem,
 )
 from PyQt6.QtCore import (
     Qt, QSize, QTimer, QUrl, QThread, pyqtSignal, QMimeData, QPoint,
@@ -453,6 +453,7 @@ class MediaTab(QWidget):
         )
         self._subtabs.addTab(self._build_local_tab(),      "💻 Local")
         self._subtabs.addTab(self._build_feeds_tab(),      "📷 Feeds")
+        self._subtabs.addTab(self._build_online_tab(),     "🌐 Online")
         self._subtabs.addTab(self._build_cloud_tab(),      "☁ Cloud")
         self._bg_tab_index = self._subtabs.addTab(
             self._build_background_tab(), "🎨 Fundal")
@@ -570,6 +571,138 @@ class MediaTab(QWidget):
         it if it's already showing the same file)."""
         if self._control and hasattr(self._control, "toggle_media_player"):
             self._control.toggle_media_player(path)
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ONLINE TAB  (YouTube / web links)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    def _online_links_path(self) -> str:
+        prof = "default"
+        try:
+            import database as _db
+            prof = _db.get_active_profile() or "default"
+        except Exception:
+            pass
+        d = os.path.join(os.path.expanduser("~"), "Cantio", "profiles", prof)
+        os.makedirs(d, exist_ok=True)
+        return os.path.join(d, "online_links.json")
+
+    def _load_online_links(self) -> list:
+        import json
+        try:
+            with open(self._online_links_path(), "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            return []
+
+    def _save_online_links(self, links: list):
+        import json
+        try:
+            with open(self._online_links_path(), "w", encoding="utf-8") as f:
+                json.dump(links, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    def _build_online_tab(self) -> QWidget:
+        w = QWidget()
+        w.setStyleSheet("background: #181818;")
+        layout = QVBoxLayout(w)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+        layout.addWidget(self._section_lbl("LINKURI ONLINE (YouTube etc.)"))
+
+        row = QHBoxLayout()
+        self._online_input = QLineEdit()
+        self._online_input.setPlaceholderText("Lipește un link YouTube și apasă Enter…")
+        self._online_input.setStyleSheet(
+            "QLineEdit { background:#1c1c1c; color:#e0e0e0; border:1px solid #2a2a2a;"
+            " border-radius:4px; padding:6px; font-size:11px; }")
+        self._online_input.returnPressed.connect(self._add_online_link)
+        row.addWidget(self._online_input, 1)
+        add_btn = self._accent_btn("＋ Adaugă")
+        add_btn.clicked.connect(self._add_online_link)
+        row.addWidget(add_btn)
+        layout.addLayout(row)
+
+        self._online_list = QListWidget()
+        self._online_list.setStyleSheet(
+            "QListWidget { background:#141414; border:1px solid #2a2a2a; border-radius:4px;"
+            " color:#ddd; } QListWidget::item { padding:8px; }"
+            " QListWidget::item:selected { background:#1c3a5a; }")
+        self._online_list.itemDoubleClicked.connect(
+            lambda it: self._send_online_live(it.data(Qt.ItemDataRole.UserRole)))
+        layout.addWidget(self._online_list, 1)
+
+        hint = QLabel("Dublu-click pe un link = afișează live pe proiector.")
+        hint.setStyleSheet("color:#666; font-size:9px;")
+        layout.addWidget(hint)
+
+        brow = QHBoxLayout()
+        send_btn = self._accent_btn("📺 Afișează live")
+        send_btn.clicked.connect(self._send_selected_online)
+        brow.addWidget(send_btn)
+        stop_btn = QPushButton("⏹ Oprește")
+        stop_btn.setStyleSheet(
+            "QPushButton { background:#2a1a1a; color:#f44336; border:1px solid #3a2020;"
+            " border-radius:4px; padding:5px 12px; font-size:11px; }"
+            "QPushButton:hover { background:#3a2020; }")
+        stop_btn.clicked.connect(self._stop_online)
+        brow.addWidget(stop_btn)
+        del_btn = QPushButton("🗑")
+        del_btn.setFixedWidth(34)
+        del_btn.setStyleSheet(
+            "QPushButton { background:#1c1c1c; color:#aaa; border:1px solid #2a2a2a;"
+            " border-radius:4px; padding:5px; } QPushButton:hover { background:#252525; }")
+        del_btn.clicked.connect(self._delete_online_link)
+        brow.addWidget(del_btn)
+        layout.addLayout(brow)
+
+        self._refresh_online_list()
+        return w
+
+    def _refresh_online_list(self):
+        if not hasattr(self, "_online_list"):
+            return
+        self._online_list.clear()
+        for link in self._load_online_links():
+            url   = link.get("url", "")
+            title = link.get("title") or url
+            it = QListWidgetItem("▶  " + title)
+            it.setData(Qt.ItemDataRole.UserRole, url)
+            it.setToolTip(url)
+            self._online_list.addItem(it)
+
+    def _add_online_link(self):
+        url = self._online_input.text().strip()
+        if not url:
+            return
+        links = self._load_online_links()
+        links.append({"url": url, "title": url})
+        self._save_online_links(links)
+        self._online_input.clear()
+        self._refresh_online_list()
+
+    def _delete_online_link(self):
+        row = self._online_list.currentRow()
+        links = self._load_online_links()
+        if 0 <= row < len(links):
+            links.pop(row)
+            self._save_online_links(links)
+            self._refresh_online_list()
+
+    def _send_selected_online(self):
+        it = self._online_list.currentItem()
+        if it:
+            self._send_online_live(it.data(Qt.ItemDataRole.UserRole))
+
+    def _send_online_live(self, url: str):
+        if url and self._control and hasattr(self._control, "_send_web_live"):
+            self._control._send_web_live(url)
+
+    def _stop_online(self):
+        if self._control and hasattr(self._control, "_stop_web_live"):
+            self._control._stop_web_live()
 
     # ═══════════════════════════════════════════════════════════════════════════
     # BACKGROUND TAB  (gol deocamdată — conținutul vine ulterior)

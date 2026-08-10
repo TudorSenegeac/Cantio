@@ -7978,6 +7978,35 @@ class ControlWindow(QMainWindow):
         self._preview_cmd("clear_background")
         self._preview_bg_active = False
 
+    def _send_web_live(self, url: str):
+        """Show an online page (e.g. YouTube) full-screen on the live output."""
+        if not url:
+            return
+        self._live_armed = True
+        for dw in self.display_windows:
+            if hasattr(dw, "show_web"):
+                try: dw.show_web(url)
+                except Exception: pass
+        # Projector closed but operator preview open → mirror to the preview
+        # (live windows otherwise auto-mirror via main.js).
+        if not self.display_windows and getattr(self, "_electron_preview_on", False):
+            mgr = getattr(self, "electron_display", None)
+            if mgr is not None:
+                try: mgr._enqueue({"type": "show_web", "url": url, "window_id": -1})
+                except Exception: pass
+        try: self._toasts.success("🌐 Link trimis live")
+        except Exception: pass
+
+    def _stop_web_live(self):
+        for dw in self.display_windows:
+            if hasattr(dw, "hide_web"):
+                try: dw.hide_web()
+                except Exception: pass
+        mgr = getattr(self, "electron_display", None)
+        if mgr is not None:
+            try: mgr._enqueue({"type": "hide_web", "window_id": -1})
+            except Exception: pass
+
     def _preview_mgr(self):
         """Return the Electron manager to mirror a live command to the operator
         preview (window_id = -1) when the projector window is closed but the

@@ -1244,6 +1244,17 @@ class ElectronDisplayProxy:
             "path":      path,
         })
 
+    def show_web(self, url: str):
+        """Show an online page (e.g. a YouTube video) full-screen on this display."""
+        self._mgr._enqueue({
+            "type":      "show_web",
+            "window_id": self._window_id,
+            "url":       url,
+        })
+
+    def hide_web(self):
+        self._mgr._enqueue({"type": "hide_web", "window_id": self._window_id})
+
     def toggle_transparent(self) -> bool:
         """Toggle transparent mode. Returns new state (True = transparent on)."""
         self._transparent = not self._transparent

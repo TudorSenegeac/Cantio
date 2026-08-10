@@ -204,6 +204,8 @@ function handleCommand(msg, ws) {
     case 'logo':
     case 'slide_image':
     case 'show_slide_image':
+    case 'show_web':
+    case 'hide_web':
     case 'transparent':
     case 'clear_text':
     case 'freeze':
