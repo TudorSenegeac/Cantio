@@ -397,11 +397,41 @@ class CameraFeedGrid(QScrollArea):
             card.stop()
 
 
+class MediaCard(QWidget):
+    """Media thumbnail container. Single-click = send live (toggle); double-click
+    = open the player in the slides area. A short timer distinguishes the two so a
+    single click isn't fired as the first half of a double-click."""
+    clicked        = pyqtSignal(str)
+    double_clicked = pyqtSignal(str)
+
+    def __init__(self, path: str, parent=None):
+        super().__init__(parent)
+        self._path = path
+        self._click_timer = QTimer(self)
+        self._click_timer.setSingleShot(True)
+        self._click_timer.setInterval(220)
+        self._click_timer.timeout.connect(lambda: self.clicked.emit(self._path))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._click_timer.start()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._click_timer.stop()            # cancel the pending single-click
+            self.double_clicked.emit(self._path)
+        else:
+            super().mouseDoubleClickEvent(event)
+
+
 class MediaTab(QWidget):
     def __init__(self, control_window=None, parent=None):
         super().__init__(parent)
         self._control = control_window
         self._folder = ""
+        self._live_media_path   = None   # media currently sent live (single-click toggle)
         self._cam_caps: dict    = {}
         self._cam_timers: dict  = {}
         self._camera_thread     = None   # CameraThread pentru live
@@ -506,6 +536,40 @@ class MediaTab(QWidget):
             return
         for dw in self._control.display_windows:
             dw.show_slide_image(pix)
+
+    # ── New media interaction (single-click = live toggle, dbl-click = player) ──
+    def _toggle_media_live(self, path: str):
+        """Single-click a media item: send it full-screen live. Clicking the same
+        item again stops it (removes it from the live output)."""
+        if getattr(self, "_live_media_path", None) == path:
+            self._stop_media_live()
+        else:
+            self._set_as_background(path)   # pushes bg_image/bg_video live
+            self._live_media_path = path
+
+    def _stop_media_live(self):
+        """Remove any media currently sent live (back to the theme/black)."""
+        if self._control:
+            for dw in self._control.display_windows:
+                dw.settings["bg_image"] = ""
+                dw.settings["bg_video"] = ""
+                try: dw._apply_background()
+                except Exception: pass
+        try:
+            from live_state import get_state
+            st = get_state()
+            st.bg_pixmap = None
+            st.bg_video_frame = None
+            st.notify()
+        except Exception:
+            pass
+        self._live_media_path = None
+
+    def _toggle_media_player(self, path: str):
+        """Double-click a media item: open the player in the slides area (or hide
+        it if it's already showing the same file)."""
+        if self._control and hasattr(self._control, "toggle_media_player"):
+            self._control.toggle_media_player(path)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # BACKGROUND TAB  (gol deocamdată — conținutul vine ulterior)
@@ -1037,13 +1101,15 @@ class MediaTab(QWidget):
             self._media_grid.addWidget(thumb, idx // cols, idx % cols)
 
     def _make_media_thumb(self, path: str) -> QWidget:
-        w = QWidget()
+        w = MediaCard(path)
         w.setFixedSize(108, 96)
         w.setStyleSheet(
             "QWidget { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 5px; }"
             "QWidget:hover { border-color: #5294e2; background: #1e1e1e; }"
         )
         w.setCursor(Qt.CursorShape.PointingHandCursor)
+        w.setToolTip("Click = trimite live (click din nou = oprește)\n"
+                     "Dublu-click = deschide player-ul")
 
         vl = QVBoxLayout(w)
         vl.setContentsMargins(3, 3, 3, 3)
@@ -1083,10 +1149,8 @@ class MediaTab(QWidget):
         name_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         vl.addWidget(name_lbl)
 
-        w.mousePressEvent = lambda e, p=path: (
-            self._set_as_background(p)
-            if e.button() == Qt.MouseButton.LeftButton else None
-        )
+        w.clicked.connect(self._toggle_media_live)
+        w.double_clicked.connect(self._toggle_media_player)
         w.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         w.customContextMenuRequested.connect(
             lambda pos, p=path: self._show_media_menu(p, w.mapToGlobal(pos))

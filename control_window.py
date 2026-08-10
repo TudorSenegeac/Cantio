@@ -1779,6 +1779,13 @@ class MiniVideoPlayer(QWidget):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    def mouseDoubleClickEvent(self, event):
+        # Double-click the player → hide it and return to the slides.
+        if self.parent_control and hasattr(self.parent_control, "hide_media_player"):
+            self.parent_control.hide_media_player()
+        else:
+            super().mouseDoubleClickEvent(event)
+
     def load_file(self, filepath: str):
         import os
         self._current_file = filepath
@@ -3828,10 +3835,11 @@ class ControlWindow(QMainWindow):
         self._right_tabs.addTab(self._build_mixer_tab(), t("tab_mixer_lbl"))
         layout.addWidget(self._right_tabs, 1)
 
-        # ── Mini video player (hidden until media is selected) ─────────────
+        # ── Media player now lives IN the slides area (added to _slides_stack as a
+        # page below); no longer docked bottom-right. Created here for ordering. ──
         self.mini_player = MiniVideoPlayer()
         self.mini_player.parent_control = self
-        layout.addWidget(self.mini_player)
+        self._media_player_page = self._slides_stack.addWidget(self.mini_player)
 
         return w
 
@@ -5222,6 +5230,32 @@ class ControlWindow(QMainWindow):
             for dw in self.display_windows:
                 try: dw.apply_settings(s)
                 except Exception: pass
+
+    # ── Media player in the slides area (double-click a media item) ─────────────
+    def toggle_media_player(self, path: str):
+        """Show the media player in place of the slides (loading `path`), or hide it
+        if it is already showing that file → back to the thumbnails/list."""
+        page = getattr(self, "_media_player_page", None)
+        if page is None:
+            return
+        showing = self._slides_stack.currentIndex() == page
+        same    = getattr(self.mini_player, "_current_file", None) == path
+        if showing and same:
+            self.hide_media_player()
+        else:
+            try: self.mini_player.load_file(path)
+            except Exception: pass
+            self._slides_stack.setCurrentIndex(page)
+
+    def hide_media_player(self):
+        """Stop the player and return the slides area to the grid/list view."""
+        page = getattr(self, "_media_player_page", None)
+        if page is None:
+            return
+        try: self.mini_player._stop()
+        except Exception: pass
+        self._slides_stack.setCurrentIndex(
+            1 if getattr(self, "_slide_view_mode", "grid") == "list" else 0)
 
     def _update_notes_bar(self, notes):
         self.current_song_notes = notes
