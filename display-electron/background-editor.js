@@ -827,23 +827,27 @@ function buildClockProps(p, L) {
     p.appendChild(row('Secunde', mkCheck(L, 'showSeconds')));
   } else if (mode === 'countdown') {
     p.appendChild(row('Durată (sec)', mkRange(L, 'duration', 5, 3600, 5)));
-    // End-of-countdown sound
-    const sc = document.createElement('div'); sc.className = 'ctl';
-    const nm = document.createElement('span');
-    nm.style.cssText = 'font-size:10px;color:#aaa;margin-right:6px;';
-    nm.textContent = L.endSound ? String(L.endSound).split(/[\\/]/).pop() : '(fără sunet)';
-    const pick = document.createElement('button'); pick.textContent = '🔊';
-    pick.title = 'Alege un sunet redat la finalul numărătorii';
-    pick.onclick = () => {
-      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'audio/*';
-      inp.onchange = () => { const f = inp.files[0]; if (f) { L.endSound = f.path || ''; rebuildProps(); } };
-      inp.click();
+    // Sound pickers: a per-second tick + an optional end sound.
+    const soundRow = (label, key, tip) => {
+      const sc = document.createElement('div'); sc.className = 'ctl';
+      const nm = document.createElement('span');
+      nm.style.cssText = 'font-size:10px;color:#aaa;margin-right:6px;';
+      nm.textContent = L[key] ? String(L[key]).split(/[\\/]/).pop() : '(fără sunet)';
+      const pick = document.createElement('button'); pick.textContent = '🔊'; pick.title = tip;
+      pick.onclick = () => {
+        const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'audio/*';
+        inp.onchange = () => { const f = inp.files[0]; if (f) { L[key] = f.path || ''; rebuildProps(); } };
+        inp.click();
+      };
+      const clr = document.createElement('button'); clr.textContent = '✕'; clr.title = 'Fără sunet';
+      clr.onclick = () => { L[key] = ''; rebuildProps(); };
+      sc.appendChild(nm); sc.appendChild(pick); sc.appendChild(clr);
+      return sc;
     };
-    const clr = document.createElement('button'); clr.textContent = '✕';
-    clr.title = 'Fără sunet';
-    clr.onclick = () => { L.endSound = ''; rebuildProps(); };
-    sc.appendChild(nm); sc.appendChild(pick); sc.appendChild(clr);
-    p.appendChild(row('Sunet la final', sc));
+    p.appendChild(row('Sunet pe secundă',
+      soundRow('tick', 'tickSound', 'Sunet redat la fiecare secundă (tic-tac / bip)')));
+    p.appendChild(row('Sunet la final',
+      soundRow('end', 'endSound', 'Sunet redat când numărătoarea ajunge la 0')));
   }
 
   p.appendChild(row('Font', mkFontPicker(L, 'font')));

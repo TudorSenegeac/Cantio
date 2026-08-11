@@ -313,24 +313,37 @@ window._renderThumb = function (doc, w, h) {
   } catch (e) { return ''; }
 };
 
-// Countdown end-sounds: scheduled when a bg-editor doc with a countdown layer that
-// has an `endSound` is shown, fired once when the countdown reaches zero.
+// Countdown sounds: a per-second "tick" (tickSound) played on every second, and an
+// optional end sound (endSound) played once when the countdown reaches zero.
 let _cdSoundTimers = [];
-function _scheduleCountdownSounds(doc) {
-  _cdSoundTimers.forEach(t => clearTimeout(t));
+function _clearCountdownSounds() {
+  _cdSoundTimers.forEach(h => { clearTimeout(h); clearInterval(h); });
   _cdSoundTimers = [];
+}
+function _playSnd(snd) {
+  try {
+    const src = /^(file|https?|data):/i.test(snd)
+              ? snd : 'file:///' + String(snd).replace(/\\/g, '/');
+    new Audio(src).play().catch(() => {});
+  } catch (e) {}
+}
+function _scheduleCountdownSounds(doc) {
+  _clearCountdownSounds();
   if (!doc || !Array.isArray(doc.layers)) return;
   for (const L of doc.layers) {
-    if (L.type === 'clock' && L.clockMode === 'countdown' && L.endSound) {
-      const durMs = Math.max(0, (L.duration || 300)) * 1000;
-      const snd = L.endSound;
-      _cdSoundTimers.push(setTimeout(() => {
-        try {
-          const src = /^(file|https?|data):/i.test(snd)
-                    ? snd : 'file:///' + String(snd).replace(/\\/g, '/');
-          new Audio(src).play().catch(() => {});
-        } catch (e) {}
-      }, durMs));
+    if (L.type !== 'clock' || L.clockMode !== 'countdown') continue;
+    const durSec = Math.max(0, (L.duration || 300));
+    if (L.tickSound) {
+      let n = 0;
+      const iv = setInterval(() => {
+        n++;
+        if (n > durSec) { clearInterval(iv); return; }
+        _playSnd(L.tickSound);
+      }, 1000);
+      _cdSoundTimers.push(iv);
+    }
+    if (L.endSound) {
+      _cdSoundTimers.push(setTimeout(() => _playSnd(L.endSound), durSec * 1000));
     }
   }
 }
