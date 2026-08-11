@@ -2486,8 +2486,8 @@ class ControlWindow(QMainWindow):
 
         left_frame = QFrame()
         left_frame.setObjectName("side_panel")
-        left_frame.setMinimumWidth(235)
-        left_frame.setMaximumWidth(320)
+        # No max width + a low min → the operator can drag the splitter freely.
+        left_frame.setMinimumWidth(150)
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
@@ -2504,8 +2504,8 @@ class ControlWindow(QMainWindow):
 
         right_frame = QFrame()
         right_frame.setObjectName("right_panel")
-        right_frame.setMinimumWidth(275)
-        right_frame.setMaximumWidth(350)
+        # No max width + a low min → the operator can drag the splitter freely.
+        right_frame.setMinimumWidth(160)
         right_layout = QVBoxLayout(right_frame)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
