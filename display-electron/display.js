@@ -313,8 +313,31 @@ window._renderThumb = function (doc, w, h) {
   } catch (e) { return ''; }
 };
 
+// Countdown end-sounds: scheduled when a bg-editor doc with a countdown layer that
+// has an `endSound` is shown, fired once when the countdown reaches zero.
+let _cdSoundTimers = [];
+function _scheduleCountdownSounds(doc) {
+  _cdSoundTimers.forEach(t => clearTimeout(t));
+  _cdSoundTimers = [];
+  if (!doc || !Array.isArray(doc.layers)) return;
+  for (const L of doc.layers) {
+    if (L.type === 'clock' && L.clockMode === 'countdown' && L.endSound) {
+      const durMs = Math.max(0, (L.duration || 300)) * 1000;
+      const snd = L.endSound;
+      _cdSoundTimers.push(setTimeout(() => {
+        try {
+          const src = /^(file|https?|data):/i.test(snd)
+                    ? snd : 'file:///' + String(snd).replace(/\\/g, '/');
+          new Audio(src).play().catch(() => {});
+        } catch (e) {}
+      }, durMs));
+    }
+  }
+}
+
 function setCustomBackground(doc, transition) {
   loadDocMedia(doc);
+  _scheduleCountdownSounds(doc);
   const switching = !!(state.bgDoc && doc && cvBg2 && ctxBg2);
   const dur = Math.max(120, parseInt(state.settings.transition_duration || 500, 10));
   const fx  = transition || state.settings.bg_transition || 'fade';
