@@ -1308,62 +1308,86 @@ class MediaTab(QWidget):
     # ═══════════════════════════════════════════════════════════════════════════
 
     def _build_feeds_tab(self) -> QWidget:
+        # No OpenCV: camera capture is handled by Electron (Chromium getUserMedia),
+        # so this works on the packaged .exe and never freezes probing devices.
         w = QWidget()
         w.setStyleSheet("background: #181818;")
         layout = QVBoxLayout(w)
         layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
+        layout.addWidget(self._section_lbl("CAMERE"))
 
-        if not HAS_CV2:
-            lbl = QLabel(
-                "OpenCV nu este instalat.\n\n"
-                "Rulează în terminal:\n"
-                "pip install opencv-python\n\n"
-                "Apoi repornește aplicația."
-            )
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            lbl.setStyleSheet(
-                "color: #f44336; font-size: 12px; padding: 20px; line-height: 1.6;"
-            )
-            layout.addWidget(lbl)
-            layout.addStretch()
-            return w
+        info = QLabel(
+            "Alege o cameră ca fundal — se vede live pe Display / preview.\n"
+            "Dacă o cameră nu apare, încearcă alt număr. Temele setate pe "
+            "«cameră» folosesc automat camera aleasă aici.")
+        info.setStyleSheet("color:#666; font-size:10px; line-height:1.5;")
+        info.setWordWrap(True)
+        layout.addWidget(info)
 
-        # Header row
-        top = QHBoxLayout()
-        top.addWidget(self._section_lbl("CAMERE"))
-        top.addStretch()
+        # Which camera index is currently the active feeds camera?
+        active = ""
+        try:
+            active = str(self._control.settings.get("feeds_camera", "")) if self._control else ""
+        except Exception:
+            active = ""
 
-        detect_btn = QPushButton("🔍 Detectează camere")
-        detect_btn.setStyleSheet(
-            "QPushButton { background: #18283a; color: #5294e2; border: 1px solid #1c3a5a; "
-            "border-radius: 4px; padding: 4px 10px; font-size: 11px; }"
-            "QPushButton:hover { background: #1c3a5a; color: #e0e0e0; }"
-        )
-        detect_btn.clicked.connect(self._detect_cameras_grid)
-        top.addWidget(detect_btn)
+        grid = QGridLayout()
+        grid.setSpacing(6)
+        self._cam_buttons = []
+        for i in range(5):
+            b = QPushButton(f"📷  Camera {i}")
+            b.setCheckable(True)
+            b.setChecked(str(i) == active)
+            b.setStyleSheet(
+                "QPushButton { background:#1c1c1c; color:#ccc; border:1px solid #2a2a2a;"
+                " border-radius:5px; padding:10px; font-size:12px; }"
+                "QPushButton:hover { background:#252525; color:#fff; }"
+                "QPushButton:checked { background:#18283a; color:#5294e2; border-color:#1c3a5a; }")
+            b.clicked.connect(lambda _=False, idx=i: self._select_feeds_camera(idx))
+            grid.addWidget(b, i // 2, i % 2)
+            self._cam_buttons.append(b)
+        layout.addLayout(grid)
 
-        stop_btn = QPushButton("⏹ Oprește feed")
+        stop_btn = QPushButton("⏹ Oprește camera (fără fundal)")
         stop_btn.setStyleSheet(
-            "QPushButton { background: #2a1a1a; color: #f44336; border: 1px solid #3a2020; "
-            "border-radius: 4px; padding: 4px 10px; font-size: 11px; }"
-            "QPushButton:hover { background: #3a2020; }"
-        )
-        stop_btn.clicked.connect(self._stop_all_cameras)
-        top.addWidget(stop_btn)
-        layout.addLayout(top)
-
-        # CameraFeedGrid
-        self._cam_feed_grid = CameraFeedGrid(self)
-        self._cam_feed_grid.camera_selected.connect(self._on_camera_card_selected)
-        layout.addWidget(self._cam_feed_grid, 1)
-
+            "QPushButton { background:#2a1a1a; color:#f44336; border:1px solid #3a2020;"
+            " border-radius:4px; padding:6px 12px; font-size:11px; }"
+            "QPushButton:hover { background:#3a2020; }")
+        stop_btn.clicked.connect(self._stop_camera_bg)
+        layout.addWidget(stop_btn)
+        layout.addStretch()
         return w
 
-    def _detect_cameras_grid(self):
-        """Detect cameras non-blocking and populate CameraFeedGrid."""
-        self._stop_all_cameras()
-        self._cam_feed_grid.refresh_cameras()
+    def _select_feeds_camera(self, cam_idx: int):
+        """Set this camera as the active feeds camera + live background (via Electron)."""
+        for j, b in enumerate(getattr(self, "_cam_buttons", [])):
+            b.setChecked(j == cam_idx)
+        self._on_camera_card_selected(cam_idx)
+
+    def _stop_camera_bg(self):
+        for b in getattr(self, "_cam_buttons", []):
+            b.setChecked(False)
+        if self._control:
+            try:
+                self._control.settings["feeds_camera"] = ""
+                import database as _db
+                _db.save_setting("feeds_camera", "")
+            except Exception:
+                pass
+            for dw in self._control.display_windows:
+                if hasattr(dw, "settings"):
+                    dw.settings["bg_type"]  = "color"
+                    dw.settings["bg_image"] = ""
+                    if hasattr(dw, "_apply_background"):
+                        try: dw._apply_background()
+                        except Exception: pass
+            if hasattr(self._control, "electron_display"):
+                try:
+                    self._control.electron_display.apply_settings(
+                        {"bg_type": "color", "bg_image": ""})
+                except Exception:
+                    pass
 
     def _on_camera_card_selected(self, cam_idx: int):
         """Handle CameraCard 'set as background' click."""
@@ -1390,8 +1414,8 @@ class MediaTab(QWidget):
                 self._control.electron_display.apply_settings(s)
             except Exception:
                 pass
-        # Start the live CameraThread for fullscreen streaming
-        self._start_camera_live_grid(cam_idx)
+        # NB: no OpenCV CameraThread here — Electron (getUserMedia) renders the
+        # camera. Running an OpenCV capture too would fight over the device (freeze).
 
     def _start_camera_live_grid(self, cam_idx: int):
         """Start CameraThread and push frames to display."""

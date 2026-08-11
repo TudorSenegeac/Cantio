@@ -1377,26 +1377,27 @@ class ThemeVisualEditor(QMainWindow):
         vl.addRow("Fișier:", vid_row)
         self.bg_stack.addWidget(vw)
 
-        # 4: Cameră
+        # 4: Cameră — the camera is chosen globally in Media → Feeds, so the theme
+        # just says "use the camera" (no per-theme picker / OpenCV probing here).
         camw = QWidget(); caml = QFormLayout(camw)
-        self.bg_cam_combo = QComboBox()
-        self.bg_cam_combo.setPlaceholderText(t("detect_first"))
-        cam_det_btn = QPushButton(f"🔍 {t('detect_cameras')}")
-        cam_det_btn.clicked.connect(self._detect_cameras)
+        self.bg_cam_combo = QComboBox(); self.bg_cam_combo.hide()  # kept for save/load compat
+        cam_info = QLabel("📷 Fundalul folosește camera activă.\n"
+                          "Alege sau schimbă camera din: Media → Feeds.")
+        cam_info.setWordWrap(True)
+        cam_info.setStyleSheet("color:#9399b2; font-size:11px;")
         self.bg_cam_op = QSlider(Qt.Orientation.Horizontal)
         self.bg_cam_op.setRange(0, 100); self.bg_cam_op.setValue(100)
         self.bg_cam_op.valueChanged.connect(self._update_canvas)
-        caml.addRow("Cameră:", self.bg_cam_combo)
-        caml.addRow("", cam_det_btn)
+        caml.addRow("", cam_info)
         caml.addRow("Opacitate:", self.bg_cam_op)
         self.bg_stack.addWidget(camw)
 
-        # 5: Gradient + Cameră
+        # 5: Gradient + Cameră (camera still chosen in Media → Feeds)
         gcamw = QWidget(); gcaml = QFormLayout(gcamw)
-        self.bg_gcam_combo = QComboBox()
-        self.bg_gcam_combo.setPlaceholderText(t("detect_first"))
-        gcam_det_btn = QPushButton(f"🔍 {t('detect_cameras')}")
-        gcam_det_btn.clicked.connect(self._detect_cameras_for_gcam)
+        self.bg_gcam_combo = QComboBox(); self.bg_gcam_combo.hide()  # kept for compat
+        gcam_info = QLabel("📷 Folosește camera activă din Media → Feeds.")
+        gcam_info.setWordWrap(True)
+        gcam_info.setStyleSheet("color:#9399b2; font-size:11px;")
         self.bg_gcam_color  = ColorButton("#000033")
         self.bg_gcam_color.colorChanged.connect(self._update_canvas)
         self.bg_gcam_op = QSlider(Qt.Orientation.Horizontal)
@@ -1405,8 +1406,7 @@ class ThemeVisualEditor(QMainWindow):
         self.bg_gcam_dir = QComboBox()
         self.bg_gcam_dir.addItems(["Radial", "Sus→Jos", "Stânga→Dreapta"])
         self.bg_gcam_dir.currentIndexChanged.connect(self._update_canvas)
-        gcaml.addRow("Cameră:", self.bg_gcam_combo)
-        gcaml.addRow("", gcam_det_btn)
+        gcaml.addRow("", gcam_info)
         gcaml.addRow("Culoare gradient:", self.bg_gcam_color)
         gcaml.addRow("Intensitate:", self.bg_gcam_op)
         gcaml.addRow("Direcție:", self.bg_gcam_dir)
