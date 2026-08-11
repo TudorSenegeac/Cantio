@@ -5279,9 +5279,11 @@ class ControlWindow(QMainWindow):
 
         d = os.path.join(os.path.expanduser("~"), "Cantio", "song_slides")
         os.makedirs(d, exist_ok=True)
-        key = str(self.current_song_id) if getattr(self, "current_song_id", None) \
-            else "".join(c for c in title if c.isalnum() or c in " -_").strip() or "cantare"
-        path = os.path.join(d, f"{key}.json")
+        # Per-(song, look) project: switching the song's look opens its own version.
+        path = self._rich_project_path(for_create=True)
+        if path is None:
+            key = "".join(c for c in title if c.isalnum() or c in " -_").strip() or "cantare"
+            path = os.path.join(d, f"{key}.json")
 
         if not os.path.exists(path):
             fmt = {"w": 1920, "h": 1080}
@@ -5289,24 +5291,12 @@ class ControlWindow(QMainWindow):
             def _uid():
                 return "l" + uuid.uuid4().hex[:8]
 
-            def _grad():
-                return {"id": _uid(), "type": "gradient", "visible": True, "opacity": 1,
-                        "x": 0.5, "y": 0.5, "w": 1, "h": 1,
-                        "gradientType": "linear", "angle": 135,
-                        "stops": [{"pos": 0, "color": "#1a237e"},
-                                  {"pos": 1, "color": "#0d47a1"}],
-                        "animate": {"mode": "none", "speed": 0.4}}
-
-            def _text(txt):
-                return {"id": _uid(), "type": "text", "text": self._plain_slide(txt),
-                        "role": "lyrics",
-                        "font": "Montserrat", "size": 96, "bold": True,
-                        "align": "center", "color": "#ffffff",
-                        "x": 0.5, "y": 0.5, "w": 0.82, "h": 0.4,
-                        "opacity": 1, "visible": True}
-
+            # Seed the new project so it OPENS looking exactly like the active look.
+            _look_s = self._resolve_settings(
+                source="songs", song_id=getattr(self, "current_song_id", None))
             doc = {"name": title, "format": fmt,
-                   "slides": [{"format": dict(fmt), "layers": [_grad(), _text(s)]}
+                   "slides": [{"format": dict(fmt),
+                               "layers": self._seed_layers_from_settings(_look_s, s, _uid)}
                               for s in slides]}
             try:
                 with open(path, "w", encoding="utf-8") as f:
@@ -8202,13 +8192,106 @@ class ControlWindow(QMainWindow):
         except Exception:
             return None
 
-    def _rich_project_path(self):
-        """Path to the current song's advanced (rich-slides) project, or None."""
+    @staticmethod
+    def _safe_look(name):
+        s = "".join(c for c in str(name) if c.isalnum() or c in " -_").strip()
+        return s.replace(" ", "_") or "default"
+
+    def _current_look_key(self):
+        """Filesystem-safe name of the look/theme currently applied to the song.
+        Advanced-editor projects are stored PER (song, look) so switching looks
+        switches the customised version. Order matches _resolve_settings:
+        active look → per-song theme → category theme → songs default."""
+        import os, json as _json
+        try:
+            look = (self.settings.get("active_look") or "").strip()
+            if look:
+                return self._safe_look(look)
+        except Exception:
+            pass
+        try:
+            tp = self._get_themes_path()
+            if os.path.exists(tp):
+                themes = _json.load(open(tp, encoding="utf-8"))
+                sid = getattr(self, "current_song_id", None)
+                name = None
+                if sid is not None:
+                    name = themes.get("song_themes", {}).get(str(sid))
+                if not name and sid is not None:
+                    song = db.get_song(sid)
+                    if song:
+                        name = themes.get("category_themes", {}).get(song.get("category", ""))
+                if not name:
+                    name = themes.get("songs_active", "")
+                if name:
+                    return self._safe_look(name)
+        except Exception:
+            pass
+        return "default"
+
+    def _seed_layers_from_settings(self, s, txt, _uid):
+        """Build bg-engine layers that mirror a resolved theme (bg + lyric text), so
+        a new advanced-editor project opens looking exactly like the active look."""
+        s = s or {}
+        bt = s.get("bg_type", "color")
+        layers = []
+        if bt == "gradient":
+            layers.append({"id": _uid(), "type": "gradient", "visible": True, "opacity": 1,
+                           "x": 0.5, "y": 0.5, "w": 1, "h": 1,
+                           "gradientType": "linear", "angle": 135,
+                           "stops": [{"pos": 0, "color": s.get("bg_grad_c1", s.get("bg_color", "#101030"))},
+                                     {"pos": 1, "color": s.get("bg_grad_c2", "#000000")}],
+                           "animate": {"mode": "none", "speed": 0.4}})
+        elif bt == "image" and s.get("bg_image"):
+            layers.append({"id": _uid(), "type": "image", "visible": True, "opacity": 1,
+                           "x": 0.5, "y": 0.5, "w": 1, "h": 1,
+                           "src": s.get("bg_image", ""), "fit": "cover"})
+        elif bt == "video" and s.get("bg_video"):
+            layers.append({"id": _uid(), "type": "video", "visible": True, "opacity": 1,
+                           "x": 0.5, "y": 0.5, "w": 1, "h": 1,
+                           "src": s.get("bg_video", ""), "fit": "cover", "loop": True, "muted": True})
+        else:  # color / camera / other → solid colour
+            col = s.get("bg_color", "#0d1030") or "#0d1030"
+            layers.append({"id": _uid(), "type": "gradient", "visible": True, "opacity": 1,
+                           "x": 0.5, "y": 0.5, "w": 1, "h": 1,
+                           "gradientType": "linear", "angle": 90,
+                           "stops": [{"pos": 0, "color": col}, {"pos": 1, "color": col}],
+                           "animate": {"mode": "none", "speed": 0.4}})
+        try:
+            _sz = int(float(str(s.get("font_size", 96)).replace("px", "") or 96))
+        except Exception:
+            _sz = 96
+        layers.append({"id": _uid(), "type": "text", "text": self._plain_slide(txt),
+                       "role": "lyrics",
+                       "font": s.get("font_family", "Montserrat"), "size": _sz,
+                       "bold": str(s.get("font_bold", "true")) == "true",
+                       "align": s.get("text_align", "center"),
+                       "color": s.get("text_color", "#ffffff"),
+                       "x": 0.5, "y": 0.5, "w": 0.82, "h": 0.4,
+                       "opacity": 1, "visible": True})
+        return layers
+
+    def _rich_project_path(self, for_create=False):
+        """Path to the current song's advanced (rich-slides) project FOR THE ACTIVE
+        LOOK, or None if it doesn't exist (unless for_create=True)."""
         import os
         sid = getattr(self, "current_song_id", None)
         if not sid:
             return None
-        p = os.path.join(os.path.expanduser("~"), "Cantio", "song_slides", f"{sid}.json")
+        look = self._current_look_key()
+        d = os.path.join(os.path.expanduser("~"), "Cantio", "song_slides")
+        p = os.path.join(d, f"{sid}__{look}.json")
+        # Back-compat: migrate a legacy per-song-only project into the current look.
+        legacy = os.path.join(d, f"{sid}.json")
+        if not os.path.exists(p) and os.path.exists(legacy):
+            try:
+                os.makedirs(d, exist_ok=True)
+                import shutil
+                shutil.copy2(legacy, p)
+            except Exception:
+                pass
+        if for_create:
+            return p
         return p if os.path.exists(p) else None
 
     def _send_rich_slide_live(self, idx: int) -> bool:
