@@ -5361,6 +5361,10 @@ class ControlWindow(QMainWindow):
     def _plain_slide(self, s) -> str:
         """Return plain-text lyrics for a slide (strips any HTML markup)."""
         import re, html as _html
+        # Slides may be dicts ({'text':..., 'label':...}) — extract the text, never
+        # str() the whole dict (that leaked "{'text': ...}" into the design text).
+        if isinstance(s, dict):
+            s = s.get("text", "") or ""
         if not isinstance(s, str):
             s = str(s) if s is not None else ""
         if "<" in s and ">" in s:
@@ -8341,10 +8345,19 @@ class ControlWindow(QMainWindow):
             return False
         self._active_bg_path = path
         _bgfx = self.settings.get("bg_transition", "fade")
+        # #5: the lyrics text is an INDEPENDENT live overlay (editable from the
+        # lyrics editor, rendered the same everywhere) — so send the design with its
+        # baked lyrics layer HIDDEN; the real text is pushed via show_text() by the
+        # caller. Any static (non-lyrics) text layers stay part of the design.
+        import copy as _copy
+        _design = _copy.deepcopy(slides[idx])
+        for L in _design.get("layers", []):
+            if isinstance(L, dict) and L.get("role") == "lyrics":
+                L["visible"] = False
         for dw in self.display_windows:
             if hasattr(dw, "show_background"):
                 try:
-                    dw.show_background(slides[idx], _bgfx)
+                    dw.show_background(_design, _bgfx)
                 except Exception:
                     pass
         return True
@@ -8877,7 +8890,7 @@ class ControlWindow(QMainWindow):
                 self._apply_custom_bg_from_settings(_live_settings)
             for dw in targets:
                 dw.apply_settings(_live_settings)
-                dw.show_text("" if _rich else text, _live_fmt,
+                dw.show_text(text, _live_fmt,      # #5: text is always the live overlay
                              metadata=self._current_metadata)
             # Push metadata into LiveState so preview copyright overlay works
             from live_state import get_state as _gs
