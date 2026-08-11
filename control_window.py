@@ -8400,20 +8400,24 @@ class ControlWindow(QMainWindow):
             self._clear_background_live()
 
     def _reset_manual_bg(self):
-        """Drop any manually-sent background (media / YouTube / fundal design) so the
-        selected song slide's LOOK background becomes authoritative."""
+        """Drop any MANUALLY-sent background (media single-click / YouTube / a fundal
+        design sent by hand) so the selected song slide's look background wins.
+        Theme-driven backgrounds are left to _apply_custom_bg_from_settings — we must
+        NOT reset _active_bg_path/_bg_from_theme for those or it can't clear them."""
         if getattr(self, "_web_live_active", False):
             try: self._stop_web_live()
             except Exception: pass
             self._web_live_active = False
-        # A manually-sent fundal design (not theme-driven) → clear it.
+        # Only a MANUALLY-sent fundal design (not from a theme) is cleared here.
         if getattr(self, "_active_bg_path", None) and not getattr(self, "_bg_from_theme", True):
             try: self._clear_background_live()
             except Exception: pass
-        self._active_bg_path = None
-        self._bg_from_theme = False
+            self._active_bg_path = None
+            self._bg_from_theme = False
+        # Media-tab single-click live media state (the DOM media itself is replaced
+        # by the look's bg via apply_settings in _go_live).
         mt = getattr(self, "_media_tab", None)
-        if mt is not None and hasattr(mt, "_live_media_path"):
+        if mt is not None and getattr(mt, "_live_media_path", None):
             mt._live_media_path = None
 
     def _theme_to_settings(self, theme: dict) -> dict:
