@@ -578,6 +578,30 @@
         ctx.fillStyle = col;
         ctx.shadowColor = col; ctx.shadowBlur = 8 * p.sz;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.sz * (preset === 'sparks' ? 1.4 : 2), 0, 7); ctx.fill();
+      } else if (preset === 'rain') {
+        p.y += (10 + p.sz * 4) * sp;
+        p.x += 1.2 * sp;                       // slight wind slant
+        if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+        ctx.globalAlpha = 0.45;
+        ctx.strokeStyle = L.color || '#9ec5ff';
+        ctx.lineWidth = Math.max(1, p.sz);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - 2 * sp, p.y - (12 + p.sz * 6));
+        ctx.stroke();
+      } else if (preset === 'stars') {
+        const tw = (Math.sin((t * 2 + p.seed) * 1.3) + 1) / 2;   // twinkle
+        ctx.globalAlpha = 0.25 + tw * 0.75;
+        ctx.fillStyle = L.color || '#ffffff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(0.6, p.sz * 0.9), 0, 7); ctx.fill();
+      } else if (preset === 'ocean') {
+        p.y -= (0.5 + p.sz * 0.5) * sp;                          // bubbles rise
+        p.x += Math.sin((t + p.seed) * 0.6) * 0.8;
+        if (p.y < -10) { p.y = H + 10; p.x = Math.random() * W; }
+        ctx.globalAlpha = 0.18;
+        ctx.strokeStyle = L.color || '#7fd4ff';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.sz * 6, 0, 7); ctx.stroke();
       } else { // bokeh
         const a = (Math.sin((t + p.seed) * 0.5) + 1) / 2;
         ctx.globalAlpha = 0.10 + a * 0.18;

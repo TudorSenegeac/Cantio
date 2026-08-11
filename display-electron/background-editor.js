@@ -944,7 +944,8 @@ function buildGradientProps(p, L) {
 
 function buildParticleProps(p, L) {
   grpH(p, 'PARTICULE');
-  p.appendChild(row('Tip', mkSelect(L, 'preset', ['sparks','snow','fog','bokeh','embers'])));
+  p.appendChild(row('Tip', mkSelect(L, 'preset',
+    ['sparks','snow','rain','stars','ocean','fog','bokeh','embers'], rebuildLayers)));
   p.appendChild(row('Număr', mkRange(L, 'count', 10, 500, 5, rebuildLayers)));
   p.appendChild(row('Culoare', mkColor(L, 'color')));
   p.appendChild(row('Culoare 2', mkColor(L, 'color2')));
