@@ -957,14 +957,48 @@ function buildParticleProps(p, L) {
 function buildShapeProps(p, L) {
   grpH(p, 'FORMĂ');
   p.appendChild(row('Tip', mkShapePicker(L)));
-  p.appendChild(row('Umplere', mkSelect(L, 'fillType', ['solid','gradient','none'])));
-  p.appendChild(row('Culoare', mkColor(L, 'color')));
-  p.appendChild(row('Grad. de la', mkColor(L, 'gradFrom')));
-  p.appendChild(row('Grad. la', mkColor(L, 'gradTo')));
-  p.appendChild(row('Grad. unghi', mkRange(L, 'gradAngle', 0, 360, 1)));
+  p.appendChild(row('Umplere', mkSelect(L, 'fillType',
+    ['solid','gradient','animated','image','video','none'], rebuildProps)));
+  const ft = L.fillType || 'solid';
+  if (ft === 'solid') {
+    p.appendChild(row('Culoare', mkColor(L, 'color')));
+  }
+  if (ft === 'gradient' || ft === 'animated') {
+    p.appendChild(row('Grad. de la', mkColor(L, 'gradFrom')));
+    p.appendChild(row('Grad. la', mkColor(L, 'gradTo')));
+    p.appendChild(row('Grad. unghi', mkRange(L, 'gradAngle', 0, 360, 1)));
+    if (ft === 'animated') p.appendChild(row('Viteză', mkRange(L, 'animSpeed', 0.1, 3, 0.1)));
+  }
+  if (ft === 'image' || ft === 'video') {
+    p.appendChild(row('Fișier umplere', mkFillPicker(L)));
+  }
   p.appendChild(row('Colț rotund', mkRange(L, 'radius', 0, 300, 1)));
   p.appendChild(row('Contur', mkColor(L, 'strokeColor')));
   p.appendChild(row('Gros. contur', mkRange(L, 'strokeWidth', 0, 40, 1)));
+}
+
+// File picker for a media FILL (image/video inside a shape/text/clock).
+function mkFillPicker(L) {
+  const c = document.createElement('div'); c.className = 'ctl';
+  const b = document.createElement('button'); b.className = 'btn';
+  b.textContent = '📁 Alege…';
+  const nm = document.createElement('span');
+  nm.style.cssText = 'font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+  nm.textContent = L.fillSrc ? L.fillSrc.split(/[\\/]/).pop() : '(niciun fișier)';
+  b.onclick = () => {
+    const inp = document.createElement('input'); inp.type = 'file';
+    inp.accept = L.fillType === 'video' ? 'video/*' : 'image/*';
+    inp.onchange = () => {
+      const f = inp.files[0]; if (!f) return;
+      L.fillSrc = f.path || '';
+      L._fillEl = null;          // force reload
+      ensureLayerMedia(L);
+      rebuildProps();
+    };
+    inp.click();
+  };
+  c.appendChild(b); c.appendChild(nm);
+  return c;
 }
 
 function buildTextProps(p, L) {
@@ -1033,6 +1067,21 @@ function buildCameraProps(p, L) {
 // layer under a `_`-prefixed key so it is never serialised). Mirrors display.js
 // so backgrounds pulled in via the picker — or any saved doc — show their media.
 function ensureLayerMedia(L) {
+  // Media FILL for shapes/text/clock (fillType image/video).
+  if (L && (L.fillType === 'image' || L.fillType === 'video') && L.fillSrc) {
+    if (!L._fillEl) {
+      const isVid = L.fillType === 'video';
+      const fel = isVid ? document.createElement('video') : new Image();
+      if (isVid) { fel.loop = true; fel.muted = true; fel.autoplay = true; fel.playsInline = true; }
+      fel.onloadeddata = fel.onload = () => BgEngine.registerMedia(L.id, fel, 'fill');
+      fel.src = /^(file|https?|data|blob):/i.test(L.fillSrc)
+        ? L.fillSrc : ('file:///' + String(L.fillSrc).replace(/\\/g, '/'));
+      if (isVid) fel.play().catch(() => {});
+      L._fillEl = fel;
+    }
+    BgEngine.registerMedia(L.id, L._fillEl, 'fill');
+    // not "return" — a shape can also be a media layer? no; shapes fall through below.
+  }
   if (L && L.type === 'camera') {
     if (L._mediaEl) { BgEngine.registerMedia(L.id, L._mediaEl, 'video'); return; }
     const vid = document.createElement('video');

@@ -625,14 +625,20 @@
 
   // ── Shape ───────────────────────────────────────────────────────────────────
 
-  function shapeFill(ctx, L, w, h) {
+  function shapeFill(ctx, L, w, h, t) {
     if (L.fillType === 'none') return null;
-    if (L.fillType === 'gradient') {
+    if (L.fillType === 'gradient' || L.fillType === 'animated') {
       const rad = (L.gradAngle || 0) * Math.PI / 180;
       const dx = Math.cos(rad) * w / 2, dy = Math.sin(rad) * h / 2;
       const g = ctx.createLinearGradient(-dx, -dy, dx, dy);
-      g.addColorStop(0, L.gradFrom || '#fff');
-      g.addColorStop(1, L.gradTo || '#000');
+      if (L.fillType === 'animated') {
+        const p = (Math.sin((t || 0) * (L.animSpeed || 0.6)) + 1) / 2;
+        g.addColorStop(0, mixHex(L.gradFrom || '#fff', L.gradTo || '#000', p));
+        g.addColorStop(1, mixHex(L.gradTo || '#000', L.gradFrom || '#fff', p));
+      } else {
+        g.addColorStop(0, L.gradFrom || '#fff');
+        g.addColorStop(1, L.gradTo || '#000');
+      }
       return g;
     }
     return L.color || '#5294e2';
@@ -752,7 +758,7 @@
     ctx.restore();
   }
 
-  function drawShape(ctx, W, H, L) {
+  function drawShape(ctx, W, H, L, t) {
     const w = (L.w || 0.3) * W, h = (L.h || 0.3) * H;
 
     if (L.shape === 'line') {
@@ -763,11 +769,31 @@
     }
 
     const builder = SHAPE_BUILDERS[L.shape] || SHAPE_BUILDERS.rect;
-    const fill = shapeFill(ctx, L, w, h);
+    ctx.lineJoin = 'round';
+    const ft = L.fillType || 'solid';
+
+    // Media fill (image / camera video) — clip to the shape, blit the media inside.
+    if (ft === 'image' || ft === 'video') {
+      ctx.save();
+      builder(ctx, w, h, L);
+      ctx.clip(EVENODD[L.shape] ? 'evenodd' : 'nonzero');
+      if (!_blitFill(ctx, _fillReg[L.id], w, h)) {
+        ctx.fillStyle = L.color || '#222'; ctx.fillRect(-w / 2, -h / 2, w, h);
+      }
+      ctx.restore();
+      if (L.strokeWidth) {
+        builder(ctx, w, h, L);
+        ctx.strokeStyle = L.strokeColor || '#fff';
+        ctx.lineWidth = L.strokeWidth;
+        ctx.stroke();
+      }
+      return;
+    }
+
+    const fill = shapeFill(ctx, L, w, h, t);
     ctx.fillStyle = fill || 'transparent';
     ctx.strokeStyle = L.strokeColor || '#fff';
     ctx.lineWidth = (L.strokeWidth || 0);
-    ctx.lineJoin = 'round';
 
     builder(ctx, w, h, L);
     if (fill) ctx.fill(EVENODD[L.shape] ? 'evenodd' : 'nonzero');
@@ -980,10 +1006,26 @@
   }
 
   // Host registers loaded media elements here (editor + display.js).
+  // kind 'fill' = media used to FILL a shape/text/clock (not a full media layer).
+  const _fillReg = {};
   function registerMedia(layerId, el, kind) {
+    if (kind === 'fill') { _fillReg[layerId] = el; return; }
     const fn = kind === 'video' ? drawVideoLayer : drawImageLayer;
     fn._reg = fn._reg || {};
     fn._reg[layerId] = el;
+  }
+
+  // Blit a media element to COVER a w×h box centred at the current origin.
+  // Assumes the caller has already clipped to the target path (shape/text).
+  function _blitFill(ctx, el, w, h) {
+    if (!el) return false;
+    const iw = el.videoWidth || el.naturalWidth || el.width;
+    const ih = el.videoHeight || el.naturalHeight || el.height;
+    if (!iw || !ih) return false;
+    const s = Math.max(w / iw, h / ih);
+    const dw = iw * s, dh = ih * s;
+    ctx.drawImage(el, -dw / 2, -dh / 2, dw, dh);
+    return true;
   }
 
   // ── Public API ──────────────────────────────────────────────────────────────

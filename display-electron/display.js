@@ -278,6 +278,23 @@ const _bgMediaCache = {};
 function loadDocMedia(doc) {
   if (!doc || !Array.isArray(doc.layers) || typeof BgEngine === 'undefined') return;
   doc.layers.forEach((L) => {
+    // Media FILL for shapes/text/clock (fillType image/video → clip + blit).
+    if ((L.fillType === 'image' || L.fillType === 'video') && L.fillSrc) {
+      const fkey = L.id + '|fill|' + L.fillSrc;
+      const fcached = _bgMediaCache[fkey];
+      if (fcached) { BgEngine.registerMedia(L.id, fcached, 'fill'); }
+      else {
+        const isVid = L.fillType === 'video';
+        const fel = isVid ? document.createElement('video') : new Image();
+        if (isVid) { fel.loop = true; fel.muted = true; fel.autoplay = true; fel.playsInline = true; }
+        fel.onloadeddata = fel.onload = () => BgEngine.registerMedia(L.id, fel, 'fill');
+        fel.src = /^(file|https?|data|blob):/i.test(L.fillSrc)
+          ? L.fillSrc : ('file:///' + String(L.fillSrc).replace(/\\/g, '/'));
+        if (isVid) fel.play().catch(() => {});
+        _bgMediaCache[fkey] = fel;
+        BgEngine.registerMedia(L.id, fel, 'fill');
+      }
+    }
     if (L.type === 'camera') {
       // Live webcam layer — open the stream via getUserMedia (no OpenCV needed).
       const key = L.id + '|cam' + (L.camIndex || 0);
