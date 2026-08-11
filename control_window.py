@@ -1992,6 +1992,7 @@ class ControlWindow(QMainWindow):
         # selected BEFORE opening still shows, because we don't reset it on open.
         self._live_armed = False
         self._slide_just_selected = False
+        self._service_view_on = False
         self._is_frozen = False
         self._logo_pixmap = None
         self._stage_editor = None
@@ -3051,6 +3052,22 @@ class ControlWindow(QMainWindow):
         )
         self._slides_label_btn.clicked.connect(self._toggle_slides_by_label)
         sal_layout.addWidget(self._slides_label_btn)
+
+        # Continuous service view — all songs' slides stacked, one after another,
+        # with a title header + per-song Look button between them.
+        self._service_view_btn = QPushButton("📋")
+        self._service_view_btn.setToolTip(
+            "Vedere serviciu: toate slide-urile din serviciu, cântare după cântare")
+        self._service_view_btn.setCheckable(True)
+        self._service_view_btn.setFixedSize(24, 20)
+        self._service_view_btn.setStyleSheet(
+            "QPushButton { background: #1c1c1c; color: #666; border: 1px solid #222; "
+            "border-radius: 3px; font-size: 11px; padding: 0; }"
+            "QPushButton:hover { color: #e0e0e0; }"
+            "QPushButton:checked { background: #18283a; color: #5294e2; border-color: #1c3a5a; }"
+        )
+        self._service_view_btn.clicked.connect(self._toggle_service_view)
+        sal_layout.addWidget(self._service_view_btn)
 
         # ── Arrangement selector (Vers/Refren sequence, like ProPresenter) ─────
         self._active_arrangement = None
@@ -7231,6 +7248,11 @@ class ControlWindow(QMainWindow):
 
     @_protect_editor_focus
     def _set_slides(self, slides):
+        # Loading a normal song exits the continuous service view.
+        if getattr(self, "_service_view_on", False):
+            self._service_view_on = False
+            try: self._service_view_btn.setChecked(False)
+            except Exception: pass
         self.current_slides = slides
         # Track the "source" slide list for arrangements. When slides change for
         # a real reason (song load / text edit) — not an arrangement view — this
@@ -8833,6 +8855,133 @@ class ControlWindow(QMainWindow):
             self._toasts.success("⬛ Slide gol adăugat (doar fundal)")
         except Exception:
             pass
+
+    # ── Continuous service view (all songs' slides, title + Look per song) ──────
+    def _toggle_service_view(self, checked):
+        self._service_view_on = bool(checked)
+        if checked:
+            self._show_service_slides()
+        elif getattr(self, "current_slides", None):
+            self._set_slides(self.current_slides)
+
+    def _show_service_slides(self):
+        items = getattr(self, "_service_items", []) or []
+        self._thumbnails.clear()
+        while self.slides_grid.count():
+            it = self.slides_grid.takeAt(0)
+            if it.widget():
+                it.widget().deleteLater()
+        self._slides_stack.setCurrentIndex(0)   # grid page
+        if not items:
+            lbl = QLabel("Serviciul e gol — adaugă cântări în listă.")
+            lbl.setStyleSheet("color:#555; font-size:12px; padding:20px;")
+            self.slides_grid.addWidget(lbl, 0, 0)
+            return
+        tw_base, _ = THUMB_SIZES.get(self._thumb_size_key, THUMB_SIZES["S"])
+        tw = tw_base
+        th = max(40, int(tw / (getattr(self, "_display_aspect", 16 / 9) or (16 / 9))))
+        avail_w = self.slides_container.width() or 500
+        cols = max(1, (avail_w - 24) // (tw + 8))
+        row = 0
+        for si, item in enumerate(items):
+            self.slides_grid.addWidget(self._make_service_header(si, item), row, 0, 1, cols)
+            row += 1
+            theme_s = self._get_preview_settings(item.get("song_id"))
+            slides = item.get("slides", []) or []
+            col = 0
+            for li, sl in enumerate(slides):
+                thumb = SlideThumbnail(sl, li, theme_s, thumb_w=tw, thumb_h=th)
+                thumb.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                thumb._service_si = si
+                thumb.clicked.connect(lambda idx, _si=si: self._service_slide_clicked(_si, idx))
+                self._thumbnails.append(thumb)
+                self.slides_grid.addWidget(thumb, row, col)
+                col += 1
+                if col >= cols:
+                    col = 0
+                    row += 1
+            if col != 0:
+                row += 1
+
+    def _make_service_header(self, si, item):
+        fr = QFrame()
+        fr.setStyleSheet("QFrame { background:#141a24; border:none;"
+                         " border-bottom:1px solid #223; border-radius:3px; }")
+        h = QHBoxLayout(fr); h.setContentsMargins(8, 5, 6, 5)
+        t = QLabel(f"{si + 1}.  {item.get('title', '')}")
+        t.setStyleSheet("color:#5294e2; font-size:12px; font-weight:bold; background:transparent;")
+        h.addWidget(t, 1)
+        look_btn = QPushButton("🎨 Look")
+        look_btn.setStyleSheet(
+            "QPushButton { background:#1c1c1c; color:#aaa; border:1px solid #2a2a2a;"
+            " border-radius:4px; padding:3px 10px; font-size:10px; }"
+            "QPushButton:hover { background:#252525; color:#fff; }")
+        menu = QMenu(look_btn)
+        menu.setStyleSheet(
+            "QMenu { background:#1e1e1e; color:#e0e0e0; border:1px solid #333; }"
+            "QMenu::item { padding:5px 16px; } QMenu::item:selected { background:#1c3a5a; }")
+        menu.addAction("— Default —").triggered.connect(
+            lambda _=False, _si=si: self._set_service_item_look(_si, ""))
+        try:
+            names = self._theme_names()
+        except Exception:
+            names = []
+        for n in names:
+            menu.addAction(f"🎨 {n}").triggered.connect(
+                lambda _=False, _n=n, _si=si: self._set_service_item_look(_si, _n))
+        look_btn.setMenu(menu)
+        h.addWidget(look_btn)
+        return fr
+
+    def _set_service_item_look(self, si, name):
+        items = getattr(self, "_service_items", [])
+        if not (0 <= si < len(items)):
+            return
+        item = items[si]
+        item["theme"] = name
+        sid = item.get("song_id")
+        if sid is not None:
+            try:
+                import os, json as _json
+                tp = self._get_themes_path()
+                themes = _json.load(open(tp, encoding="utf-8")) if os.path.exists(tp) else {}
+                st = themes.setdefault("song_themes", {})
+                if name:
+                    st[str(sid)] = name
+                else:
+                    st.pop(str(sid), None)
+                _json.dump(themes, open(tp, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+                if name and self.settings.get("display_mode") != "themes":
+                    self.settings["display_mode"] = "themes"
+                    db.save_setting("display_mode", "themes")
+            except Exception:
+                pass
+        self._show_service_slides()
+        try:
+            self._toasts.success(f"🎨 Look «{name or 'default'}» → {item.get('title', '')}")
+        except Exception:
+            pass
+
+    def _service_slide_clicked(self, si, li):
+        items = getattr(self, "_service_items", [])
+        if not (0 <= si < len(items)):
+            return
+        item = items[si]
+        self.current_song_id = item.get("song_id")
+        self.current_slides = list(item.get("slides", []) or [])
+        self._current_metadata = {"title": item.get("title", ""), "author": "",
+                                  "category": "", "source": item.get("notes", "")}
+        if not (0 <= li < len(self.current_slides)):
+            return
+        self.current_slide_idx = li
+        self._live_armed = True
+        self._reset_manual_bg()
+        # Highlight the clicked thumbnail (match by service index + slide index).
+        for thumb in self._thumbnails:
+            thumb.set_selected(getattr(thumb, "_service_si", None) == si
+                               and thumb.slide_index == li)
+        self._go_live()
+        self._push_remote_state()
 
     # ── Display ───────────────────────────────────────────────────────────────
 
