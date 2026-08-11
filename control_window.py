@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QFrame, QScrollArea, QApplication, QStatusBar, QToolBar, QSizePolicy,
     QGridLayout, QGroupBox, QSpinBox, QCheckBox, QInputDialog, QSpacerItem,
     QProgressDialog, QStyledItemDelegate, QStyle, QColorDialog, QRadioButton,
+    QMenu,
 )
 from PyQt6.QtCore import (Qt, QSize, pyqtSignal, QTimer, QRect, QPoint, QSizeF, QRectF,
                            QAbstractListModel, QModelIndex, QPointF)
@@ -2898,6 +2899,24 @@ class ControlWindow(QMainWindow):
         )
         self.new_slide_btn.clicked.connect(self._new_slide)
         tb_layout.addWidget(self.new_slide_btn)
+
+        # Blank slide(s) — show only the background (intro/outro). Menu: start/end/both.
+        self.blank_slide_btn = QPushButton("⬛ Slide gol")
+        self.blank_slide_btn.setToolTip("Adaugă un slide gol (doar fundal) la început, sfârșit sau ambele")
+        self.blank_slide_btn.setStyleSheet(
+            "QPushButton { background: #1c1c1c; color: #888; border: 1px solid #242424; "
+            "border-radius: 4px; padding: 6px 12px; font-size: 11px; }"
+            "QPushButton:hover { background: #222; color: #e0e0e0; }"
+        )
+        _blank_menu = QMenu(self.blank_slide_btn)
+        _blank_menu.setStyleSheet(
+            "QMenu { background:#1e1e1e; color:#e0e0e0; border:1px solid #333; }"
+            "QMenu::item { padding:6px 18px; } QMenu::item:selected { background:#1c3a5a; }")
+        _blank_menu.addAction("⬆ La început").triggered.connect(lambda: self._add_blank_slide("start"))
+        _blank_menu.addAction("⬇ La sfârșit").triggered.connect(lambda: self._add_blank_slide("end"))
+        _blank_menu.addAction("⬍ Ambele").triggered.connect(lambda: self._add_blank_slide("both"))
+        self.blank_slide_btn.setMenu(_blank_menu)
+        tb_layout.addWidget(self.blank_slide_btn)
 
         self.adv_editor_btn = QPushButton("🎬 Editor avansat")
         self.adv_editor_btn.setToolTip(
@@ -7891,12 +7910,11 @@ class ControlWindow(QMainWindow):
             self.preview.apply_settings(s)
         except Exception:
             pass
-        if self.display_windows and self.current_slide_idx >= 0:
-            self._go_live()                      # re-push current slide, new theme
-        elif getattr(self, "_electron_preview_on", False):
-            self._push_preview()
+        # Do NOT change the LIVE output instantly — the new look (incl. its
+        # background) is applied when the operator next selects a slide.
         try:
-            self._toasts.info(f"🎨 Look: {name}" if name else "🎨 Look dezactivat")
+            self._toasts.info(f"🎨 Look: {name} — se aplică la următorul slide"
+                              if name else "🎨 Look dezactivat")
         except Exception:
             pass
 
@@ -7973,6 +7991,7 @@ class ControlWindow(QMainWindow):
         if not url:
             return
         self._live_armed = True
+        self._web_live_active = True
         for dw in self.display_windows:
             if hasattr(dw, "show_web"):
                 try: dw.show_web(url)
@@ -8345,6 +8364,23 @@ class ControlWindow(QMainWindow):
         if getattr(self, "_active_bg_path", None) and getattr(self, "_bg_from_theme", False):
             self._clear_background_live()
 
+    def _reset_manual_bg(self):
+        """Drop any manually-sent background (media / YouTube / fundal design) so the
+        selected song slide's LOOK background becomes authoritative."""
+        if getattr(self, "_web_live_active", False):
+            try: self._stop_web_live()
+            except Exception: pass
+            self._web_live_active = False
+        # A manually-sent fundal design (not theme-driven) → clear it.
+        if getattr(self, "_active_bg_path", None) and not getattr(self, "_bg_from_theme", True):
+            try: self._clear_background_live()
+            except Exception: pass
+        self._active_bg_path = None
+        self._bg_from_theme = False
+        mt = getattr(self, "_media_tab", None)
+        if mt is not None and hasattr(mt, "_live_media_path"):
+            mt._live_media_path = None
+
     def _theme_to_settings(self, theme: dict) -> dict:
         """
         Convert a themes.json theme dict into a flat settings dict compatible
@@ -8623,6 +8659,9 @@ class ControlWindow(QMainWindow):
             return
         # Explicit operator choice → a Display opened from now on shows this slide.
         self._live_armed = True
+        # Selecting a song slide makes its LOOK's background authoritative: drop any
+        # manually-sent media / YouTube / fundal background so the look's bg shows.
+        self._reset_manual_bg()
         # During a dynamic presentation, clicking a slide SEEKS the audio there
         # (operator intervention) instead of pushing a static slide.
         if getattr(self, "_dynamic_active", False):
@@ -8764,6 +8803,24 @@ class ControlWindow(QMainWindow):
         self.editor.setTextCursor(cursor)
         self.editor.setFocus()
 
+    def _add_blank_slide(self, where="end"):
+        """Insert an empty slide (background only, no text) at the start / end / both.
+        Useful for an intro/outro where just the look's background shows."""
+        slides = list(getattr(self, "current_slides", []) or [])
+
+        def _blank():
+            return {"text": "", "label": "⬛ Gol", "blank": True}
+
+        if where in ("start", "both"):
+            slides.insert(0, _blank())
+        if where in ("end", "both"):
+            slides.append(_blank())
+        self._set_slides(slides)
+        try:
+            self._toasts.success("⬛ Slide gol adăugat (doar fundal)")
+        except Exception:
+            pass
+
     # ── Display ───────────────────────────────────────────────────────────────
 
     def _go_live(self):
@@ -8788,8 +8845,10 @@ class ControlWindow(QMainWindow):
                 self._update_status(
                     slide_msg=f"Slide {idx + 1}/{total}")
         elif self.current_slides:
-            text = self._slide_text(self.current_slides[self.current_slide_idx])
-            if not text.strip():
+            _cur_slide = self.current_slides[self.current_slide_idx]
+            text = self._slide_text(_cur_slide)
+            _is_blank = isinstance(_cur_slide, dict) and _cur_slide.get("blank")
+            if not text.strip() and not _is_blank:
                 self._toasts.warning("Slide gol — nu există text de afișat.")
                 self._increment_warnings()
             elif len(text) > 200:
