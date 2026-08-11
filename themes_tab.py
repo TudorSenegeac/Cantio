@@ -354,13 +354,17 @@ class ThemesTab(QWidget):
         vl.addRow("Opacitate:", self.bg_vid_opacity)
         self.bg_stack.addWidget(vw)
 
-        # 4: Cameră
-        camw = QWidget(); caml = QFormLayout(camw)
-        self.bg_cam_combo = QComboBox()
-        det_btn = QPushButton("🔍 Detectează camere")
-        det_btn.clicked.connect(self._detect_cameras)
-        caml.addRow("Cameră:", self.bg_cam_combo)
-        caml.addRow("", det_btn)
+        # 4: Cameră — camera itself is chosen globally in Media → Feeds, so the
+        # theme just says "use the camera". No per-theme camera picker here.
+        camw = QWidget(); caml = QVBoxLayout(camw)
+        cam_info = QLabel("📷 Fundalul folosește camera activă.\n\n"
+                          "Alege sau schimbă camera din:\nMedia → Feeds.")
+        cam_info.setStyleSheet("color:#9aa; font-size:11px;")
+        cam_info.setWordWrap(True)
+        caml.addWidget(cam_info)
+        caml.addStretch()
+        # Kept for backward-compat with code that references it (hidden, unused).
+        self.bg_cam_combo = QComboBox(); self.bg_cam_combo.hide()
         self.bg_stack.addWidget(camw)
 
         # 5: Transparent

@@ -8397,12 +8397,13 @@ class ControlWindow(QMainWindow):
 
         elif bg_type == "camera":
             merged["bg_type"]  = "camera"
-            merged["bg_image"] = str(bg.get("camera_id", "0"))
+            # Which camera is chosen globally in Media → Feeds, not per-theme.
+            merged["bg_image"] = str(self.settings.get("feeds_camera", "0"))
             merged["bg_transparent"] = "false"
 
         elif bg_type == "camera_gradient":
             merged["bg_type"]       = "camera_gradient"
-            merged["bg_image"]      = str(bg.get("camera_id", "0"))
+            merged["bg_image"]      = str(self.settings.get("feeds_camera", "0"))
             merged["bg_grad_c1"]    = bg.get("grad_color", "#000033")
             merged["bg_grad_dir"]   = bg.get("grad_dir", "Radial")
             merged["bg_grad_opacity"] = str(bg.get("grad_opacity", 0.5))

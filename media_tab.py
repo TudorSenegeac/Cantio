@@ -1367,6 +1367,15 @@ class MediaTab(QWidget):
 
     def _on_camera_card_selected(self, cam_idx: int):
         """Handle CameraCard 'set as background' click."""
+        # Remember the globally-active feeds camera so themes with a 'camera'
+        # background use THIS camera (chosen here, not in the theme editor).
+        if self._control:
+            try:
+                self._control.settings["feeds_camera"] = str(cam_idx)
+                import database as _db
+                _db.save_setting("feeds_camera", str(cam_idx))
+            except Exception:
+                pass
         if self._control:
             for dw in self._control.display_windows:
                 if hasattr(dw, 'settings'):
