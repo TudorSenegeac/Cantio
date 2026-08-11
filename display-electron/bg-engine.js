@@ -111,6 +111,11 @@
         name: 'Video', src: '', fit: 'cover',
         loop: true, muted: true, w: 1, h: 1, x: 0.5, y: 0.5,
       });
+    } else if (type === 'camera') {
+      Object.assign(base, {
+        name: 'Cameră', camIndex: 0, fit: 'cover',   // live webcam via getUserMedia
+        w: 1, h: 1, x: 0.5, y: 0.5,
+      });
     } else if (type === 'clock') {
       Object.assign(base, {
         name: 'Ceas', clockMode: 'clock',   // clock | date | stopwatch | countdown
@@ -387,6 +392,7 @@
       case 'clock':     drawClock(ctx, W, H, L, t); break;
       case 'image':     drawImageLayer(ctx, W, H, L, t); break;
       case 'video':     drawVideoLayer(ctx, W, H, L, t); break;
+      case 'camera':    drawVideoLayer(ctx, W, H, L, t); break;  // camera = live video element
       case 'lyrics':    drawLyrics(ctx, W, H, L, t, bg); break;
     }
     ctx.restore();

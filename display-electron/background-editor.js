@@ -7,7 +7,7 @@ const _fs   = (typeof require !== 'undefined') ? require('fs')   : null;
 let   _ipc  = null;
 try { _ipc = (typeof require !== 'undefined') ? require('electron').ipcRenderer : null; } catch (e) {}
 
-const ICONS = { gradient:'🌈', particles:'✨', shape:'⬛', text:'🅣', clock:'🕐', lyrics:'🎤', image:'🖼', video:'🎬' };
+const ICONS = { gradient:'🌈', particles:'✨', shape:'⬛', text:'🅣', clock:'🕐', lyrics:'🎤', image:'🖼', video:'🎬', camera:'📹' };
 
 const state = {
   bg: null,
@@ -423,7 +423,7 @@ function renderLoop() {
 
 // ── Direct-manipulation: select / move / resize on the canvas ─────────────────
 
-const SELECTABLE = { shape: 1, text: 1, clock: 1, image: 1, video: 1, lyrics: 1 };
+const SELECTABLE = { shape: 1, text: 1, clock: 1, image: 1, video: 1, lyrics: 1, camera: 1 };
 let drag = null;
 
 function isSelectable(L) { return L && SELECTABLE[L.type] && L.visible !== false; }
@@ -756,6 +756,7 @@ function rebuildProps() {
   else if (L.type === 'clock') buildClockProps(p, L);
   else if (L.type === 'lyrics') buildLyricsProps(p, L);
   else if (L.type === 'image' || L.type === 'video') buildMediaProps(p, L);
+  else if (L.type === 'camera') buildCameraProps(p, L);
 
   // Common: position/size (skip for full-bleed gradient/particles)
   if (L.type !== 'gradient' && L.type !== 'particles') {
@@ -1009,10 +1010,45 @@ function buildMediaProps(p, L) {
   if (L.type === 'video') { p.appendChild(row('Loop', mkCheck(L, 'loop'))); }
 }
 
+function buildCameraProps(p, L) {
+  grpH(p, 'CAMERĂ LIVE');
+  const info = document.createElement('div');
+  info.style.cssText = 'font-size:10px;color:#888;margin-bottom:6px;';
+  info.textContent = 'Cameră live (fără fișiere). Dacă nu apare, încearcă alt număr.';
+  p.appendChild(info);
+  p.appendChild(row('Cameră nr.', mkRange(L, 'camIndex', 0, 4, 1, () => {
+    // Restart the stream on the new index.
+    try {
+      if (L._mediaEl && L._mediaEl.srcObject) {
+        L._mediaEl.srcObject.getTracks().forEach((tr) => tr.stop());
+      }
+    } catch (e) {}
+    L._mediaEl = null;
+    ensureLayerMedia(L);
+  })));
+  p.appendChild(row('Încadrare', mkSelect(L, 'fit', ['cover','contain','stretch'])));
+}
+
 // Load + register an image/video layer's media element (once, cached on the
 // layer under a `_`-prefixed key so it is never serialised). Mirrors display.js
 // so backgrounds pulled in via the picker — or any saved doc — show their media.
 function ensureLayerMedia(L) {
+  if (L && L.type === 'camera') {
+    if (L._mediaEl) { BgEngine.registerMedia(L.id, L._mediaEl, 'video'); return; }
+    const vid = document.createElement('video');
+    vid.muted = true; vid.autoplay = true; vid.playsInline = true;
+    L._mediaEl = vid;
+    navigator.mediaDevices.enumerateDevices().then((devs) => {
+      const cams = devs.filter((d) => d.kind === 'videoinput');
+      const cam = cams[parseInt(L.camIndex) || 0];
+      return navigator.mediaDevices.getUserMedia(
+        cam ? { video: { deviceId: { exact: cam.deviceId } } } : { video: true });
+    }).then((stream) => {
+      vid.srcObject = stream; vid.play().catch(() => {});
+      BgEngine.registerMedia(L.id, vid, 'video');
+    }).catch(() => {});
+    return;
+  }
   if (!L || (L.type !== 'image' && L.type !== 'video') || !L.src) return;
   if (L._mediaEl) { BgEngine.registerMedia(L.id, L._mediaEl, L.type); return; }
   const isVideo = L.type === 'video';

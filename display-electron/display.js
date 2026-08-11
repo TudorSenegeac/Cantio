@@ -278,6 +278,26 @@ const _bgMediaCache = {};
 function loadDocMedia(doc) {
   if (!doc || !Array.isArray(doc.layers) || typeof BgEngine === 'undefined') return;
   doc.layers.forEach((L) => {
+    if (L.type === 'camera') {
+      // Live webcam layer — open the stream via getUserMedia (no OpenCV needed).
+      const key = L.id + '|cam' + (L.camIndex || 0);
+      const cached = _bgMediaCache[key];
+      if (cached) { BgEngine.registerMedia(L.id, cached, 'video'); return; }
+      const vid = document.createElement('video');
+      vid.muted = true; vid.autoplay = true; vid.playsInline = true;
+      navigator.mediaDevices.enumerateDevices().then((devs) => {
+        const cams = devs.filter((d) => d.kind === 'videoinput');
+        const cam = cams[parseInt(L.camIndex) || 0];
+        return navigator.mediaDevices.getUserMedia(
+          cam ? { video: { deviceId: { exact: cam.deviceId } } } : { video: true });
+      }).then((stream) => {
+        vid.srcObject = stream;
+        vid.play().catch(() => {});
+        _bgMediaCache[key] = vid;
+        BgEngine.registerMedia(L.id, vid, 'video');
+      }).catch(() => {});
+      return;
+    }
     if (L.type !== 'image' && L.type !== 'video') return;
     const src = L.src || '';
     if (!src) return;
