@@ -8242,12 +8242,34 @@ class ControlWindow(QMainWindow):
         s = "".join(c for c in str(name) if c.isalnum() or c in " -_").strip()
         return s.replace(" ", "_") or "default"
 
+    def _themes_cached(self) -> dict:
+        """Load themes.json with an mtime cache so slide navigation (which resolves
+        the look on every send) doesn't hit the disk every time."""
+        import os, json as _json
+        tp = self._get_themes_path()
+        try:
+            mt = os.path.getmtime(tp)
+        except Exception:
+            return {}
+        if (getattr(self, "_themes_cache_mt", None) == mt
+                and getattr(self, "_themes_cache_path", None) == tp):
+            return getattr(self, "_themes_cache", {}) or {}
+        try:
+            with open(tp, encoding="utf-8") as f:
+                data = _json.load(f)
+        except Exception:
+            data = {}
+        self._themes_cache = data
+        self._themes_cache_mt = mt
+        self._themes_cache_path = tp
+        return data
+
     def _current_look_key(self):
         """Filesystem-safe name of the look/theme currently applied to the song.
         Advanced-editor projects are stored PER (song, look) so switching looks
         switches the customised version. Order matches _resolve_settings:
         active look → per-song theme → category theme → songs default."""
-        import os, json as _json
+        import os
         try:
             look = (self.settings.get("active_look") or "").strip()
             if look:
@@ -8257,7 +8279,7 @@ class ControlWindow(QMainWindow):
         try:
             tp = self._get_themes_path()
             if os.path.exists(tp):
-                themes = _json.load(open(tp, encoding="utf-8"))
+                themes = self._themes_cached()
                 sid = getattr(self, "current_song_id", None)
                 name = None
                 if sid is not None:
@@ -8343,6 +8365,16 @@ class ControlWindow(QMainWindow):
         """If the current song has an advanced project, send slide `idx` live as a
         custom background (full design incl. its own text). Returns True if used."""
         import os, json as _json
+        # Blank slides (background only) aren't part of the advanced project — show
+        # just the theme background for them.
+        cur = self.current_slides[idx] if 0 <= idx < len(getattr(self, "current_slides", [])) else None
+        if isinstance(cur, dict) and cur.get("blank"):
+            return False
+        # Map the on-screen index to the project index by skipping blank slides
+        # before it (blank slides shift positions but aren't in the project).
+        idx = sum(1 for i in range(idx)
+                  if not (isinstance(self.current_slides[i], dict)
+                          and self.current_slides[i].get("blank")))
         path = self._rich_project_path()
         if not path:
             return False
