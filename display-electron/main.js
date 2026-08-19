@@ -130,7 +130,8 @@ function handleCommand(msg, ws) {
       const screenIdx     = msg.screen_index !== undefined ? msg.screen_index : (msg.screen_idx || 0);
       const windowName    = msg.window_name  || `Display ${window_id}`;
       const isTransparent = msg.transparent === true || msg.transparent === 'true';
-      openDisplay(screenIdx, window_id, windowName, isTransparent);
+      openDisplay(screenIdx, window_id, windowName, isTransparent,
+                  parseInt(msg.custom_w) || 0, parseInt(msg.custom_h) || 0);
       return { type: 'ok', window_id };
     }
 
@@ -247,7 +248,8 @@ function handleCommand(msg, ws) {
 }
 
 // ── Open display window ───────────────────────────────────────────────────────
-function openDisplay(screenIdx, windowId, windowName, isTransparent = false) {
+function openDisplay(screenIdx, windowId, windowName, isTransparent = false,
+                     customW = 0, customH = 0) {
   if (windows.has(windowId)) {
     windows.get(windowId).focus();
     return;
@@ -280,7 +282,16 @@ function openDisplay(screenIdx, windowId, windowName, isTransparent = false) {
 
   console.log(`[Display] Target: ${targetDisplay.bounds.width}×${targetDisplay.bounds.height} @ (${targetDisplay.bounds.x},${targetDisplay.bounds.y})`);
 
-  const bounds = targetDisplay.bounds;
+  const scr = targetDisplay.bounds;
+  // Custom resolution → a windowed output of that exact size, centred on the target
+  // screen (not fullscreen). Otherwise fill the screen as before.
+  const useCustom = customW > 0 && customH > 0;
+  const bounds = useCustom ? {
+    x:      scr.x + Math.max(0, Math.round((scr.width  - customW) / 2)),
+    y:      scr.y + Math.max(0, Math.round((scr.height - customH) / 2)),
+    width:  customW,
+    height: customH,
+  } : scr;
 
   const win = new BrowserWindow({
     x:               bounds.x,

@@ -284,7 +284,8 @@ class ElectronDisplayManager:
     # ── Display commands (enqueue) ────────────────────────────────────────────
 
     def open_display(self, screen_index: int = 0, window_id: int = 0,
-                     window_name: str = "Cantio Display"):
+                     window_name: str = "Cantio Display",
+                     custom_w: int = 0, custom_h: int = 0):
         # Captează dimensiunile ecranului pentru metodele de geometrie Qt-compat.
         # Folosește aceeași logică primary/secondary ca main.js openDisplay():
         #   screen_index 0 → primul ecran secundar (non-primary)
@@ -320,7 +321,9 @@ class ElectronDisplayManager:
         self._enqueue({"type": "open",
                        "window_id": window_id,
                        "screen_index": screen_index,
-                       "window_name": window_name})
+                       "window_name": window_name,
+                       "custom_w": int(custom_w or 0),
+                       "custom_h": int(custom_h or 0)})
 
     def open_bg_editor(self, file_path: str):
         """Open the Electron background editor window for the given .json file."""
@@ -1043,10 +1046,19 @@ class ElectronDisplayProxy:
 
     def show(self):
         """Open the Electron window (called after construction)."""
+        cw = ch = 0
+        if str(self.settings.get("custom_resolution", "false")) == "true":
+            try:
+                cw = int(self.settings.get("custom_res_w", 1920))
+                ch = int(self.settings.get("custom_res_h", 1080))
+            except Exception:
+                cw = ch = 0
         self._mgr.open_display(
             screen_index = self.settings.get("_screen_index", 0),
             window_id    = self._window_id,
             window_name  = self._window_name,
+            custom_w     = cw,
+            custom_h     = ch,
         )
         self.is_open = True
         # Push initial settings
