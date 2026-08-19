@@ -9467,6 +9467,14 @@ class ControlWindow(QMainWindow):
         from stage_monitor import StageEditorWindow
         if self._stage_editor is None or not self._stage_editor.isVisible():
             self._stage_editor = StageEditorWindow(parent=None)
+            # Default the stage OUTPUT screen to the app-wide Settings choice.
+            try:
+                st = int(self.settings.get("stage_screen", 0))
+                sc = getattr(self._stage_editor, "screen_combo", None)
+                if sc is not None:
+                    sc.setCurrentIndex(min(st, sc.count() - 1))
+            except Exception:
+                pass
             self._stage_editor.show()
             self._update_status(stage_msg="Stage: activ")
         else:
