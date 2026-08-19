@@ -205,7 +205,29 @@ class ThemesTab(QWidget):
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
-        outer.addWidget(main_splitter)
+
+        # Sub-tabs: the theme grid ("Teme") + the embedded Stage layout editor.
+        _sub = QTabWidget()
+        _sub.setDocumentMode(True)
+        _sub.setStyleSheet(
+            "QTabBar::tab { padding:5px 14px; font-size:11px; color:#888; border:none;"
+            " border-bottom:2px solid transparent; }"
+            "QTabBar::tab:selected { color:#e0e0e0; border-bottom:2px solid #5294e2; }"
+            "QTabWidget::pane { border:none; }")
+        _teme_page = QWidget()
+        _tl = QVBoxLayout(_teme_page)
+        _tl.setContentsMargins(0, 0, 0, 0)
+        _tl.addWidget(main_splitter)
+        _sub.addTab(_teme_page, "🎨 Teme")
+        try:
+            from stage_monitor import StageEditorWindow
+            self._stage_editor_embed = StageEditorWindow(parent=None)
+            _sub.addTab(self._stage_editor_embed, "🎭 Stage")
+        except Exception as e:
+            _err = QLabel(f"Editor Stage indisponibil: {e}")
+            _err.setStyleSheet("color:#888; padding:20px;")
+            _sub.addTab(_err, "🎭 Stage")
+        outer.addWidget(_sub)
 
     # ── Text tab ─────────────────────────────────────────────────────────────
 

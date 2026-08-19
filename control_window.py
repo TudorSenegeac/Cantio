@@ -2348,11 +2348,17 @@ class ControlWindow(QMainWindow):
         saved layout's widgets."""
         from stage_monitor import StageOutputWindow
         import json as _json
+        # Read fresh from the db — the embedded Stage editor (Teme tab) saves layouts
+        # there, so self.settings (cached at startup) may not have the latest.
         try:
-            layouts = _json.loads(self.settings.get("stage_layouts", "{}") or "{}")
+            _db_s = db.get_settings()
+        except Exception:
+            _db_s = self.settings
+        try:
+            layouts = _json.loads(_db_s.get("stage_layouts", "{}") or "{}")
         except Exception:
             layouts = {}
-        active = self.settings.get("stage_active_layout", "")
+        active = _db_s.get("stage_active_layout", "")
         widgets = layouts.get(active) if active in layouts else next(iter(layouts.values()), None)
         screens = QApplication.screens()
         try:
