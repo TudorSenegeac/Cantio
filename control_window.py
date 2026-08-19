@@ -8405,9 +8405,17 @@ class ControlWindow(QMainWindow):
         if not (isinstance(slides, list) and slides):
             return False
         _d = _copy.deepcopy(slides[0])
+        # The theme's lyrics box is POSITIONED in the design → fill it with the
+        # current slide text and render it there (don't hide it + overlay, that would
+        # ignore the operator-chosen position). Content still comes from the lyrics.
+        cur_txt = ""
+        if 0 <= self.current_slide_idx < len(self.current_slides):
+            cur_txt = self._slide_text(self.current_slides[self.current_slide_idx])
         for L in _d.get("layers", []):
             if isinstance(L, dict) and L.get("role") == "lyrics":
-                L["visible"] = False
+                L["text"] = cur_txt
+                L["visible"] = True
+        self._rich_text_in_design = True   # design renders the text → no overlay
         self._active_bg_path = "theme_design"
         _bgfx = self.settings.get("bg_transition", "fade")
         for dw in self.display_windows:
@@ -8485,6 +8493,7 @@ class ControlWindow(QMainWindow):
         """If the current song has an advanced project, send slide `idx` live as a
         custom background (full design incl. its own text). Returns True if used."""
         import os, json as _json
+        self._rich_text_in_design = False   # default: text via overlay (reset per send)
         # Blank slides (background only) aren't part of the advanced project — show
         # just the theme background for them.
         cur = self.current_slides[idx] if 0 <= idx < len(getattr(self, "current_slides", [])) else None
@@ -8530,6 +8539,7 @@ class ControlWindow(QMainWindow):
         for L in _design.get("layers", []):
             if isinstance(L, dict) and L.get("role") == "lyrics":
                 L["visible"] = False
+        self._rich_text_in_design = False   # per-song: text via the standard overlay
         for dw in self.display_windows:
             if hasattr(dw, "show_background"):
                 try:
@@ -9218,8 +9228,8 @@ class ControlWindow(QMainWindow):
                 self._apply_custom_bg_from_settings(_live_settings)
             for dw in targets:
                 dw.apply_settings(_live_settings)
-                dw.show_text(text, _live_fmt,      # #5: text is always the live overlay
-                             metadata=self._current_metadata)
+                dw.show_text("" if getattr(self, "_rich_text_in_design", False) else text,
+                             _live_fmt, metadata=self._current_metadata)
             # Push metadata into LiveState so preview copyright overlay works
             from live_state import get_state as _gs
             _gs()._metadata = dict(self._current_metadata or {})
