@@ -47,6 +47,7 @@ except Exception:
 
 class ThemesTab(QWidget):
     theme_applied = pyqtSignal(str, str)   # (theme_name, type)
+    _theme_saved_sig = pyqtSignal(str)     # Electron theme editor saved (name)
 
     def __init__(self, parent_control=None):
         super().__init__()
@@ -1029,19 +1030,59 @@ class ThemesTab(QWidget):
     # ── Visual editor ─────────────────────────────────────────────────────────
 
     def _open_visual_editor(self, theme_name: str):
-        if ThemeVisualEditor is None:
-            show_toast("ThemeVisualEditor indisponibil", "warning")
-            return
+        """Open the FULL ELECTRON theme editor (live render + sample text). Falls
+        back to the old PyQt editor only if the Electron subsystem is unavailable."""
         themes = self._load_themes()
         theme  = themes["list"].get(theme_name, {})
+        mgr = getattr(self.parent_control, "electron_display", None) if self.parent_control else None
+        if mgr is not None and hasattr(mgr, "open_theme_editor"):
+            if not getattr(self, "_theme_saved_wired", False):
+                try:
+                    mgr.set_theme_saved_callback(
+                        lambda name: self._theme_saved_sig.emit(name))
+                    self._theme_saved_sig.connect(self._merge_saved_theme)
+                    self._theme_saved_wired = True
+                except Exception:
+                    pass
+            mgr.open_theme_editor(theme_name, theme)
+            return
+        # Fallback: legacy PyQt editor
+        if ThemeVisualEditor is None:
+            show_toast("Editorul de teme indisponibil", "warning")
+            return
         editor = ThemeVisualEditor(
-            theme_name=theme_name,
-            theme_data=theme,
-            preview_dir=self._preview_dir(),
-            parent=self,
-        )
+            theme_name=theme_name, theme_data=theme,
+            preview_dir=self._preview_dir(), parent=self)
         editor.theme_saved.connect(self._on_theme_saved)
         editor.show()
+
+    def _merge_saved_theme(self, name: str):
+        """Electron theme editor saved → read the temp file and merge into themes.json
+        (preserving any keys the editor didn't touch)."""
+        import os, tempfile
+        d = os.path.join(tempfile.gettempdir(), "cantio")
+        safe = "".join(c for c in str(name) if c.isalnum() or c in " -_").strip() or "tema"
+        path = os.path.join(d, f"theme_edit_{safe}.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                raw = json.load(f)
+            data = raw.get("theme", {}) or {}
+        except Exception:
+            return
+        themes = self._load_themes()
+        old = themes["list"].get(name, {}) or {}
+        for k, v in data.items():          # merge sub-sections, preserve the rest
+            if isinstance(v, dict) and isinstance(old.get(k), dict):
+                old[k].update(v)
+            else:
+                old[k] = v
+        themes["list"][name] = old
+        self._save_themes(themes)
+        self._refresh_grid()
+        try:
+            show_toast(f"🎨 Temă salvată: {name}", "success")
+        except Exception:
+            pass
 
     def _on_theme_saved(self, name: str, data: dict):
         themes = self._load_themes()

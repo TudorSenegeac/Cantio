@@ -863,6 +863,27 @@ class ElectronDisplayManager:
         thumbnail render is ready."""
         self._thumb_cb = callback
 
+    def set_theme_saved_callback(self, callback) -> None:
+        """Register a callback(name:str) fired when the Electron theme editor saves."""
+        self._theme_saved_cb = callback
+
+    def open_theme_editor(self, name: str, theme: dict):
+        """Open the Electron theme editor for `name`/`theme` (writes a temp file with
+        {name, theme} and points the editor at it)."""
+        import os, json as _json, tempfile
+        d = os.path.join(tempfile.gettempdir(), "cantio")
+        os.makedirs(d, exist_ok=True)
+        safe = "".join(c for c in str(name) if c.isalnum() or c in " -_").strip() or "tema"
+        path = os.path.join(d, f"theme_edit_{safe}.json")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                _json.dump({"name": name, "theme": theme}, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error("[ThemeEditor] temp write failed: %s", e)
+            return None
+        self._enqueue({"type": "open_theme_editor", "file": path})
+        return path
+
     def _on_ws_message(self, ws, raw):
         try:
             msg = json.loads(raw)
@@ -903,6 +924,13 @@ class ElectronDisplayManager:
                     cb(msg.get("id", ""), msg.get("dataURL", ""))
                 except Exception as e:
                     logger.debug("[ElectronDisplay] thumb_result callback error: %s", e)
+        elif mtype == "theme_saved":
+            cb = getattr(self, "_theme_saved_cb", None)
+            if cb:
+                try:
+                    cb(msg.get("name", ""))
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] theme_saved callback error: %s", e)
 
     def _on_ws_error(self, ws, error):
         logger.debug("[ElectronDisplay] WS error: %s", error)

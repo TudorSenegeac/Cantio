@@ -159,6 +159,11 @@ function handleCommand(msg, ws) {
       return { type: 'ok' };
     }
 
+    case 'open_theme_editor': {
+      openThemeEditor(msg.file || '');
+      return { type: 'ok' };
+    }
+
     case 'open_preview': {
       openPreview();
       return { type: 'ok' };
@@ -482,6 +487,55 @@ function openBgEditor(filePath) {
   bgEditorWin.on('closed', () => { bgEditorWin = null; });
   return bgEditorWin;
 }
+
+// ── Theme editor window (full Electron, live render + sample text) ──────────────
+let themeEditorWin = null;
+function openThemeEditor(filePath) {
+  if (themeEditorWin && !themeEditorWin.isDestroyed()) {
+    themeEditorWin.focus();
+    themeEditorWin.loadFile(path.join(__dirname, 'theme-editor.html'),
+      { query: { file: filePath } });
+    return themeEditorWin;
+  }
+  const primary = screen.getPrimaryDisplay();
+  const b = primary.workArea;
+  themeEditorWin = new BrowserWindow({
+    width:  Math.min(1400, b.width  - 80),
+    height: Math.min(860,  b.height - 80),
+    center: true,
+    backgroundColor: '#14141c',
+    title: 'Cantio — Editor Teme',
+    icon: CANTIO_ICON,
+    autoHideMenuBar: true,
+    skipTaskbar: false,
+    show: true,
+    webPreferences: {
+      nodeIntegration:  true,
+      contextIsolation: false,
+      webSecurity:      false,
+      allowRunningInsecureContent: true,
+    },
+  });
+  themeEditorWin.loadFile(path.join(__dirname, 'theme-editor.html'),
+    { query: { file: filePath } })
+    .catch(err => console.error('[ThemeEditor] loadFile failed:', err));
+  const _toFront = () => {
+    if (!themeEditorWin || themeEditorWin.isDestroyed()) return;
+    themeEditorWin.show(); themeEditorWin.setAlwaysOnTop(true); themeEditorWin.focus();
+    setTimeout(() => { try { themeEditorWin.setAlwaysOnTop(false); } catch (e) {} }, 500);
+  };
+  themeEditorWin.once('ready-to-show', _toFront);
+  themeEditorWin.webContents.once('did-finish-load', _toFront);
+  setTimeout(_toFront, 1200);
+  themeEditorWin.on('closed', () => { themeEditorWin = null; });
+  return themeEditorWin;
+}
+
+ipcMain.on('theme_saved', (_e, name) => {
+  if (!wss) return;
+  const data = JSON.stringify({ type: 'theme_saved', name });
+  wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} } });
+});
 
 // Relay editor save events to Python WS clients (so the list can refresh).
 ipcMain.on('bg_saved', (_e, file) => {
