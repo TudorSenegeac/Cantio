@@ -784,10 +784,22 @@ class SlideThumbnail(QWidget):
         if self._wysiwyg_pix is not None and not self._wysiwyg_pix.isNull():
             p = QPainter(self)
             p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
             p.drawPixmap(0, 0, self._wysiwyg_pix.scaled(
                 self.thumb_w, self.thumb_h,
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation))
+            # #4: draw the standard lyric text on top (the WYSIWYG render is the
+            # background only) so the thumbnail matches the live output.
+            _wt = self.slide_text
+            if isinstance(_wt, str) and _wt.strip() and not _wt.lstrip().startswith("<"):
+                try:
+                    from preview_widget import render_text_on_painter
+                    render_text_on_painter(p, _wt, self.thumb_w, self.thumb_h,
+                                           self.settings, self.thumb_w / 1920.0)
+                except Exception:
+                    pass
             if self._selected:
                 pen = p.pen(); pen.setColor(self._sel_color()); pen.setWidth(3); p.setPen(pen)
                 p.drawRect(1, 1, self.thumb_w - 2, self.thumb_h - 2)
@@ -7378,9 +7390,17 @@ class ControlWindow(QMainWindow):
         th = max(24, int(tw_base / (getattr(self, "_display_aspect", 16 / 9) or (16 / 9))))
         self._wysiwyg_token += 1
         token = self._wysiwyg_token
+        import copy as _copy
         for idx in range(min(len(slides), len(self._thumbnails))):
             try:
-                mgr.render_thumb(slides[idx], tw_base, th, f"{token}:{idx}", 0)
+                # #4: match the live output — the thumbnail's WYSIWYG render shows the
+                # BACKGROUND only (lyrics hidden); the standard text is drawn on top by
+                # SlideThumbnail, exactly like the live overlay.
+                _d = _copy.deepcopy(slides[idx])
+                for L in _d.get("layers", []):
+                    if isinstance(L, dict) and L.get("role") == "lyrics":
+                        L["visible"] = False
+                mgr.render_thumb(_d, tw_base, th, f"{token}:{idx}", 0)
             except Exception:
                 pass
 
