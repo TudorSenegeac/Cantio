@@ -867,6 +867,10 @@ class ElectronDisplayManager:
         """Register a callback(name:str) fired when the Electron theme editor saves."""
         self._theme_saved_cb = callback
 
+    def set_bg_saved_callback(self, callback) -> None:
+        """Register a callback(file:str) fired when the bg editor saves a design."""
+        self._bg_saved_cb = callback
+
     def open_theme_editor(self, name: str, theme: dict):
         """Open the Electron theme editor for `name`/`theme` (writes a temp file with
         {name, theme} and points the editor at it)."""
@@ -931,6 +935,13 @@ class ElectronDisplayManager:
                     cb(msg.get("name", ""))
                 except Exception as e:
                     logger.debug("[ElectronDisplay] theme_saved callback error: %s", e)
+        elif mtype == "bg_saved":
+            cb = getattr(self, "_bg_saved_cb", None)
+            if cb:
+                try:
+                    cb(msg.get("file", ""))
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] bg_saved callback error: %s", e)
 
     def _on_ws_error(self, ws, error):
         logger.debug("[ElectronDisplay] WS error: %s", error)

@@ -8369,6 +8369,53 @@ class ControlWindow(QMainWindow):
             pass
         return "default"
 
+    def _resolved_theme_for_song(self):
+        """The theme dict currently applied to the song (same priority as
+        _resolve_settings: active look → per-song → category → songs default)."""
+        try:
+            themes = self._themes_cached()
+            theme_list = themes.get("list", {})
+            look = (self.settings.get("active_look") or "").strip()
+            if look and look in theme_list:
+                return theme_list[look]
+            if self.settings.get("display_mode", "settings") != "themes":
+                return None
+            sid = getattr(self, "current_song_id", None)
+            name = None
+            if sid is not None:
+                name = themes.get("song_themes", {}).get(str(sid))
+            if not name and sid is not None:
+                song = db.get_song(sid)
+                if song:
+                    name = themes.get("category_themes", {}).get(song.get("category", ""))
+            if not name:
+                name = themes.get("songs_active", "")
+            return theme_list.get(name) if name in theme_list else None
+        except Exception:
+            return None
+
+    def _send_theme_design_live(self) -> bool:
+        """If the resolved theme is a DESIGN template (bg-editor doc with a lyrics
+        placeholder), render it live — lyrics hidden, real text sent as the standard
+        overlay (#5). Returns True if used."""
+        import copy as _copy
+        theme = self._resolved_theme_for_song()
+        design = theme.get("design") if isinstance(theme, dict) else None
+        slides = design.get("slides") if isinstance(design, dict) else None
+        if not (isinstance(slides, list) and slides):
+            return False
+        _d = _copy.deepcopy(slides[0])
+        for L in _d.get("layers", []):
+            if isinstance(L, dict) and L.get("role") == "lyrics":
+                L["visible"] = False
+        self._active_bg_path = "theme_design"
+        _bgfx = self.settings.get("bg_transition", "fade")
+        for dw in self.display_windows:
+            if hasattr(dw, "show_background"):
+                try: dw.show_background(_d, _bgfx)
+                except Exception: pass
+        return True
+
     def _seed_layers_from_settings(self, s, txt, _uid):
         """Build bg-engine layers that mirror a resolved theme (bg + lyric text), so
         a new advanced-editor project opens looking exactly like the active look."""
@@ -8450,7 +8497,9 @@ class ControlWindow(QMainWindow):
                           and self.current_slides[i].get("blank")))
         path = self._rich_project_path()
         if not path:
-            return False
+            # No per-song design → fall back to the THEME's design template (if the
+            # resolved theme is a rich design edited in the bg editor).
+            return self._send_theme_design_live()
         try:
             mtime = os.path.getmtime(path)
         except Exception:

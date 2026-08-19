@@ -1030,21 +1030,49 @@ class ThemesTab(QWidget):
     # ── Visual editor ─────────────────────────────────────────────────────────
 
     def _open_visual_editor(self, theme_name: str):
-        """Open the FULL ELECTRON theme editor (live render + sample text). Falls
-        back to the old PyQt editor only if the Electron subsystem is unavailable."""
+        """Edit a theme in the FULL background editor: the theme is a design template
+        (background layers + a positionable lyrics text box). Rich, all bg-editor
+        features. Falls back to the PyQt editor only if Electron is unavailable."""
         themes = self._load_themes()
         theme  = themes["list"].get(theme_name, {})
-        mgr = getattr(self.parent_control, "electron_display", None) if self.parent_control else None
-        if mgr is not None and hasattr(mgr, "open_theme_editor"):
-            if not getattr(self, "_theme_saved_wired", False):
+        pc  = self.parent_control
+        mgr = getattr(pc, "electron_display", None) if pc else None
+        if mgr is not None and hasattr(mgr, "open_bg_editor"):
+            import os, tempfile, uuid
+            design = theme.get("design")
+            if not design:
+                # Seed a design from the theme's flat settings (bg + lyrics text box).
+                def _uid(): return "l" + uuid.uuid4().hex[:8]
                 try:
-                    mgr.set_theme_saved_callback(
-                        lambda name: self._theme_saved_sig.emit(name))
-                    self._theme_saved_sig.connect(self._merge_saved_theme)
-                    self._theme_saved_wired = True
+                    settings = pc._theme_to_settings(theme)
+                except Exception:
+                    settings = dict(getattr(pc, "settings", {}) or {})
+                try:
+                    layers = pc._seed_layers_from_settings(
+                        settings, "Slăvit să fie Domnul\nÎn veci îndurarea Lui", _uid)
+                except Exception:
+                    layers = []
+                design = {"name": theme_name, "format": {"w": 1920, "h": 1080},
+                          "slides": [{"format": {"w": 1920, "h": 1080}, "layers": layers}]}
+            d = os.path.join(tempfile.gettempdir(), "cantio")
+            os.makedirs(d, exist_ok=True)
+            safe = "".join(c for c in theme_name if c.isalnum() or c in " -_").strip() or "tema"
+            path = os.path.join(d, f"theme_design_{safe}.json")
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(design, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+            self._theme_design_paths = getattr(self, "_theme_design_paths", {})
+            self._theme_design_paths[os.path.normcase(path)] = theme_name
+            if not getattr(self, "_bg_saved_wired", False):
+                try:
+                    mgr.set_bg_saved_callback(lambda fp: self._theme_saved_sig.emit(fp))
+                    self._theme_saved_sig.connect(self._on_theme_design_saved)
+                    self._bg_saved_wired = True
                 except Exception:
                     pass
-            mgr.open_theme_editor(theme_name, theme)
+            mgr.open_bg_editor(path)
             return
         # Fallback: legacy PyQt editor
         if ThemeVisualEditor is None:
@@ -1056,27 +1084,21 @@ class ThemesTab(QWidget):
         editor.theme_saved.connect(self._on_theme_saved)
         editor.show()
 
-    def _merge_saved_theme(self, name: str):
-        """Electron theme editor saved → read the temp file and merge into themes.json
-        (preserving any keys the editor didn't touch)."""
-        import os, tempfile
-        d = os.path.join(tempfile.gettempdir(), "cantio")
-        safe = "".join(c for c in str(name) if c.isalnum() or c in " -_").strip() or "tema"
-        path = os.path.join(d, f"theme_edit_{safe}.json")
+    def _on_theme_design_saved(self, filepath: str):
+        """The bg editor saved a THEME design → store the design on the theme."""
+        import os
+        name = getattr(self, "_theme_design_paths", {}).get(os.path.normcase(filepath))
+        if not name:
+            return   # a normal fundal design, not a theme
         try:
-            with open(path, encoding="utf-8") as f:
-                raw = json.load(f)
-            data = raw.get("theme", {}) or {}
+            with open(filepath, encoding="utf-8") as f:
+                design = json.load(f)
         except Exception:
             return
         themes = self._load_themes()
-        old = themes["list"].get(name, {}) or {}
-        for k, v in data.items():          # merge sub-sections, preserve the rest
-            if isinstance(v, dict) and isinstance(old.get(k), dict):
-                old[k].update(v)
-            else:
-                old[k] = v
-        themes["list"][name] = old
+        t = themes["list"].get(name, {}) or {}
+        t["design"] = design
+        themes["list"][name] = t
         self._save_themes(themes)
         self._refresh_grid()
         try:
