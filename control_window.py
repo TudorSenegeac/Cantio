@@ -8941,12 +8941,21 @@ class ControlWindow(QMainWindow):
         th = max(40, int(tw / (getattr(self, "_display_aspect", 16 / 9) or (16 / 9))))
         avail_w = self.slides_container.width() or 500
         cols = max(1, (avail_w - 24) // (tw + 8))
-        header_w = cols * (tw + 8)           # span the full thumbnail-row width
-        row = 0
+        # Each song = its OWN section (header + its own thumbnail grid), stacked
+        # vertically. This keeps songs cleanly separated (no slides bleeding under
+        # the next song's header, which happened when everything shared one grid).
         for si, item in enumerate(items):
-            self.slides_grid.addWidget(
-                self._make_service_header(si, item, header_w), row, 0, 1, cols)
-            row += 1
+            section = QWidget()
+            sv = QVBoxLayout(section)
+            sv.setContentsMargins(0, 0, 0, 10)
+            sv.setSpacing(5)
+            sv.addWidget(self._make_service_header(si, item, cols * (tw + 8)))
+
+            grid_holder = QWidget()
+            tg = QGridLayout(grid_holder)
+            tg.setContentsMargins(0, 0, 0, 0)
+            tg.setSpacing(8)
+            tg.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
             theme_s = self._get_preview_settings(item.get("song_id"))
             slides = item.get("slides", []) or []
             if isinstance(slides, str):      # defensive: never iterate a JSON string
@@ -8955,20 +8964,15 @@ class ControlWindow(QMainWindow):
                     slides = _json.loads(slides)
                 except Exception:
                     slides = [slides]
-            col = 0
             for li, sl in enumerate(slides):
                 thumb = SlideThumbnail(sl, li, theme_s, thumb_w=tw, thumb_h=th)
                 thumb.setFocusPolicy(Qt.FocusPolicy.NoFocus)
                 thumb._service_si = si
                 thumb.clicked.connect(lambda idx, _si=si: self._service_slide_clicked(_si, idx))
                 self._thumbnails.append(thumb)
-                self.slides_grid.addWidget(thumb, row, col)
-                col += 1
-                if col >= cols:
-                    col = 0
-                    row += 1
-            if col != 0:
-                row += 1
+                tg.addWidget(thumb, li // cols, li % cols)
+            sv.addWidget(grid_holder)
+            self.slides_grid.addWidget(section, si, 0, 1, cols)
 
     def _make_service_header(self, si, item, min_w=0):
         fr = QFrame()

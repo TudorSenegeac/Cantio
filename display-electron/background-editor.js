@@ -827,7 +827,7 @@ function buildClockProps(p, L) {
     p.appendChild(row('Format 24h', mkCheck(L, 'format24')));
     p.appendChild(row('Secunde', mkCheck(L, 'showSeconds')));
   } else if (mode === 'countdown') {
-    p.appendChild(row('Durată (sec)', mkRange(L, 'duration', 5, 3600, 5)));
+    p.appendChild(row('Durată (sec)', mkRange(L, 'duration', 5, 36000, 5)));
     // Sound pickers: a per-second tick + an optional end sound.
     const soundRow = (label, key, tip) => {
       const sc = document.createElement('div'); sc.className = 'ctl';
@@ -852,7 +852,7 @@ function buildClockProps(p, L) {
   }
 
   p.appendChild(row('Font', mkFontPicker(L, 'font')));
-  p.appendChild(row('Mărime', mkRange(L, 'size', 20, 500, 1)));
+  p.appendChild(row('Mărime', mkRange(L, 'size', 20, 2000, 1)));
   const styleRow = document.createElement('div'); styleRow.className = 'row';
   styleRow.innerHTML = '<label>Stil</label>';
   const c = document.createElement('div'); c.className = 'ctl';
@@ -877,7 +877,7 @@ function buildClockProps(p, L) {
 function buildLyricsProps(p, L) {
   grpH(p, 'VERSURI (cascadă)');
   p.appendChild(row('Font', mkFontPicker(L, 'font')));
-  p.appendChild(row('Mărime', mkRange(L, 'size', 20, 200, 1)));
+  p.appendChild(row('Mărime', mkRange(L, 'size', 20, 2000, 1)));
   p.appendChild(row('Bold', mkCheck(L, 'bold')));
   p.appendChild(row('Majuscule', mkCheck(L, 'uppercase')));
   p.appendChild(row('Aliniere', mkSelect(L, 'align', ['left','center','right'])));
@@ -1005,7 +1005,7 @@ function buildTextProps(p, L) {
   grpH(p, 'TEXT');
   p.appendChild(row('Conținut', mkArea(L, 'text')));
   p.appendChild(row('Font', mkFontPicker(L, 'font')));
-  p.appendChild(row('Mărime', mkRange(L, 'size', 12, 400, 1)));
+  p.appendChild(row('Mărime', mkRange(L, 'size', 12, 2000, 1)));
   const styleRow = document.createElement('div'); styleRow.className = 'row';
   styleRow.innerHTML = '<label>Stil</label>';
   const c = document.createElement('div'); c.className = 'ctl';

@@ -248,7 +248,7 @@ class OverlaySettingsWidget(QWidget):
         ff.addRow("Familie:", self._tk_font)
 
         self._tk_size = QSpinBox()
-        self._tk_size.setRange(8, 72)
+        self._tk_size.setRange(8, 400)
         self._tk_size.setValue(tk["font_size"])
         ff.addRow("Size:", self._tk_size)
 
@@ -288,7 +288,7 @@ class OverlaySettingsWidget(QWidget):
         lf.addRow("Poziție:", self._tk_pos)
 
         self._tk_speed = QSpinBox()
-        self._tk_speed.setRange(1, 10)
+        self._tk_speed.setRange(1, 100)
         self._tk_speed.setValue(tk["speed"])
         lf.addRow("Viteză:", self._tk_speed)
 
@@ -329,7 +329,7 @@ class OverlaySettingsWidget(QWidget):
         self._ck_font.setCurrentFont(QFont(ck["font_family"]))
         ff.addRow("Familie:", self._ck_font)
         self._ck_size = QSpinBox()
-        self._ck_size.setRange(8, 120)
+        self._ck_size.setRange(8, 800)
         self._ck_size.setValue(ck["font_size"])
         ff.addRow("Size:", self._ck_size)
         self._ck_bold = QCheckBox("Bold")
@@ -420,7 +420,7 @@ class OverlaySettingsWidget(QWidget):
         self._tm_font.setCurrentFont(QFont(tm["font_family"]))
         ff.addRow("Familie:", self._tm_font)
         self._tm_size = QSpinBox()
-        self._tm_size.setRange(12, 200)
+        self._tm_size.setRange(12, 1000)
         self._tm_size.setValue(tm["font_size"])
         ff.addRow("Size:", self._tm_size)
         self._tm_bold = QCheckBox("Bold")
