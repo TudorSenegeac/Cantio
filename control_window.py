@@ -2005,6 +2005,7 @@ class ControlWindow(QMainWindow):
         self._live_armed = False
         self._slide_just_selected = False
         self._service_view_on = False
+        self._stage_output = None
         self._is_frozen = False
         self._logo_pixmap = None
         self._stage_editor = None
@@ -2328,11 +2329,46 @@ class ControlWindow(QMainWindow):
         except Exception: pass
 
     def _toggle_stage_monitor(self):
-        """Stage button = open the Stage window if closed, close it if open."""
-        if self._stage_editor is not None and self._stage_editor.isVisible():
-            self._close_stage_monitor()
-        else:
-            self._open_stage_monitor()
+        """Stage button = open/close the Stage OUTPUT window (the confidence monitor
+        on the screen chosen in Settings, using the active saved layout). The layout
+        is edited in the Teme tab → Stage sub-tab."""
+        so = getattr(self, "_stage_output", None)
+        if so is not None:
+            try: so.close()
+            except Exception: pass
+            self._stage_output = None
+            self._update_status(stage_msg="Stage: oprit")
+            try: self._update_btn_states()
+            except Exception: pass
+            return
+        self._open_stage_output()
+
+    def _open_stage_output(self):
+        """Open the Stage OUTPUT window on the Settings stage_screen, with the active
+        saved layout's widgets."""
+        from stage_monitor import StageOutputWindow
+        import json as _json
+        try:
+            layouts = _json.loads(self.settings.get("stage_layouts", "{}") or "{}")
+        except Exception:
+            layouts = {}
+        active = self.settings.get("stage_active_layout", "")
+        widgets = layouts.get(active) if active in layouts else next(iter(layouts.values()), None)
+        screens = QApplication.screens()
+        try:
+            st = int(self.settings.get("stage_screen", 0))
+        except Exception:
+            st = 0
+        screen = screens[min(st, len(screens) - 1)] if screens else None
+        self._stage_output = StageOutputWindow(screen=screen, parent=None)
+        if widgets:
+            try: self._stage_output.set_widgets(widgets)
+            except Exception: pass
+        self._stage_output.show()
+        self._update_status(stage_msg="Stage: activ")
+        try: self._update_btn_states()
+        except Exception: pass
+        self._push_stage_state()
 
     def _show_tutorial(self):
         """Launch the interactive tutorial overlay."""
@@ -9500,7 +9536,8 @@ class ControlWindow(QMainWindow):
         self._update_btn_states()
 
     def _push_stage_state(self):
-        if self._stage_editor is None:
+        so = getattr(self, "_stage_output", None)
+        if self._stage_editor is None and so is None:
             return
         current = self._slide_text(self.current_slides[self.current_slide_idx]) if (
             0 <= self.current_slide_idx < len(self.current_slides)
@@ -9508,7 +9545,12 @@ class ControlWindow(QMainWindow):
         next_text = self._slide_text(self.current_slides[self.current_slide_idx + 1]) if (
             0 <= self.current_slide_idx + 1 < len(self.current_slides)
         ) else ""
-        self._stage_editor.update_state(current, next_text, self.current_song_notes)
+        if self._stage_editor is not None:
+            try: self._stage_editor.update_state(current, next_text, self.current_song_notes)
+            except Exception: pass
+        if so is not None:
+            try: so.update_state(current, next_text, self.current_song_notes)
+            except Exception: pass
 
     # ── Overlay Controls ──────────────────────────────────────────────────────
 
