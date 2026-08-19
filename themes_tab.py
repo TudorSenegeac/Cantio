@@ -1030,81 +1030,17 @@ class ThemesTab(QWidget):
     # ── Visual editor ─────────────────────────────────────────────────────────
 
     def _open_visual_editor(self, theme_name: str):
-        """Edit a theme in the FULL background editor: the theme is a design template
-        (background layers + a positionable lyrics text box). Rich, all bg-editor
-        features. Falls back to the PyQt editor only if Electron is unavailable."""
+        """Edit a theme in the (PyQt) visual theme editor."""
+        if ThemeVisualEditor is None:
+            show_toast("ThemeVisualEditor indisponibil", "warning")
+            return
         themes = self._load_themes()
         theme  = themes["list"].get(theme_name, {})
-        pc  = self.parent_control
-        mgr = getattr(pc, "electron_display", None) if pc else None
-        if mgr is not None and hasattr(mgr, "open_bg_editor"):
-            import os, tempfile, uuid
-            design = theme.get("design")
-            if not design:
-                # Seed a design from the theme's flat settings (bg + lyrics text box).
-                def _uid(): return "l" + uuid.uuid4().hex[:8]
-                try:
-                    settings = pc._theme_to_settings(theme)
-                except Exception:
-                    settings = dict(getattr(pc, "settings", {}) or {})
-                try:
-                    layers = pc._seed_layers_from_settings(
-                        settings, "Slăvit să fie Domnul\nÎn veci îndurarea Lui", _uid)
-                except Exception:
-                    layers = []
-                design = {"name": theme_name, "format": {"w": 1920, "h": 1080},
-                          "slides": [{"format": {"w": 1920, "h": 1080}, "layers": layers}]}
-            d = os.path.join(tempfile.gettempdir(), "cantio")
-            os.makedirs(d, exist_ok=True)
-            safe = "".join(c for c in theme_name if c.isalnum() or c in " -_").strip() or "tema"
-            path = os.path.join(d, f"theme_design_{safe}.json")
-            try:
-                with open(path, "w", encoding="utf-8") as f:
-                    json.dump(design, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
-            self._theme_design_paths = getattr(self, "_theme_design_paths", {})
-            self._theme_design_paths[os.path.normcase(path)] = theme_name
-            if not getattr(self, "_bg_saved_wired", False):
-                try:
-                    mgr.set_bg_saved_callback(lambda fp: self._theme_saved_sig.emit(fp))
-                    self._theme_saved_sig.connect(self._on_theme_design_saved)
-                    self._bg_saved_wired = True
-                except Exception:
-                    pass
-            mgr.open_bg_editor(path)
-            return
-        # Fallback: legacy PyQt editor
-        if ThemeVisualEditor is None:
-            show_toast("Editorul de teme indisponibil", "warning")
-            return
         editor = ThemeVisualEditor(
             theme_name=theme_name, theme_data=theme,
             preview_dir=self._preview_dir(), parent=self)
         editor.theme_saved.connect(self._on_theme_saved)
         editor.show()
-
-    def _on_theme_design_saved(self, filepath: str):
-        """The bg editor saved a THEME design → store the design on the theme."""
-        import os
-        name = getattr(self, "_theme_design_paths", {}).get(os.path.normcase(filepath))
-        if not name:
-            return   # a normal fundal design, not a theme
-        try:
-            with open(filepath, encoding="utf-8") as f:
-                design = json.load(f)
-        except Exception:
-            return
-        themes = self._load_themes()
-        t = themes["list"].get(name, {}) or {}
-        t["design"] = design
-        themes["list"][name] = t
-        self._save_themes(themes)
-        self._refresh_grid()
-        try:
-            show_toast(f"🎨 Temă salvată: {name}", "success")
-        except Exception:
-            pass
 
     def _on_theme_saved(self, name: str, data: dict):
         themes = self._load_themes()
