@@ -9,14 +9,14 @@ import copy
 import json
 import os
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QPoint
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QPoint, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFileDialog,
     QFormLayout, QGroupBox, QHBoxLayout, QInputDialog,
     QLabel, QMenu, QMessageBox, QPushButton, QRadioButton, QSlider,
     QSpinBox, QSplitter, QStackedWidget, QTabWidget,
-    QVBoxLayout, QWidget, QFontComboBox,
+    QVBoxLayout, QWidget, QFontComboBox, QListWidget, QListWidgetItem,
 )
 
 import database as db
@@ -77,7 +77,9 @@ class ThemesTab(QWidget):
         self.type_songs_btn.setChecked(True)
         self.type_bible_btn = QPushButton(f"📖 {t('theme_bible')}")
         self.type_bible_btn.setCheckable(True)
-        for btn in (self.type_songs_btn, self.type_bible_btn):
+        self.type_stage_btn = QPushButton("🎭 Stage")
+        self.type_stage_btn.setCheckable(True)
+        for btn in (self.type_songs_btn, self.type_bible_btn, self.type_stage_btn):
             btn.setStyleSheet(
                 "QPushButton { background:#1e1e2e; color:#888; border:1px solid #333;"
                 "border-radius:4px; padding:4px 8px; }"
@@ -86,28 +88,39 @@ class ThemesTab(QWidget):
                 "QPushButton:hover { color:#cdd6f4; }")
         self.type_songs_btn.clicked.connect(lambda: self._switch_type("songs"))
         self.type_bible_btn.clicked.connect(lambda: self._switch_type("bible"))
+        self.type_stage_btn.clicked.connect(lambda: self._switch_type("stage"))
         type_row.addWidget(self.type_songs_btn)
         type_row.addWidget(self.type_bible_btn)
+        type_row.addWidget(self.type_stage_btn)
         left_l.addLayout(type_row)
 
-        # ThemesGrid (or fallback label)
+        # Content stack: theme grid (songs/bible) + stage-arrangements list.
+        self._grid_stack = QStackedWidget()
         if _THEME_EDITOR_OK and ThemesGrid is not None:
             self.themes_grid = ThemesGrid()
             self.themes_grid.theme_selected.connect(
                 self._on_theme_selected_by_name)
             self.themes_grid.theme_double_clicked.connect(
                 self._open_visual_editor)
-            left_l.addWidget(self.themes_grid, 1)
+            self._grid_stack.addWidget(self.themes_grid)
         else:
             self.themes_grid = None
-            left_l.addWidget(
-                QLabel("⚠ theme_editor.py nu a putut fi încărcat."), 1)
+            self._grid_stack.addWidget(
+                QLabel("⚠ theme_editor.py nu a putut fi încărcat."))
+        # Stage arrangements list (double-click = edit; ★ = default)
+        self._stage_list = QListWidget()
+        self._stage_list.setStyleSheet(
+            "QListWidget { background:#181825; border:1px solid #313244; border-radius:6px;"
+            " color:#cdd6f4; } QListWidget::item { padding:8px; }"
+            " QListWidget::item:selected { background:#1c3a5a; }")
+        self._stage_list.itemDoubleClicked.connect(self._open_stage_arrangement)
+        self._grid_stack.addWidget(self._stage_list)
+        left_l.addWidget(self._grid_stack, 1)
 
         # Buttons
         btn_row = QHBoxLayout()
         add_icon = "＋"
-        add_cb   = (self._new_theme_with_dialog
-                    if _THEME_EDITOR_OK else self._new_theme)
+        add_cb   = self._on_add_clicked
         for icon, cb in [(add_icon, add_cb),
                          ("⧉", self._duplicate_theme_selected),
                          ("🗑", self._delete_theme_selected)]:
@@ -205,29 +218,7 @@ class ThemesTab(QWidget):
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 4, 4, 4)
-
-        # Sub-tabs: the theme grid ("Teme") + the embedded Stage layout editor.
-        _sub = QTabWidget()
-        _sub.setDocumentMode(True)
-        _sub.setStyleSheet(
-            "QTabBar::tab { padding:5px 14px; font-size:11px; color:#888; border:none;"
-            " border-bottom:2px solid transparent; }"
-            "QTabBar::tab:selected { color:#e0e0e0; border-bottom:2px solid #5294e2; }"
-            "QTabWidget::pane { border:none; }")
-        _teme_page = QWidget()
-        _tl = QVBoxLayout(_teme_page)
-        _tl.setContentsMargins(0, 0, 0, 0)
-        _tl.addWidget(main_splitter)
-        _sub.addTab(_teme_page, "🎨 Teme")
-        try:
-            from stage_monitor import StageEditorWindow
-            self._stage_editor_embed = StageEditorWindow(parent=None)
-            _sub.addTab(self._stage_editor_embed, "🎭 Stage")
-        except Exception as e:
-            _err = QLabel(f"Editor Stage indisponibil: {e}")
-            _err.setStyleSheet("color:#888; padding:20px;")
-            _sub.addTab(_err, "🎭 Stage")
-        outer.addWidget(_sub)
+        outer.addWidget(main_splitter)
 
     # ── Text tab ─────────────────────────────────────────────────────────────
 
@@ -667,9 +658,90 @@ class ThemesTab(QWidget):
         self._current_type = t_type
         self.type_songs_btn.setChecked(t_type == "songs")
         self.type_bible_btn.setChecked(t_type == "bible")
+        if hasattr(self, "type_stage_btn"):
+            self.type_stage_btn.setChecked(t_type == "stage")
         if hasattr(self, "bible_zone_group"):
             self.bible_zone_group.setVisible(t_type == "bible")
-        self._refresh_grid()
+        if t_type == "stage":
+            self._grid_stack.setCurrentIndex(1)
+            self._refresh_stage_list()
+        else:
+            self._grid_stack.setCurrentIndex(0)
+            self._refresh_grid()
+
+    # ── Stage arrangements (layouts for the confidence-monitor window) ─────────
+    def _stage_layouts(self) -> dict:
+        try:
+            return json.loads(db.get_settings().get("stage_layouts", "{}") or "{}")
+        except Exception:
+            return {}
+
+    def _refresh_stage_list(self):
+        if not hasattr(self, "_stage_list"):
+            return
+        self._stage_list.clear()
+        try:
+            active = db.get_settings().get("stage_active_layout", "")
+        except Exception:
+            active = ""
+        for name in self._stage_layouts().keys():
+            it = QListWidgetItem(("★  " if name == active else "🎭  ") + name)
+            it.setData(Qt.ItemDataRole.UserRole, name)
+            self._stage_list.addItem(it)
+        if not self._stage_list.count():
+            hint = QListWidgetItem("(niciun aranjament — apasă ＋ ca să creezi)")
+            hint.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._stage_list.addItem(hint)
+
+    def _open_stage_arrangement(self, item=None):
+        name = item.data(Qt.ItemDataRole.UserRole) if item else None
+        self._open_stage_editor(name)
+
+    def _open_stage_editor(self, name=None):
+        from stage_monitor import StageEditorWindow
+        win = getattr(self, "_stage_editor_win", None)
+        if win is None or not win.isVisible():
+            self._stage_editor_win = StageEditorWindow(parent=None)
+            win = self._stage_editor_win
+        win.show(); win.raise_(); win.activateWindow()
+        if name:
+            try:
+                layouts = self._stage_layouts()
+                if name in layouts and hasattr(win, "canvas"):
+                    win.canvas.set_widgets(layouts[name])
+            except Exception:
+                pass
+        QTimer.singleShot(400, self._refresh_stage_list)
+
+    def _new_stage_arrangement(self):
+        self._open_stage_editor(None)
+
+    def _on_add_clicked(self):
+        if getattr(self, "_current_type", "") == "stage":
+            self._new_stage_arrangement()
+        elif _THEME_EDITOR_OK:
+            self._new_theme_with_dialog()
+        else:
+            self._new_theme()
+
+    def _set_stage_default(self):
+        it = self._stage_list.currentItem()
+        if not it or not it.data(Qt.ItemDataRole.UserRole):
+            show_toast("Selectează un aranjament", "warning"); return
+        name = it.data(Qt.ItemDataRole.UserRole)
+        db.save_setting("stage_active_layout", name)
+        self._refresh_stage_list()
+        show_toast(f"★ Stage default: {name}", "success")
+
+    def _delete_stage_arrangement(self):
+        it = self._stage_list.currentItem()
+        if not it or not it.data(Qt.ItemDataRole.UserRole):
+            return
+        name = it.data(Qt.ItemDataRole.UserRole)
+        layouts = self._stage_layouts()
+        layouts.pop(name, None)
+        db.save_setting("stage_layouts", json.dumps(layouts))
+        self._refresh_stage_list()
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -765,6 +837,8 @@ class ThemesTab(QWidget):
             self._refresh_grid()
 
     def _delete_theme_selected(self):
+        if getattr(self, "_current_type", "") == "stage":
+            self._delete_stage_arrangement(); return
         name = self.themes_grid.selected_name() if self.themes_grid else None
         if name:
             self._delete_theme(name)
@@ -1026,6 +1100,8 @@ class ThemesTab(QWidget):
     def _apply_selected_theme(self):
         """Apply the selected theme. If a song is loaded, assign it to THAT song
         (per-song theme); otherwise set it as the global default for its type."""
+        if getattr(self, "_current_type", "") == "stage":
+            self._set_stage_default(); return
         name = self._current_theme
         if not name:
             show_toast("Selectează o temă mai întâi", "warning")
