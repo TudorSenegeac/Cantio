@@ -8864,6 +8864,9 @@ class ControlWindow(QMainWindow):
     def _toggle_service_view(self, checked):
         self._service_view_on = bool(checked)
         if checked:
+            n = len(getattr(self, "_service_items", []) or [])
+            try: self._toasts.info(f"📋 Vedere serviciu: {n} cântări")
+            except Exception: pass
             self._show_service_slides()
         elif getattr(self, "current_slides", None):
             self._set_slides(self.current_slides)
@@ -8886,12 +8889,20 @@ class ControlWindow(QMainWindow):
         th = max(40, int(tw / (getattr(self, "_display_aspect", 16 / 9) or (16 / 9))))
         avail_w = self.slides_container.width() or 500
         cols = max(1, (avail_w - 24) // (tw + 8))
+        header_w = cols * (tw + 8)           # span the full thumbnail-row width
         row = 0
         for si, item in enumerate(items):
-            self.slides_grid.addWidget(self._make_service_header(si, item), row, 0, 1, cols)
+            self.slides_grid.addWidget(
+                self._make_service_header(si, item, header_w), row, 0, 1, cols)
             row += 1
             theme_s = self._get_preview_settings(item.get("song_id"))
             slides = item.get("slides", []) or []
+            if isinstance(slides, str):      # defensive: never iterate a JSON string
+                try:
+                    import json as _json
+                    slides = _json.loads(slides)
+                except Exception:
+                    slides = [slides]
             col = 0
             for li, sl in enumerate(slides):
                 thumb = SlideThumbnail(sl, li, theme_s, thumb_w=tw, thumb_h=th)
@@ -8907,13 +8918,19 @@ class ControlWindow(QMainWindow):
             if col != 0:
                 row += 1
 
-    def _make_service_header(self, si, item):
+    def _make_service_header(self, si, item, min_w=0):
         fr = QFrame()
-        fr.setStyleSheet("QFrame { background:#141a24; border:none;"
-                         " border-bottom:1px solid #223; border-radius:3px; }")
-        h = QHBoxLayout(fr); h.setContentsMargins(8, 5, 6, 5)
+        # Force a full-width, clearly-visible separator bar (the grid is AlignLeft,
+        # so a spanning widget won't stretch on its own — give it an explicit size).
+        if min_w:
+            fr.setMinimumWidth(int(min_w))
+        fr.setMinimumHeight(30)
+        fr.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        fr.setStyleSheet("QFrame { background:#18283a; border:none;"
+                         " border-left:3px solid #5294e2; border-radius:4px; }")
+        h = QHBoxLayout(fr); h.setContentsMargins(10, 5, 6, 5)
         t = QLabel(f"{si + 1}.  {item.get('title', '')}")
-        t.setStyleSheet("color:#5294e2; font-size:12px; font-weight:bold; background:transparent;")
+        t.setStyleSheet("color:#8fc0ff; font-size:12px; font-weight:bold; background:transparent;")
         h.addWidget(t, 1)
         look_btn = QPushButton("🎨 Look")
         look_btn.setStyleSheet(
