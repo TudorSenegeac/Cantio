@@ -9345,7 +9345,6 @@ class ControlWindow(QMainWindow):
                 dw.canvas.set_frame(pixmap)   # no-op in v4 DisplayCanvas
 
     def _black_screen(self):
-        self._set_slides_selection_active(False)   # live command → slides not the target
         for dw in self.display_windows:
             dw.black_screen()
         self._preview_cmd("black_screen")
@@ -11297,7 +11296,6 @@ class ControlWindow(QMainWindow):
 
     def _clear_text(self):
         """Clear text from all displays without affecting background."""
-        self._set_slides_selection_active(False)   # live command → slides not the target
         for dw in self.display_windows:
             if hasattr(dw, "clear_text"):
                 dw.clear_text()
@@ -11313,7 +11311,6 @@ class ControlWindow(QMainWindow):
         self._update_status(slide_msg="Text cleared")
 
     def _toggle_freeze(self, checked):
-        self._set_slides_selection_active(False)   # live command → slides not the target
         self._is_frozen = checked
         for dw in self.display_windows:
             if checked:
@@ -11350,7 +11347,6 @@ class ControlWindow(QMainWindow):
         self._push_remote_state()
 
     def _toggle_logo(self, checked):
-        self._set_slides_selection_active(False)   # live command → slides not the target
         if checked:
             if self._logo_pixmap is None:
                 path, _ = QFileDialog.getOpenFileName(
