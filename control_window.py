@@ -2322,6 +2322,17 @@ class ControlWindow(QMainWindow):
                 self._stage_editor.close()
             except Exception:
                 pass
+            self._stage_editor = None
+        self._update_status(stage_msg="Stage: oprit")
+        try: self._update_btn_states()
+        except Exception: pass
+
+    def _toggle_stage_monitor(self):
+        """Stage button = open the Stage window if closed, close it if open."""
+        if self._stage_editor is not None and self._stage_editor.isVisible():
+            self._close_stage_monitor()
+        else:
+            self._open_stage_monitor()
 
     def _show_tutorial(self):
         """Launch the interactive tutorial overlay."""
@@ -2450,7 +2461,7 @@ class ControlWindow(QMainWindow):
 
         self._stage_btn = QPushButton(f"🎭 {t('stage')}")
         self._stage_btn.setToolTip(f"{t('stage_monitor')}  [Ctrl+Shift+P]  •  Click dreapta = Stage Editor")
-        self._stage_btn.clicked.connect(self._open_stage_monitor)
+        self._stage_btn.clicked.connect(self._toggle_stage_monitor)
         self._stage_btn.setStyleSheet(self._btn_style_closed())
         self._stage_btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._stage_btn.customContextMenuRequested.connect(self._open_stage_editor)

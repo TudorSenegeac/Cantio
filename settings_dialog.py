@@ -462,6 +462,30 @@ class SettingsDialog(QDialog):
             g = scr.geometry()
             self.screen_combo.addItem(f"Screen {i+1}: {scr.name()} ({g.width()}×{g.height()})", i)
         sf.addRow(t("display_on"), self.screen_combo)
+
+        # Which screen the Stage (confidence-monitor) window opens on.
+        self.stage_screen_combo = QComboBox()
+        for i, scr in enumerate(QApplication.screens()):
+            g = scr.geometry()
+            self.stage_screen_combo.addItem(
+                f"Screen {i+1}: {scr.name()} ({g.width()}×{g.height()})", i)
+        sf.addRow("Fereastra Stage pe:", self.stage_screen_combo)
+
+        # Custom resolution for the live / stage windows (windowed, not fullscreen).
+        self.custom_res_check = QCheckBox("Rezoluție custom (fereastră, nu fullscreen)")
+        sf.addRow("", self.custom_res_check)
+        _res_row = QHBoxLayout()
+        self.custom_res_w = QSpinBox(); self.custom_res_w.setRange(320, 7680); self.custom_res_w.setValue(1920)
+        self.custom_res_w.setSuffix(" px")
+        self.custom_res_h = QSpinBox(); self.custom_res_h.setRange(240, 4320); self.custom_res_h.setValue(1080)
+        self.custom_res_h.setSuffix(" px")
+        _res_row.addWidget(self.custom_res_w); _res_row.addWidget(QLabel("×")); _res_row.addWidget(self.custom_res_h)
+        _res_row.addStretch()
+        sf.addRow("Rezoluție:", _res_row)
+        self.custom_res_check.toggled.connect(
+            lambda on: (self.custom_res_w.setEnabled(on), self.custom_res_h.setEnabled(on)))
+        self.custom_res_w.setEnabled(False); self.custom_res_h.setEnabled(False)
+
         layout.addWidget(screen_group)
 
         # Background
@@ -1788,6 +1812,19 @@ class SettingsDialog(QDialog):
 
         scr_idx = int(s.get("display_screen", 1))
         self.screen_combo.setCurrentIndex(min(scr_idx, self.screen_combo.count() - 1))
+        try:
+            st_idx = int(s.get("stage_screen", 0))
+            self.stage_screen_combo.setCurrentIndex(
+                min(st_idx, self.stage_screen_combo.count() - 1))
+        except Exception:
+            pass
+        _cr = str(s.get("custom_resolution", "false")) == "true"
+        self.custom_res_check.setChecked(_cr)
+        self.custom_res_w.setEnabled(_cr); self.custom_res_h.setEnabled(_cr)
+        try: self.custom_res_w.setValue(int(s.get("custom_res_w", 1920)))
+        except Exception: pass
+        try: self.custom_res_h.setValue(int(s.get("custom_res_h", 1080)))
+        except Exception: pass
 
         # Text tab
         from PyQt6.QtGui import QFont as QF
@@ -1872,6 +1909,10 @@ class SettingsDialog(QDialog):
         return {
             "display_mode": "themes" if self.mode_themes_radio.isChecked() else "settings",
             "display_screen": str(self.screen_combo.currentData()),
+            "stage_screen": str(self.stage_screen_combo.currentData()),
+            "custom_resolution": "true" if self.custom_res_check.isChecked() else "false",
+            "custom_res_w": str(self.custom_res_w.value()),
+            "custom_res_h": str(self.custom_res_h.value()),
             "bg_color": self.bg_color_btn.color(),
             "bg_image": self.bg_img_label.text() if self.bg_img_label.text() != "None" else "",
             "bg_opacity": str(self.bg_opacity_slider.value() / 100.0),
