@@ -66,6 +66,25 @@ function resize() {
 
 window.addEventListener('resize', () => { resize(); renderCurrent(); });
 
+// Report the live background video's playback position to the operator (FreeShow-
+// style transport bar). Only the LIVE window reports, so time isn't sent twice.
+if (bgVideo && !IS_PREVIEW) {
+  const _reportMediaTime = () => {
+    try {
+      ipcRenderer.send('media_time', {
+        current:  bgVideo.currentTime || 0,
+        duration: bgVideo.duration    || 0,
+        paused:   bgVideo.paused,
+        active:   bgVideo.style.display !== 'none' && !!bgVideo.src,
+      });
+    } catch (e) {}
+  };
+  bgVideo.addEventListener('timeupdate', _reportMediaTime);
+  bgVideo.addEventListener('loadedmetadata', _reportMediaTime);
+  bgVideo.addEventListener('play', _reportMediaTime);
+  bgVideo.addEventListener('pause', _reportMediaTime);
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let state = {
   text:         '',
@@ -946,6 +965,28 @@ function handleMessage(msg) {
       if (_audioEl && _audioEl.duration) _audioEl.currentTime = Math.max(0, Math.min(1, parseFloat(msg.p))) * _audioEl.duration;
       break;
     }
+
+    // ── Live media (background video) transport controls (FreeShow-style) ──────
+    case 'media_play':   { if (bgVideo) bgVideo.play().catch(() => {}); break; }
+    case 'media_pause':  { if (bgVideo) bgVideo.pause(); break; }
+    case 'media_toggle': {
+      if (bgVideo) { bgVideo.paused ? bgVideo.play().catch(() => {}) : bgVideo.pause(); }
+      break;
+    }
+    case 'media_seek': {
+      if (bgVideo && bgVideo.duration) {
+        bgVideo.currentTime = Math.max(0, Math.min(1, parseFloat(msg.p) || 0)) * bgVideo.duration;
+      }
+      break;
+    }
+    case 'media_volume': {
+      if (bgVideo) {
+        bgVideo.muted = false;
+        bgVideo.volume = Math.max(0, Math.min(1, parseFloat(msg.value)));
+      }
+      break;
+    }
+    case 'media_restart': { if (bgVideo) { bgVideo.currentTime = 0; bgVideo.play().catch(() => {}); } break; }
 
     default:
       console.warn('[Display.js] Tip mesaj necunoscut:', type);

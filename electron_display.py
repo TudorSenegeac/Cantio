@@ -384,6 +384,29 @@ class ElectronDisplayManager:
     def audio_seek(self, p: float, window_id: int = 0):
         self._enqueue({"type": "audio_seek", "window_id": window_id, "p": p})
 
+    # ── Live background-video transport (FreeShow-style) ───────────────────────
+    def media_play(self, window_id: int = 0):
+        self._enqueue({"type": "media_play", "window_id": window_id})
+
+    def media_pause(self, window_id: int = 0):
+        self._enqueue({"type": "media_pause", "window_id": window_id})
+
+    def media_toggle(self, window_id: int = 0):
+        self._enqueue({"type": "media_toggle", "window_id": window_id})
+
+    def media_seek(self, p: float, window_id: int = 0):
+        self._enqueue({"type": "media_seek", "window_id": window_id, "p": p})
+
+    def media_volume(self, value: float, window_id: int = 0):
+        self._enqueue({"type": "media_volume", "window_id": window_id, "value": value})
+
+    def media_restart(self, window_id: int = 0):
+        self._enqueue({"type": "media_restart", "window_id": window_id})
+
+    def set_media_time_callback(self, callback) -> None:
+        """callback(info:dict) with {current,duration,paused,active} of the live video."""
+        self._media_time_cb = callback
+
     # ── Audio Bin (background music, independent of presentations) ──────────
     def audio_bin_play(self, src: str, loop: bool = False, window_id: int = 0):
         self._enqueue({"type": "audio_bin_play", "window_id": window_id,
@@ -942,6 +965,13 @@ class ElectronDisplayManager:
                     cb(msg.get("file", ""))
                 except Exception as e:
                     logger.debug("[ElectronDisplay] bg_saved callback error: %s", e)
+        elif mtype == "media_time":
+            cb = getattr(self, "_media_time_cb", None)
+            if cb:
+                try:
+                    cb(msg.get("info", {}) or {})
+                except Exception as e:
+                    logger.debug("[ElectronDisplay] media_time callback error: %s", e)
 
     def _on_ws_error(self, ws, error):
         logger.debug("[ElectronDisplay] WS error: %s", error)

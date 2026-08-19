@@ -212,6 +212,12 @@ function handleCommand(msg, ws) {
     case 'show_slide_image':
     case 'show_web':
     case 'hide_web':
+    case 'media_play':
+    case 'media_pause':
+    case 'media_toggle':
+    case 'media_seek':
+    case 'media_volume':
+    case 'media_restart':
     case 'transparent':
     case 'clear_text':
     case 'freeze':
@@ -549,6 +555,13 @@ ipcMain.on('bg_saved', (_e, file) => {
 ipcMain.on('dynamic_slide', (_e, index) => {
   if (!wss) return;
   const data = JSON.stringify({ type: 'dynamic_slide', index });
+  wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} } });
+});
+
+// Live background-video playback position → operator transport bar.
+ipcMain.on('media_time', (_e, info) => {
+  if (!wss) return;
+  const data = JSON.stringify({ type: 'media_time', info });
   wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} } });
 });
 

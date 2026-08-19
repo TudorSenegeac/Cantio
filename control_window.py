@@ -1947,6 +1947,8 @@ class ControlWindow(QMainWindow):
     _dynamic_slide_received = pyqtSignal(int)
     # Emitted when a WYSIWYG thumbnail render is ready (req_id, data_url).
     _thumb_ready = pyqtSignal(str, str)
+    # Live background-video playback position (from the WS thread → GUI thread).
+    _media_time_sig = pyqtSignal(dict)
     # Emitted from the MIDI listener thread with a key like "note:60" / "cc:1".
     _midi_received = pyqtSignal(str)
     # YouTube audio download (background thread → GUI thread).
@@ -1960,6 +1962,7 @@ class ControlWindow(QMainWindow):
         self._preview_hwnd_received.connect(self._embed_preview_hwnd)
         self._dynamic_slide_received.connect(self._on_dynamic_slide)
         self._thumb_ready.connect(self._on_thumb_ready)
+        self._media_time_sig.connect(self._on_media_time)
         self._midi_received.connect(self._on_midi_event)
         self._midi_running = False
         self._midi_learn_cb = None
@@ -2069,6 +2072,8 @@ class ControlWindow(QMainWindow):
                 lambda i: self._dynamic_slide_received.emit(int(i)))
             self.electron_display.set_thumb_callback(
                 lambda i, u: self._thumb_ready.emit(str(i), str(u)))
+            self.electron_display.set_media_time_callback(
+                lambda info: self._media_time_sig.emit(dict(info or {})))
         except Exception as _ederr:
             self.electron_display = None
             logger.debug("[Electron] not available: %s", _ederr)
@@ -3672,6 +3677,34 @@ class ControlWindow(QMainWindow):
         self.preview.apply_settings(self.settings)
         pw_layout.addWidget(self.preview)
         layout.addWidget(self._preview_wrap)
+
+        # FreeShow-style transport bar for the live background video (play/pause +
+        # timeline). Hidden until a video is actually playing on the live output.
+        from PyQt6.QtWidgets import QSlider as _QSlider
+        self._media_bar = QWidget()
+        self._media_bar.setStyleSheet("background:#141414;")
+        _mb = QHBoxLayout(self._media_bar)
+        _mb.setContentsMargins(8, 3, 8, 3); _mb.setSpacing(6)
+        self._media_play_btn = QPushButton("⏸")
+        self._media_play_btn.setFixedWidth(30)
+        self._media_play_btn.setStyleSheet(
+            "QPushButton { background:#1c1c1c; color:#5294e2; border:1px solid #2a2a2a;"
+            " border-radius:4px; font-size:12px; } QPushButton:hover { background:#252525; }")
+        self._media_play_btn.clicked.connect(self._media_toggle)
+        _mb.addWidget(self._media_play_btn)
+        _mrestart = QPushButton("⏮"); _mrestart.setFixedWidth(28)
+        _mrestart.setStyleSheet(self._media_play_btn.styleSheet())
+        _mrestart.clicked.connect(self._media_restart)
+        _mb.addWidget(_mrestart)
+        self._media_slider = _QSlider(Qt.Orientation.Horizontal)
+        self._media_slider.setRange(0, 1000)
+        self._media_slider.sliderMoved.connect(self._media_seek)
+        _mb.addWidget(self._media_slider, 1)
+        self._media_time_lbl = QLabel("0:00 / 0:00")
+        self._media_time_lbl.setStyleSheet("color:#888; font-size:10px; background:transparent;")
+        _mb.addWidget(self._media_time_lbl)
+        self._media_bar.hide()
+        layout.addWidget(self._media_bar)
 
         # Wire RenderEngine → PreviewWidget now that both exist.
         # QueuedConnection ensures update_preview runs on the main thread even
@@ -8114,6 +8147,56 @@ class ControlWindow(QMainWindow):
         if mgr is not None:
             try: mgr._enqueue({"type": "hide_web", "window_id": -1})
             except Exception: pass
+
+    # ── Live background-video transport bar (FreeShow-style) ────────────────────
+    def _live_video_wids(self):
+        ids = [getattr(dw, "_window_id", None) for dw in self.display_windows]
+        ids = [w for w in ids if w is not None]
+        return ids or [0]
+
+    def _media_toggle(self):
+        mgr = getattr(self, "electron_display", None)
+        if mgr is None:
+            return
+        for wid in self._live_video_wids():
+            try: mgr.media_toggle(wid)
+            except Exception: pass
+
+    def _media_restart(self):
+        mgr = getattr(self, "electron_display", None)
+        if mgr is None:
+            return
+        for wid in self._live_video_wids():
+            try: mgr.media_restart(wid)
+            except Exception: pass
+
+    def _media_seek(self, value):
+        mgr = getattr(self, "electron_display", None)
+        if mgr is None:
+            return
+        for wid in self._live_video_wids():
+            try: mgr.media_seek(value / 1000.0, wid)
+            except Exception: pass
+
+    @staticmethod
+    def _fmt_time(s):
+        s = int(s or 0)
+        return f"{s // 60}:{s % 60:02d}"
+
+    def _on_media_time(self, info):
+        active = bool(info.get("active")) and (info.get("duration") or 0) > 0
+        if not active:
+            if self._media_bar.isVisible():
+                self._media_bar.hide()
+            return
+        if not self._media_bar.isVisible():
+            self._media_bar.show()
+        dur = info.get("duration") or 0
+        cur = info.get("current") or 0
+        if dur > 0 and not self._media_slider.isSliderDown():
+            self._media_slider.setValue(int(cur / dur * 1000))
+        self._media_play_btn.setText("▶" if info.get("paused") else "⏸")
+        self._media_time_lbl.setText(f"{self._fmt_time(cur)} / {self._fmt_time(dur)}")
 
     def _preview_mgr(self):
         """Return the Electron manager to mirror a live command to the operator
