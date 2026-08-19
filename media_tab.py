@@ -497,12 +497,15 @@ class MediaTab(QWidget):
     # ── SET BACKGROUND (shared) ───────────────────────────────────────────────
 
     def _set_as_background(self, path: str):
-        ext = Path(path).suffix.lower()
-        if ext in _SUPPORTED_IMAGES:
+        ext    = Path(path).suffix.lower()
+        is_img = ext in _SUPPORTED_IMAGES
+        is_vid = ext in _SUPPORTED_VIDEOS
+        if not (is_img or is_vid):
+            return
+        if is_img:
             pix = QPixmap(path)
             if pix.isNull():
                 return
-            # Actualizează LiveState pentru preview / consumers vechi
             try:
                 from live_state import get_state
                 state = get_state()
@@ -511,17 +514,16 @@ class MediaTab(QWidget):
                 state.notify()
             except Exception:
                 pass
-            if self._control:
-                for dw in self._control.display_windows:
-                    dw.settings["bg_image"] = path
-                    dw.settings["bg_video"] = ""
-                    dw._apply_background()
-        elif ext in _SUPPORTED_VIDEOS:
-            if self._control:
-                for dw in self._control.display_windows:
-                    dw.settings["bg_video"] = path
-                    dw.settings["bg_image"] = ""
-                    dw._apply_background()
+        if self._control:
+            for dw in self._control.display_windows:
+                # display.js applyBackground reads bg_image for BOTH images and
+                # videos (it detects a video by the file extension). Setting only
+                # bg_video left bg_image empty → nothing showed.
+                dw.settings["bg_image"]       = path
+                dw.settings["bg_video"]       = path if is_vid else ""
+                dw.settings["bg_type"]        = "video" if is_vid else "image"
+                dw.settings["bg_transparent"] = "false"
+                dw._apply_background()
 
         # Load into mini player (images + videos)
         if self._control and hasattr(self._control, "mini_player"):

@@ -969,7 +969,7 @@ function _toEmbedUrl(url) {
 
 function _bgSignature(s) {
   if (!s) return '';
-  return [s.bg_type, s.bg_color, s.bg_image, s.bg_grad_c1, s.bg_grad_c2,
+  return [s.bg_type, s.bg_color, s.bg_image, s.bg_video, s.bg_grad_c1, s.bg_grad_c2,
           s.bg_grad_dir, s.bg_fundal_file, s.bg_transparent, s.bg_opacity].join('|');
 }
 
