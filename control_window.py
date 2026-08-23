@@ -7963,8 +7963,9 @@ class ControlWindow(QMainWindow):
 
             theme_list = themes_data.get("list", {})
 
-            # Priority 0: active LOOK (global override)
-            if _look and _look in theme_list:
+            # Priority 0: active LOOK — applies to SONGS only; the Bible keeps its
+            # own separate look (bible_active), never the song look.
+            if _look and _look in theme_list and source == "songs":
                 return self._theme_to_settings(theme_list[_look])
             if self.settings.get("display_mode", "settings") != "themes":
                 return None
@@ -8904,9 +8905,9 @@ class ControlWindow(QMainWindow):
             cat_themes  = themes.get("category_themes", {})
             song_themes = themes.get("song_themes", {})
 
-            # Priority 0: active LOOK — a global override applied live to
-            # everything (songs + bible), trumping per-song/category/default.
-            if look and look in theme_list:
+            # Priority 0: active LOOK — SONGS only; the Bible keeps its own separate
+            # look (bible_active), never the song look.
+            if look and look in theme_list and source == "songs":
                 return self._theme_to_settings(theme_list[look])
             if not themes_mode:
                 return dict(self.settings)
