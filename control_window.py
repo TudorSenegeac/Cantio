@@ -3843,6 +3843,16 @@ class ControlWindow(QMainWindow):
         nav.addWidget(self.next_btn)
         ctrl_layout.addLayout(nav)
 
+        # Live-control buttons must NOT grab keyboard focus — otherwise clicking one
+        # then pressing an arrow / Page Down moves the focus rectangle BETWEEN buttons
+        # instead of navigating slides. NoFocus routes the keys to the slide handler.
+        for _b in (self._dual_lang_btn, self.go_live_btn, self.black_btn,
+                   self._clear_text_btn, self._freeze_btn, self._logo_btn,
+                   getattr(self, "_preview_btn", None), self._electron_preview_btn,
+                   self.prev_btn, self.next_btn):
+            if _b is not None:
+                _b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
         sep = QFrame()
         sep.setObjectName("divider")
         sep.setFixedHeight(1)
