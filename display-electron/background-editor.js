@@ -7,7 +7,7 @@ const _fs   = (typeof require !== 'undefined') ? require('fs')   : null;
 let   _ipc  = null;
 try { _ipc = (typeof require !== 'undefined') ? require('electron').ipcRenderer : null; } catch (e) {}
 
-const ICONS = { gradient:'🌈', particles:'✨', shape:'⬛', text:'🅣', clock:'🕐', lyrics:'🎤', image:'🖼', video:'🎬', camera:'📹' };
+const ICONS = { gradient:'🌈', particles:'✨', shape:'⬛', text:'🅣', clock:'🕐', lyrics:'🎤', image:'🖼', video:'🎬', camera:'📹', ticker:'📜' };
 
 const state = {
   bg: null,
@@ -757,6 +757,7 @@ function rebuildProps() {
   else if (L.type === 'lyrics') buildLyricsProps(p, L);
   else if (L.type === 'image' || L.type === 'video') buildMediaProps(p, L);
   else if (L.type === 'camera') buildCameraProps(p, L);
+  else if (L.type === 'ticker') buildTickerProps(p, L);
 
   // Common: position/size (skip for full-bleed gradient/particles)
   if (L.type !== 'gradient' && L.type !== 'particles') {
@@ -1042,6 +1043,22 @@ function buildMediaProps(p, L) {
   c.appendChild(b); c.appendChild(nm); r.appendChild(c); p.appendChild(r);
   p.appendChild(row('Încadrare', mkSelect(L, 'fit', ['cover','contain','stretch'])));
   if (L.type === 'video') { p.appendChild(row('Loop', mkCheck(L, 'loop'))); }
+}
+
+function buildTickerProps(p, L) {
+  grpH(p, 'TEXT DERULANT');
+  p.appendChild(row('Text', mkText(L, 'text')));
+  p.appendChild(row('Font', mkFontPicker(L, 'font')));
+  p.appendChild(row('Mărime', mkRange(L, 'size', 12, 400, 1)));
+  p.appendChild(row('Culoare', mkColor(L, 'color')));
+  p.appendChild(row('Îngroșat', mkCheck(L, 'bold')));
+  p.appendChild(row('Viteză', mkRange(L, 'speed', 10, 500, 5)));
+  p.appendChild(row('Poziție Y', mkRange(L, 'y', 0, 1, 0.01)));
+  p.appendChild(row('Spațiu între', mkRange(L, 'gap', 0, 1000, 10)));
+  grpH(p, 'FUNDAL BARĂ (opțional)');
+  p.appendChild(row('Activ', mkCheck(L, 'bgEnabled')));
+  p.appendChild(row('Culoare', mkColor(L, 'bgColor')));
+  p.appendChild(row('Opacitate', mkRange(L, 'bgOpacity', 0, 1, 0.05)));
 }
 
 function buildCameraProps(p, L) {

@@ -824,11 +824,15 @@ function handleMessage(msg) {
         document.body.style.backgroundColor = 'transparent';
         if (cvCurr) cvCurr.style.background = 'transparent';
         if (cvPrev) cvPrev.style.background = 'transparent';
+        if (cvBg)   cvBg.style.background   = 'transparent';   // bg-doc canvas (overlays)
+        if (cvBg2)  cvBg2.style.background  = 'transparent';
       } else {
         document.body.style.background     = '#000000';
         document.body.style.backgroundColor = '#000000';
         if (cvCurr) cvCurr.style.background = '';
         if (cvPrev) cvPrev.style.background = '';
+        if (cvBg)   cvBg.style.background   = '';
+        if (cvBg2)  cvBg2.style.background  = '';
       }
       break;
     }

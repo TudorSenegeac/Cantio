@@ -116,6 +116,15 @@
         name: 'Cameră', camIndex: 0, fit: 'cover',   // live webcam via getUserMedia
         w: 1, h: 1, x: 0.5, y: 0.5,
       });
+    } else if (type === 'ticker') {
+      Object.assign(base, {
+        name: 'Text derulant', text: 'Text derulant… • ',
+        font: 'Montserrat', size: 48, bold: true, color: '#ffffff',
+        speed: 80,          // px/sec, right → left
+        y: 0.9,             // vertical position (0–1)
+        gap: 200,           // px gap between repeats
+        bgEnabled: false, bgColor: '#000000', bgOpacity: 0.5,
+      });
     } else if (type === 'clock') {
       Object.assign(base, {
         name: 'Ceas', clockMode: 'clock',   // clock | date | stopwatch | countdown
@@ -374,7 +383,7 @@
     if (pm) scale *= pm.scale;
 
     // Full-canvas layers (gradient/particles ignore positional transform)
-    const fullBleed = (L.type === 'gradient' || L.type === 'particles');
+    const fullBleed = (L.type === 'gradient' || L.type === 'particles' || L.type === 'ticker');
 
     if (!fullBleed) {
       const cx = (L.x != null ? L.x : 0.5) * W + driftX + (pm ? pm.dx : 0);
@@ -393,6 +402,7 @@
       case 'image':     drawImageLayer(ctx, W, H, L, t); break;
       case 'video':     drawVideoLayer(ctx, W, H, L, t); break;
       case 'camera':    drawVideoLayer(ctx, W, H, L, t); break;  // camera = live video element
+      case 'ticker':    drawTicker(ctx, W, H, L, t); break;
       case 'lyrics':    drawLyrics(ctx, W, H, L, t, bg); break;
     }
     ctx.restore();
@@ -544,6 +554,33 @@
       life: r(),
       seed: r() * 1000,
     };
+  }
+
+  // Horizontal scrolling text (ticker / marquee), right → left, seamless repeat.
+  function drawTicker(ctx, W, H, L, t) {
+    const text = String(L.text || '');
+    if (!text) return;
+    const size = L.size || 48;
+    ctx.font = `${L.bold ? 'bold ' : ''}${size}px "${L.font || 'Montserrat'}", sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    const tw = ctx.measureText(text).width || 1;
+    const gap = (L.gap != null ? L.gap : 200);
+    const period = tw + gap;
+    const y = (L.y != null ? L.y : 0.9) * H;
+    const speed = (L.speed != null ? L.speed : 80);
+    const offset = (((t * speed) % period) + period) % period;
+    if (L.bgEnabled) {
+      ctx.save();
+      ctx.globalAlpha = (L.bgOpacity != null ? L.bgOpacity : 0.5);
+      ctx.fillStyle = L.bgColor || '#000000';
+      ctx.fillRect(0, y - size * 0.75, W, size * 1.5);
+      ctx.restore();
+    }
+    ctx.fillStyle = L.color || '#ffffff';
+    let x = W - offset;
+    while (x > -period) x -= period;          // back-fill the left edge
+    for (; x < W; x += period) ctx.fillText(text, x, y);
   }
 
   function drawParticles(ctx, W, H, L, t) {
