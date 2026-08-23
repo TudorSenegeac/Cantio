@@ -135,6 +135,24 @@ function handleCommand(msg, ws) {
       return { type: 'ok', window_id };
     }
 
+    // ── Overlays: transparent, click-through windows independent of the main
+    // display; multiple can be live at once (each on its own screen). ──────────
+    case 'open_overlay': {
+      openOverlay(msg.overlay_id, msg.screen_index || 0);
+      if (msg.background) {
+        overlaySend(msg.overlay_id, { type: 'show_background', background: msg.background, transition: 'fade' });
+      }
+      return { type: 'ok' };
+    }
+    case 'overlay_render': {
+      overlaySend(msg.overlay_id, { type: 'show_background', background: msg.background, transition: 'fade' });
+      return { type: 'ok' };
+    }
+    case 'close_overlay': {
+      closeOverlay(msg.overlay_id);
+      return { type: 'ok' };
+    }
+
     case 'set_transparent': {
       // Transparent must be set at window creation time on Windows.
       // Close the old window and reopen with transparent:true / false.
@@ -581,6 +599,60 @@ function closeDisplay(windowId) {
     }
   };
   step();
+}
+
+// ── Overlays (transparent, click-through, independent of the main display) ──────
+const overlayWindows = new Map();   // overlay_id → BrowserWindow
+
+function _pickScreen(screenIdx) {
+  const displays = screen.getAllDisplays();
+  const primary  = screen.getPrimaryDisplay();
+  const secondary = displays.filter(d => d.id !== primary.id);
+  if (screenIdx === 0 && secondary.length > 0) return secondary[0];
+  if (screenIdx > 0 && screenIdx <= secondary.length) return secondary[screenIdx - 1];
+  return displays[Math.min(screenIdx, displays.length - 1)];
+}
+
+function openOverlay(overlayId, screenIdx) {
+  if (overlayWindows.has(overlayId)) {
+    const w = overlayWindows.get(overlayId);
+    if (w && !w.isDestroyed()) return w;
+    overlayWindows.delete(overlayId);
+  }
+  const b = _pickScreen(screenIdx || 0).bounds;
+  const win = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    backgroundColor: '#00000000', transparent: true, frame: false,
+    alwaysOnTop: true, skipTaskbar: true, show: false, focusable: false,
+    webPreferences: { nodeIntegration: true, contextIsolation: false,
+                      webSecurity: false, allowRunningInsecureContent: true },
+  });
+  try { win.setIgnoreMouseEvents(true); } catch (e) {}   // click-through
+  win.loadFile(path.join(__dirname, 'display.html'), { query: { overlay: '1' } });
+  win.webContents.on('did-finish-load', () => {
+    try { win.showInactive(); } catch (e) {}
+    try { win.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }); } catch (e) {}
+    // Ensure the renderer treats its background as transparent.
+    overlaySend(overlayId, { type: 'transparent', value: true });
+  });
+  win.on('closed', () => overlayWindows.delete(overlayId));
+  overlayWindows.set(overlayId, win);
+  return win;
+}
+
+function overlaySend(overlayId, msg) {
+  const win = overlayWindows.get(overlayId);
+  if (win && !win.isDestroyed()) {
+    try { win.webContents.send('render', msg); } catch (e) {}
+    const js = `if(typeof window._handleRender==='function')window._handleRender(${JSON.stringify(msg)})`;
+    win.webContents.executeJavaScript(js).catch(() => {});
+  }
+}
+
+function closeOverlay(overlayId) {
+  const win = overlayWindows.get(overlayId);
+  if (win && !win.isDestroyed()) { try { win.close(); } catch (e) {} }
+  overlayWindows.delete(overlayId);
 }
 
 // ── Broadcast to renderer ─────────────────────────────────────────────────────

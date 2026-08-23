@@ -329,6 +329,18 @@ class ElectronDisplayManager:
         """Open the Electron background editor window for the given .json file."""
         self._enqueue({"type": "open_bg_editor", "file": file_path})
 
+    # ── Overlays (transparent, click-through windows; independent of the display) ──
+    def open_overlay(self, overlay_id: str, screen_index: int = 0, design=None):
+        self._enqueue({"type": "open_overlay", "overlay_id": overlay_id,
+                       "screen_index": screen_index, "background": design})
+
+    def overlay_render(self, overlay_id: str, design):
+        self._enqueue({"type": "overlay_render", "overlay_id": overlay_id,
+                       "background": design})
+
+    def close_overlay(self, overlay_id: str):
+        self._enqueue({"type": "close_overlay", "overlay_id": overlay_id})
+
     def open_preview(self):
         """Open the operator-preview window (mirrors live content, same Chromium)."""
         self._enqueue({"type": "open_preview"})
