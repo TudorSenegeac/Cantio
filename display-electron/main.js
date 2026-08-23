@@ -138,10 +138,7 @@ function handleCommand(msg, ws) {
     // ── Overlays: transparent, click-through windows independent of the main
     // display; multiple can be live at once (each on its own screen). ──────────
     case 'open_overlay': {
-      openOverlay(msg.overlay_id, msg.screen_index || 0);
-      if (msg.background) {
-        overlaySend(msg.overlay_id, { type: 'show_background', background: msg.background, transition: 'fade' });
-      }
+      openOverlay(msg.overlay_id, msg.screen_index || 0, msg.background || null);
       return { type: 'ok' };
     }
     case 'overlay_render': {
@@ -613,10 +610,13 @@ function _pickScreen(screenIdx) {
   return displays[Math.min(screenIdx, displays.length - 1)];
 }
 
-function openOverlay(overlayId, screenIdx) {
+function openOverlay(overlayId, screenIdx, design) {
   if (overlayWindows.has(overlayId)) {
     const w = overlayWindows.get(overlayId);
-    if (w && !w.isDestroyed()) return w;
+    if (w && !w.isDestroyed()) {
+      if (design) overlaySend(overlayId, { type: 'show_background', background: design, transition: 'fade' });
+      return w;
+    }
     overlayWindows.delete(overlayId);
   }
   const b = _pickScreen(screenIdx || 0).bounds;
@@ -632,8 +632,9 @@ function openOverlay(overlayId, screenIdx) {
   win.webContents.on('did-finish-load', () => {
     try { win.showInactive(); } catch (e) {}
     try { win.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }); } catch (e) {}
-    // Ensure the renderer treats its background as transparent.
+    // Transparent background first, then the overlay design (once the renderer is ready).
     overlaySend(overlayId, { type: 'transparent', value: true });
+    if (design) overlaySend(overlayId, { type: 'show_background', background: design, transition: 'fade' });
   });
   win.on('closed', () => overlayWindows.delete(overlayId));
   overlayWindows.set(overlayId, win);
