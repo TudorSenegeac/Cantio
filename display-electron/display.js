@@ -1410,9 +1410,9 @@ function _renderTransition(type, p, W, H) {
       break;
     }
     // ── Fade: textul dispare complet, apoi reapare (dip) ─────────────────────
-    case 'fade':
-    case 'crossfade':  _fadeThrough(p, W, H); break;
-    // ── Defaults: blur / necunoscut ──────────────────────────────────────────
+    case 'fade':       _fadeThrough(p, W, H); break;
+    // ── Crossfade (si blur / necunoscut): cross-dissolve clasic suprapus ─────
+    case 'crossfade':
     case 'blur':
     default: _crossfade(p, W, H); break;
   }
