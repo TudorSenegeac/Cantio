@@ -2685,6 +2685,17 @@ class ControlWindow(QMainWindow):
         self._alerts_btn.clicked.connect(self._open_alerts)
         tb.addWidget(self._alerts_btn)
 
+        # ── Notificări (anunțuri de la echipă: versiuni/baze de date noi) ────
+        self._notif_btn = QPushButton("🔔")
+        self._notif_btn.setToolTip("Notificări")
+        self._notif_btn.setFixedWidth(40)
+        self._notif_btn.setStyleSheet(self._notif_btn_style(0))
+        self._notif_btn.clicked.connect(self._open_notifications)
+        tb.addWidget(self._notif_btn)
+        self._notifications = []
+        self._notif_fetcher = None
+        QTimer.singleShot(2500, self._fetch_notifications)
+
         # ── Expandable spacer — pushes Display / Stage / Settings right ───
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -4108,41 +4119,22 @@ class ControlWindow(QMainWindow):
         sep2.setFixedHeight(1)
         ctrl_layout.addWidget(sep2)
 
-        # Overlays
-        ovl_lbl = QLabel(t("overlays").upper())
+        # Ceas / Cronometru (alertele-ticker s-au mutat in butonul ⚠ din toolbar)
+        ovl_lbl = QLabel("CEAS / CRONOMETRU")
         ovl_lbl.setObjectName("section_lbl")
         ctrl_layout.addWidget(ovl_lbl)
 
-        # Ticker
-        ticker_row = QHBoxLayout()
+        # Ticker-ul (alertele) a fost mutat in managerul de Alerte (buton ⚠).
+        # Pastram widget-urile ASCUNSE ca sa nu stricam referintele existente
+        # (_send_ticker / _clear_ticker / token-uri).
         self.ticker_input = QLineEdit()
-        self.ticker_input.setPlaceholderText(t("alert_ticker"))
-        self.ticker_input.setToolTip(
-            "Token-uri: {time} {time_s} {date} {slide} {total} {next} {title}")
-        self.ticker_input.setStyleSheet(
-            "QLineEdit { background: #1a1a1a; border: 1px solid #222; "
-            "border-radius: 4px; padding: 5px 8px; color: #e0e0e0; font-size: 11px; }"
-            "QLineEdit:focus { border-color: #5294e2; }"
-        )
+        self.ticker_input.hide()
         self.ticker_btn = QPushButton(t("send"))
-        self.ticker_btn.setStyleSheet(
-            "QPushButton { background: #18283a; color: #5294e2; border: 1px solid #1c3a5a; "
-            "border-radius: 4px; padding: 5px 10px; font-size: 11px; }"
-            "QPushButton:hover { background: #1c3a5a; }"
-        )
         self.ticker_btn.clicked.connect(self._send_ticker)
+        self.ticker_btn.hide()
         self.ticker_clear_btn = QPushButton("✕")
-        self.ticker_clear_btn.setFixedWidth(28)
-        self.ticker_clear_btn.setStyleSheet(
-            "QPushButton { background: #1c1c1c; color: #888; border: 1px solid #222; "
-            "border-radius: 4px; padding: 5px; font-size: 11px; }"
-            "QPushButton:hover { background: #222; }"
-        )
         self.ticker_clear_btn.clicked.connect(self._clear_ticker)
-        ticker_row.addWidget(self.ticker_input, 1)
-        ticker_row.addWidget(self.ticker_btn)
-        ticker_row.addWidget(self.ticker_clear_btn)
-        ctrl_layout.addLayout(ticker_row)
+        self.ticker_clear_btn.hide()
 
         # Clock + Countdown
         clock_row = QHBoxLayout()
@@ -10128,6 +10120,76 @@ class ControlWindow(QMainWindow):
                 dw.hide_ticker_with_effect()
             else:
                 dw.set_ticker("")
+
+    # ── Notificări (anunțuri de la echipă) ────────────────────────────────────
+    def _notif_btn_style(self, unseen: int) -> str:
+        if unseen > 0:
+            return ("QPushButton { background:#3a2a10; color:#f9e2af; border:1px solid #6a5020; "
+                    "border-radius:4px; padding:4px 6px; font-size:14px; font-weight:700; }"
+                    "QPushButton:hover { background:#4a3818; }")
+        return ("QPushButton { background:#1c1c1c; color:#888; border:1px solid #2a2a2a; "
+                "border-radius:4px; padding:4px 6px; font-size:14px; }"
+                "QPushButton:hover { background:#252525; color:#ccc; }")
+
+    def _seen_notif_ids(self) -> set:
+        try:
+            return set(db.get_cache().get("seen_notifications", []))
+        except Exception:
+            return set()
+
+    def _unseen_notif_count(self) -> int:
+        seen = self._seen_notif_ids()
+        return sum(1 for n in (self._notifications or []) if n.get("id") not in seen)
+
+    def _update_notif_badge(self):
+        try:
+            c = self._unseen_notif_count()
+            self._notif_btn.setText(f"🔔{c}" if c > 0 else "🔔")
+            self._notif_btn.setStyleSheet(self._notif_btn_style(c))
+            self._notif_btn.setToolTip(
+                f"Notificări — {c} necitite" if c > 0 else "Notificări")
+        except Exception:
+            pass
+
+    def _fetch_notifications(self):
+        try:
+            from notifications import NotificationsFetcher
+            self._notif_fetcher = NotificationsFetcher()
+            self._notif_fetcher.done.connect(self._on_notifications_fetched)
+            self._notif_fetcher.start()
+        except Exception as e:
+            logger.debug("[Notif] fetch failed: %s", e)
+
+    def _on_notifications_fetched(self, items: list):
+        self._notifications = items or []
+        self._update_notif_badge()
+        # La pornire, daca sunt notificari NOI, deschidem automat fereastra
+        # centrata (o singura data). Raman in istoric (clopotel) oricum.
+        if self._unseen_notif_count() > 0:
+            self._open_notifications()
+
+    def _mark_all_notifs_seen(self):
+        """Marcheaza toate notificarile curente drept citite (persistent)."""
+        try:
+            cache = db.get_cache()
+            seen = set(cache.get("seen_notifications", []))
+            seen |= {n.get("id") for n in (self._notifications or []) if n.get("id")}
+            cache["seen_notifications"] = sorted(x for x in seen if x)
+            db.save_cache(cache)
+        except Exception:
+            pass
+
+    def _open_notifications(self):
+        try:
+            from notifications import NotificationsDialog
+            dlg = NotificationsDialog(self, self._notifications, self._seen_notif_ids())
+            dlg.exec()
+            # La inchidere, tot ce s-a afisat devine 'citit' -> nu mai apare
+            # automat la urmatoarea pornire, dar ramane in istoric.
+            self._mark_all_notifs_seen()
+            self._update_notif_badge()
+        except Exception as e:
+            logger.debug("[Notif] open failed: %s", e)
 
     def _toggle_clock(self, checked):
         # Read from overlays JSON (saved by OverlaySettingsWidget) with fallback to flat keys

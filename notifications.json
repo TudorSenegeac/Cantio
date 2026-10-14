@@ -1,0 +1,13 @@
+{
+  "_comment": "Editeaza acest fisier si fa commit ca sa trimiti notificari utilizatorilor Cantio. Fiecare notificare are nevoie de un 'id' unic. Tipuri: info | update | db | warning.",
+  "notifications": [
+    {
+      "id": "2026-10-15-bun-venit",
+      "title": "Bun venit la notificările Cantio!",
+      "body": "De acum vei primi aici anunțuri despre versiuni noi, baze de date noi și noutăți. Mulțumim că folosești Cantio!",
+      "date": "2026-10-15",
+      "type": "info",
+      "url": ""
+    }
+  ]
+}
