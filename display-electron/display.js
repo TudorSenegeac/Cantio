@@ -707,6 +707,7 @@ function handleMessage(msg) {
       tickerState.barY      = null;
       tickerState.animating = false;
       tickerState.barOpacity = 1.0;
+      tickerState.passCount = 0;   // numar de derulari complete (pt. repeats)
       break;
     }
 
@@ -715,6 +716,7 @@ function handleMessage(msg) {
       state.tickerText   = '';
       tickerState.barY   = null;
       tickerState.animating = false;
+      tickerState.passCount = 0;
       renderCurrent();
       break;
     }
@@ -728,6 +730,7 @@ function handleMessage(msg) {
       if (msg.settings && Object.keys(msg.settings).length > 0) {
         tickerSettings = { ...tickerSettings, ...msg.settings };
       }
+      tickerState.passCount = 0;
       showTickerWithEffect(inEffect, parseInt(msg.settings && msg.settings.ticker_duration || 400));
       break;
     }
@@ -2963,6 +2966,23 @@ function hideTickerWithEffect(effect, duration) {
   _tickerAnimLoop(performance.now());
 }
 
+// O derulare completa a textului. Daca alerta are un numar de repetari setat,
+// dupa atatea derulari ticker-ul se ascunde singur.
+function _tickerPassComplete() {
+  const reps = parseInt(tickerSettings.repeats || 0);
+  if (!reps || reps <= 0) return;   // 0 = infinit
+  tickerState.passCount = (tickerState.passCount || 0) + 1;
+  if (tickerState.passCount >= reps) {
+    state.tickerActive = false;
+    state.tickerText   = '';
+    tickerState.barY   = null;
+    tickerState.animating = false;
+    tickerState.passCount = 0;
+    try { if (!IS_PREVIEW && typeof ipcRenderer !== 'undefined') ipcRenderer.send('ticker_done'); } catch (e) {}
+    renderCurrent();
+  }
+}
+
 function _tickerAnimLoop(ts) {
   if (!tickerState.animating) return;
 
@@ -3354,8 +3374,8 @@ function mainLoop(ts) {
       const dir  = anim === 'scroll_right' ? 1 : -1;
       tickerX   += dir * pxPerSec * dt / 1000;
       const textW = (ctxC ? ctxC.measureText(state.tickerText).width : 0) || cvCurr.width;
-      if (anim === 'scroll_left'  && tickerX < -textW - 50)      tickerX = cvCurr.width + 50;
-      if (anim === 'scroll_right' && tickerX > cvCurr.width + 50) tickerX = -textW - 50;
+      if (anim === 'scroll_left'  && tickerX < -textW - 50)      { tickerX = cvCurr.width + 50; _tickerPassComplete(); }
+      if (anim === 'scroll_right' && tickerX > cvCurr.width + 50) { tickerX = -textW - 50;      _tickerPassComplete(); }
     }
     // fade and blink don't advance position — they pulse in drawTicker
     needRedraw = true;

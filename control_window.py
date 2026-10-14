@@ -2674,6 +2674,17 @@ class ControlWindow(QMainWindow):
         tb.addWidget(self._look_combo)
         QTimer.singleShot(600, self._refresh_look_combo)
 
+        # ── Alerte (ticker) — buton ⚠ care deschide managerul de alerte ──────
+        self._alerts_btn = QPushButton("⚠")
+        self._alerts_btn.setToolTip("Alerte — mesaje derulante pe ecran")
+        self._alerts_btn.setFixedWidth(34)
+        self._alerts_btn.setStyleSheet(
+            "QPushButton { background:#2a2410; color:#f9e2af; border:1px solid #4a3a10; "
+            "border-radius:4px; padding:4px 6px; font-size:14px; }"
+            "QPushButton:hover { background:#3a3010; color:#ffe9b0; }")
+        self._alerts_btn.clicked.connect(self._open_alerts)
+        tb.addWidget(self._alerts_btn)
+
         # ── Expandable spacer — pushes Display / Stage / Settings right ───
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -10043,6 +10054,70 @@ class ControlWindow(QMainWindow):
         self.ticker_input.clear()
         for dw in self.display_windows:
             dw.set_ticker("")
+
+    # ── Alerte (manager din toolbar, buton ⚠) ────────────────────────────────
+    def _alerts_profile_dir(self) -> str:
+        try:
+            prof = getattr(self, "_profile_name", None) or db.get_active_profile() or "Default"
+        except Exception:
+            prof = "Default"
+        return os.path.join(os.path.expanduser("~"), "Cantio", "profiles", prof)
+
+    def _open_alerts(self):
+        try:
+            from alerts_manager import AlertsDialog
+            dlg = AlertsDialog(self, self._alerts_profile_dir(),
+                               on_show=self._alert_show, on_hide=self._alert_hide)
+            dlg.show()   # non-modal: operatorul vede ecranul live in timp ce lucreaza
+        except Exception as e:
+            logger.debug("[Alerts] %s", e)
+
+    def _alert_show(self, text: str, opts: dict):
+        """Afișează o alertă ca ticker derulant jos, cu nr. de derulări (repeats)."""
+        text = self._expand_tokens(text)
+        if not text:
+            return
+        # Stilul de baza al ticker-ului (din overlays) + suprascrierile alertei.
+        try:
+            ov_raw = self.settings.get("overlays", "{}")
+            ov = json.loads(ov_raw) if isinstance(ov_raw, str) else (ov_raw or {})
+            tk = ov.get("ticker", {})
+        except Exception:
+            tk = {}
+        bg_hex = (tk.get("bg_color", "#000000") or "#000000")[:7]
+        bg_rgba = self._hex_opacity_to_rgba(bg_hex, int(tk.get("bg_opacity", 85)))
+        ticker_settings = {
+            "speed":        float(opts.get("speed") or tk.get("speed") or 3),
+            "repeats":      int(opts.get("repeats", 0)),
+            "font_size":    int(tk.get("font_size") or self.settings.get("ticker_font_size", 22)),
+            "font_family":  tk.get("font_family") or self.settings.get("ticker_font_family", "Arial"),
+            "text_color":   opts.get("color") or tk.get("color") or "#f9e2af",
+            "bg_color":     bg_rgba,
+            "bar_height":   int(tk.get("height") or self.settings.get("ticker_height", 52)),
+            "position":     tk.get("position") or self.settings.get("ticker_position", "bottom"),
+            "animation":    tk.get("animation", "scroll_left"),
+            "bold":         bool(tk.get("bold", False)),
+            "italic":       bool(tk.get("italic", False)),
+            "ticker_in_effect":  self.settings.get("ticker_in_effect", "slide_up"),
+            "ticker_out_effect": self.settings.get("ticker_out_effect", "slide_down"),
+            "ticker_duration":   int(self.settings.get("ticker_anim_duration", 400)),
+        }
+        if not self.display_windows:
+            self._toasts.info("Deschide Display-ul ca să afișezi alerta.")
+            return
+        for dw in self.display_windows:
+            if hasattr(dw, "show_ticker_advanced"):
+                dw.show_ticker_advanced(text, ticker_settings)
+            else:
+                dw.set_ticker(text, ticker_settings=ticker_settings)
+        self._update_status(slide_msg="Alertă activă")
+
+    def _alert_hide(self):
+        for dw in self.display_windows:
+            if hasattr(dw, "hide_ticker_with_effect"):
+                dw.hide_ticker_with_effect()
+            else:
+                dw.set_ticker("")
 
     def _toggle_clock(self, checked):
         # Read from overlays JSON (saved by OverlaySettingsWidget) with fallback to flat keys
