@@ -22,6 +22,7 @@ import json
 import platform
 import urllib.request
 import urllib.error
+import urllib.parse
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -73,30 +74,45 @@ class _SendWorker(QThread):
         self._payload = payload
 
     def run(self):
+        # Form-urlencoded e cel mai compatibil cu FormSubmit (inclusiv la
+        # fluxul de activare de la prima trimitere) — mai robust decat JSON.
         try:
-            data = json.dumps(self._payload).encode("utf-8")
+            data = urllib.parse.urlencode(self._payload).encode("utf-8")
             req = urllib.request.Request(
                 FORMSUBMIT_URL, data=data, method="POST",
                 headers={
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                     "Accept": "application/json",
-                    "User-Agent": "Cantio-Feedback",
+                    "User-Agent": "Mozilla/5.0 (Cantio Feedback)",
+                    # Fara Origin/Referer, FormSubmit crede ca cererea vine
+                    # dintr-un fisier local si o refuza.
+                    "Origin": "https://cantioapp.com",
+                    "Referer": "https://cantioapp.com/",
                 },
             )
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with urllib.request.urlopen(req, timeout=45) as resp:
                 raw = resp.read().decode("utf-8", "replace")
             try:
                 obj = json.loads(raw)
             except Exception:
                 obj = {}
-            ok = str(obj.get("success", "")).lower() == "true"
-            if ok:
+            success_val = str(obj.get("success", "")).lower()
+            msg = str(obj.get("message", ""))
+            if success_val == "true":
                 self.done.emit(True, "")
+            elif "activ" in msg.lower():
+                # Flux de activare unica (doar la prima configurare) — semnalizat
+                # distinct ca sa nu para o eroare de retea.
+                self.done.emit(False, "__ACTIVATION__")
+            elif success_val == "false":
+                self.done.emit(False, msg or "Serviciul de trimitere a refuzat mesajul.")
             else:
-                msg = obj.get("message", "Serviciul de trimitere a refuzat mesajul.")
-                self.done.emit(False, str(msg))
+                # Raspuns 200 fara camp 'success' clar — tratam ca succes.
+                self.done.emit(True, "")
+        except urllib.error.HTTPError as e:
+            self.done.emit(False, f"Serverul a raspuns cu eroarea {e.code}.")
         except urllib.error.URLError as e:
-            self.done.emit(False, f"Fără conexiune la internet? ({e.reason})")
+            self.done.emit(False, f"Fara conexiune la internet? ({e.reason})")
         except Exception as e:  # pragma: no cover - defensiv
             self.done.emit(False, str(e))
 
@@ -234,7 +250,7 @@ class FeedbackDialog(QDialog):
 
         self._send_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
-        self._set_status("Se trimite…", "#89b4fa")
+        self._set_status("Se trimite… (poate dura câteva secunde)", "#89b4fa")
 
         self._worker = _SendWorker(payload, self)
         self._worker.done.connect(self._on_done)
@@ -250,6 +266,13 @@ class FeedbackDialog(QDialog):
             self._name.setReadOnly(True)
             self._email.setReadOnly(True)
             self._cancel_btn.setText("Închide")
+        elif message == "__ACTIVATION__":
+            # Doar la prima configurare: FormSubmit a trimis un email de
+            # activare pe adresa de primire. Dupa activare, mesajele curg normal.
+            self._send_btn.setEnabled(True)
+            self._set_status(
+                "Serviciul de feedback se activează (pas unic de configurare). "
+                "Te rugăm încearcă din nou în câteva minute.", "#f9e2af")
         else:
             self._send_btn.setEnabled(True)
             self._set_status(
