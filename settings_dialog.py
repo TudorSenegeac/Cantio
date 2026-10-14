@@ -729,6 +729,33 @@ class SettingsDialog(QDialog):
         dg.addLayout(df)
         layout.addWidget(countdown_group)
 
+        # ── Culori etichete secțiuni (Strofă / Refren / …) ────────────────────
+        labels_group = QGroupBox("Etichete secțiuni — culori")
+        lg = QFormLayout(labels_group)
+        lg.setSpacing(6)
+        self._label_color_btns = {}
+        _overrides = {}
+        try:
+            _overrides = db.get_label_color_overrides()
+        except Exception:
+            _overrides = {}
+        # Tipurile principale (cheia canonică folosită la potrivire)
+        _label_types = [
+            ("Strofa", "Strofă"), ("Refren", "Refren"), ("Cor", "Cor"),
+            ("Bridge", "Bridge"), ("Pre-Refren", "Pre-Refren"),
+            ("Intro", "Intro"), ("Outro", "Outro"), ("Final", "Final"),
+        ]
+        for key, display in _label_types:
+            try:
+                default_col = db.LABEL_COLORS.get(key, "#6c7086")
+            except Exception:
+                default_col = "#6c7086"
+            col = _overrides.get(key, default_col)
+            btn = ColorButton(col)
+            self._label_color_btns[key] = btn
+            lg.addRow(display + ":", btn)
+        layout.addWidget(labels_group)
+
         # ── Copyright / Watermark ─────────────────────────────────────────────
         cr_group = QGroupBox("Copyright / Watermark")
         crf = QVBoxLayout(cr_group)
@@ -799,7 +826,7 @@ class SettingsDialog(QDialog):
         brf.addRow(br_lbl)
 
         self.br_font_size = QSpinBox()
-        self.br_font_size.setRange(8, 60)
+        self.br_font_size.setRange(8, 2000)   # fara plafon practic
         self.br_font_size.setValue(int(s.get("ref_font_size", 24)))
         brf.addRow("Dimensiune font:", self.br_font_size)
 
@@ -1959,6 +1986,10 @@ class SettingsDialog(QDialog):
             "ref_italic":     "true" if (hasattr(self, 'br_italic') and self.br_italic.isChecked()) else "false",
             "ref_position":   ["bottom_right", "bottom_left", "bottom_center", "top_right", "top_left", "top_center"][
                                self.br_position.currentIndex()] if hasattr(self, 'br_position') else "bottom_right",
+            "label_colors": json.dumps(
+                {k: b.color() for k, b in getattr(self, "_label_color_btns", {}).items()},
+                ensure_ascii=False,
+            ),
         }
 
     def _collect_copyright(self) -> str:

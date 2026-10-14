@@ -1781,8 +1781,39 @@ LABEL_COLORS = {
 }
 
 
+def get_label_color_overrides() -> dict:
+    """User-customised label→color map (from Settings), or {}."""
+    try:
+        raw = get_settings().get("label_colors", "")
+        if raw:
+            import json as _json
+            d = _json.loads(raw)
+            if isinstance(d, dict):
+                return {str(k): str(v) for k, v in d.items()}
+    except Exception:
+        pass
+    return {}
+
+
+def save_label_color_overrides(mapping: dict):
+    """Persist the user's label→color customisations."""
+    import json as _json
+    try:
+        save_setting("label_colors", _json.dumps(mapping or {}))
+    except Exception:
+        pass
+
+
 def get_label_color(label: str) -> str:
-    """Return hex color for a given label string, or grey as default."""
+    """Return hex color for a given label string. User overrides (Settings) win
+    over the built-in defaults; grey if nothing matches."""
+    if not label:
+        return "#6c7086"
+    overrides = get_label_color_overrides()
+    # Exact type match first (overrides are keyed by canonical type name)
+    for key, color in overrides.items():
+        if key.lower() in label.lower():
+            return color
     for key, color in LABEL_COLORS.items():
         if key.lower() in label.lower():
             return color

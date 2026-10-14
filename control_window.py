@@ -644,6 +644,74 @@ def _auto_slide_label(text: str, index: int, total: int) -> str:
     return ""
 
 
+def _keyword_label(text: str) -> str:
+    """Only the keyword-based label (no generic S# fallback)."""
+    if not text:
+        return ""
+    first_line = str(text).split("\n")[0].strip().lower()
+    for kw, label in _LABEL_KEYWORDS.items():
+        if first_line.startswith(kw):
+            return label
+    return ""
+
+
+def _normalize_slide_text(slide) -> str:
+    """Normalize a slide's text for repeat-detection (lowercase, strip
+    punctuation/accents-insensitive-ish, collapse whitespace)."""
+    import re as _re2
+    if isinstance(slide, dict):
+        txt = slide.get("text", "")
+    else:
+        txt = str(slide or "")
+    # Strip rich-text HTML if present
+    if txt.lstrip().startswith("<"):
+        txt = _re2.sub(r"<[^>]+>", " ", txt)
+    txt = txt.lower()
+    txt = _re2.sub(r"[^\w\s]", "", txt, flags=_re2.UNICODE)
+    txt = _re2.sub(r"\s+", " ", txt).strip()
+    return txt
+
+
+def detect_smart_labels(slides: list) -> list:
+    """Smart section labels: a text block that repeats (≥2 identical slides) is
+    the CHORUS ('Refren'); unique blocks become 'Strofa N' in order. Explicit
+    labels (dict 'label') and keyword headers are respected first.
+    Returns a list of label strings aligned with `slides`."""
+    n = len(slides)
+    norm = [_normalize_slide_text(s) for s in slides]
+    counts = {}
+    for tnorm in norm:
+        if tnorm:
+            counts[tnorm] = counts.get(tnorm, 0) + 1
+
+    labels = [""] * n
+    strofa_n = 0
+    chorus_map = {}       # normalized text -> assigned chorus label
+    chorus_count = 0
+    for i, s in enumerate(slides):
+        # 1) explicit label on a dict slide
+        if isinstance(s, dict) and s.get("label"):
+            labels[i] = str(s["label"])
+            continue
+        raw = s.get("text", "") if isinstance(s, dict) else str(s or "")
+        # 2) keyword header (Refren:, Strofa 2, Bridge…)
+        kw = _keyword_label(raw)
+        if kw:
+            labels[i] = kw
+            continue
+        tnorm = norm[i]
+        # 3) repeated block → chorus
+        if tnorm and counts.get(tnorm, 0) >= 2:
+            if tnorm not in chorus_map:
+                chorus_count += 1
+                chorus_map[tnorm] = "Refren" if chorus_count == 1 else f"Refren {chorus_count}"
+            labels[i] = chorus_map[tnorm]
+        else:
+            strofa_n += 1
+            labels[i] = f"Strofa {strofa_n}" if n > 1 else ""
+    return labels
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SlideThumbnail(QWidget):
@@ -703,6 +771,66 @@ class SlideThumbnail(QWidget):
 
     def _sel_color(self):
         return QColor("#5294e2") if self._sel_active else QColor("#585863")
+
+    @staticmethod
+    def _mix(c1: QColor, c2: QColor, f: float) -> QColor:
+        f = max(0.0, min(1.0, f))
+        return QColor(
+            int(c1.red()   + (c2.red()   - c1.red())   * f),
+            int(c1.green() + (c2.green() - c1.green()) * f),
+            int(c1.blue()  + (c2.blue()  - c1.blue())  * f),
+        )
+
+    def _paint_label_bar(self, p, rect, th3, tw, bar3, SS):
+        """Bottom bar: coloured by the slide's label (name + colour), FreeShow-ish.
+        Falls back to a neutral bar + preview text when the slide has no label."""
+        has_label = bool(self.label)
+        label_col = QColor(self.label_color or "#6c7086")
+
+        # Background
+        if has_label:
+            bg = self._mix(QColor("#141414"), label_col, 0.30)
+            if self._selected:
+                bg = self._mix(bg, self._sel_color(), 0.28)
+            p.fillRect(rect, bg)
+            # Left accent stripe in the full label colour
+            p.fillRect(QRect(rect.x(), rect.y(), 5 * SS, rect.height()), label_col)
+        else:
+            if self._selected:
+                p.fillRect(rect, QColor("#1a3355" if self._sel_active else "#2b2b33"))
+            else:
+                p.fillRect(rect, QColor("#161616"))
+
+        # Number badge
+        num_x = (9 * SS) if has_label else (4 * SS)
+        badge_color = self._sel_color() if self._selected else QColor("#2a2a2a")
+        badge_rect  = QRect(num_x, th3 + 4 * SS, 20 * SS, 14 * SS)
+        p.setBrush(QBrush(badge_color))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(badge_rect, 3 * SS, 3 * SS)
+        p.setPen(QColor("#ffffff") if self._selected else QColor("#aaaaaa"))
+        p.setFont(QFont("Segoe UI", 7 * SS, QFont.Weight.Bold))
+        p.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, str(self.slide_index + 1))
+
+        text_x = num_x + 24 * SS
+        text_rect = QRect(text_x, th3 + 4 * SS, max(1, tw * SS - text_x - 4 * SS), 14 * SS)
+        if has_label:
+            # Label NAME in the label colour (bright on the dark tint)
+            p.setPen(self._mix(label_col, QColor("#ffffff"), 0.25))
+            p.setFont(QFont("Segoe UI", 7 * SS, QFont.Weight.Bold))
+            p.drawText(text_rect,
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       str(self.label))
+        else:
+            raw = self.slide_text if isinstance(self.slide_text, str) else ""
+            preview = raw.replace("\n", " ")
+            if len(preview) > 28:
+                preview = preview[:28] + "…"
+            p.setPen(QColor("#cccccc") if self._selected else QColor("#555555"))
+            p.setFont(QFont("Segoe UI", 7 * SS))
+            p.drawText(text_rect,
+                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                       preview)
 
     def mark_dirty(self):
         """Invalidate cached pixmap; schedules a repaint."""
@@ -826,11 +954,10 @@ class SlideThumbnail(QWidget):
             if self._selected:
                 pen = p.pen(); pen.setColor(self._sel_color()); pen.setWidth(3); p.setPen(pen)
                 p.drawRect(1, 1, self.thumb_w - 2, self.thumb_h - 2)
-            if self.label:
-                p.fillRect(0, self.thumb_h, self.thumb_w, 22, QColor("#141414"))
-                p.setPen(QColor(self.label_color or "#888888"))
-                f = p.font(); f.setPointSize(8); p.setFont(f)
-                p.drawText(6, self.thumb_h + 15, str(self.label))
+            # Bara de jos colorata cu eticheta (SS=1 la dimensiune reala)
+            self._paint_label_bar(
+                p, QRect(0, self.thumb_h, self.thumb_w, 22),
+                self.thumb_h, self.thumb_w, 22, 1)
             p.end()
             return
         # Serve from cache when nothing has changed
@@ -894,21 +1021,7 @@ class SlideThumbnail(QWidget):
             hov.setColorAt(1, QColor(255, 255, 255, 0))
             p.fillRect(thumb, hov)
 
-        # ── Section label badge (top-left) ────────────────────────────────────
-        if self.label:
-            lbl_color = QColor(self.label_color or "#6c7086")
-            lbl_font  = QFont("Segoe UI", 7 * SS, QFont.Weight.Bold)
-            p.setFont(lbl_font)
-            fm_lbl = p.fontMetrics()
-            pad    = 4 * SS
-            lbl_w  = fm_lbl.horizontalAdvance(self.label) + pad * 2
-            lbl_h  = 14 * SS
-            badge  = QRect(4 * SS, 4 * SS, lbl_w, lbl_h)
-            p.setBrush(QBrush(lbl_color))
-            p.setPen(Qt.PenStyle.NoPen)
-            p.drawRoundedRect(badge, 3 * SS, 3 * SS)
-            p.setPen(QColor("#1e1e2e"))
-            p.drawText(badge, Qt.AlignmentFlag.AlignCenter, self.label)
+        # Eticheta nu mai e badge in colt — se afiseaza in bara de jos (colorata).
 
         # ── Slide text ────────────────────────────────────────────────────────
         if self.slide_text:
@@ -948,37 +1061,8 @@ class SlideThumbnail(QWidget):
                 from preview_widget import render_text_on_painter
                 render_text_on_painter(p, self.slide_text, tw3, th3, s, scale3)
 
-        # ── Label bar ─────────────────────────────────────────────────────────
-        if self._selected:
-            bar_color = QColor("#1a3355" if self._sel_active else "#2b2b33")
-        else:
-            bar_color = QColor("#161616")
-        p.fillRect(label_rect, bar_color)
-
-        # Number badge
-        badge_color = self._sel_color() if self._selected else QColor("#2a2a2a")
-        badge_rect  = QRect(4 * SS, th3 + 4 * SS, 22 * SS, 14 * SS)
-        p.setBrush(QBrush(badge_color))
-        p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(badge_rect, 3 * SS, 3 * SS)
-
-        p.setPen(QColor("#ffffff") if self._selected else QColor("#888888"))
-        num_font = QFont("Segoe UI", 7 * SS, QFont.Weight.Bold)
-        p.setFont(num_font)
-        p.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, str(self.slide_index + 1))
-
-        # Preview text in label bar
-        p.setPen(QColor("#cccccc") if self._selected else QColor("#555555"))
-        text_font = QFont("Segoe UI", 7 * SS)
-        p.setFont(text_font)
-        preview = self.slide_text.replace("\n", " ")[:28]
-        if len(self.slide_text.replace("\n", " ")) > 28:
-            preview += "…"
-        p.drawText(
-            QRect(30 * SS, th3 + 4 * SS, (tw - 34) * SS, 14 * SS),
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            preview
-        )
+        # ── Label bar (banda jos = eticheta colorata) ────────────────────────
+        self._paint_label_bar(p, label_rect, th3, tw, bar3, SS)
 
         # Border
         if self._selected:
@@ -7535,21 +7619,29 @@ class ControlWindow(QMainWindow):
         _theme_s = self._resolve_settings()
         by_label = getattr(self, "_slides_by_label", False)
         transp   = getattr(self, "_thumbs_transparent", False)
+        # Etichete inteligente: refren detectat prin repetitie, strofe numerotate.
+        try:
+            smart_labels = detect_smart_labels(slides)
+        except Exception:
+            smart_labels = [""] * len(slides)
         _row = 0
         _col = 0
         _prev_label = None
         for i, slide in enumerate(slides):
-            # Auto-assign a label when the slide is a plain string (no label yet)
-            if isinstance(slide, str) and not isinstance(slide, dict):
-                slide_for_thumb = slide
-                auto_label = _auto_slide_label(slide, i, len(slides))
+            lbl = smart_labels[i] if i < len(smart_labels) else ""
+            lbl_color = db.get_label_color(lbl) if lbl else ""
+            if isinstance(slide, dict):
+                # Pastram label-ul explicit al dict-ului daca exista; altfel cel smart.
                 thumb = SlideThumbnail(
-                    slide_for_thumb, i, _theme_s,
-                    thumb_w=tw, thumb_h=th,
-                    label=auto_label,
+                    slide, i, _theme_s, thumb_w=tw, thumb_h=th,
+                    label=lbl, label_color=lbl_color,
                 )
             else:
-                thumb = SlideThumbnail(slide, i, _theme_s, thumb_w=tw, thumb_h=th)
+                thumb = SlideThumbnail(
+                    slide, i, _theme_s,
+                    thumb_w=tw, thumb_h=th,
+                    label=lbl, label_color=lbl_color,
+                )
             thumb.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             thumb.clicked.connect(self._send_slide_to_live)
             thumb.double_clicked.connect(self._edit_slide_at)
