@@ -2230,6 +2230,7 @@ class ControlWindow(QMainWindow):
         m_help.addAction(_act("Scurtături Tastatură", self._show_shortcuts))
         m_help.addAction(_act("Tutorial",             self._show_tutorial))
         m_help.addSeparator()
+        m_help.addAction(_act("💬 Trimite Feedback",   self._show_feedback))
         m_help.addAction(_act("Ajutor Online", lambda: QDesktopServices.openUrl(
             QUrl("https://cantioapp.com/helpdesk")
         )))
@@ -10684,6 +10685,18 @@ class ControlWindow(QMainWindow):
     def _show_about(self):
         from about_dialog import AboutDialog
         dlg = AboutDialog(self)
+        dlg.exec()
+
+    def _show_feedback(self):
+        from feedback_dialog import FeedbackDialog
+        ver = "1.5.2"
+        try:
+            app = QApplication.instance()
+            if app and app.applicationVersion():
+                ver = app.applicationVersion()
+        except Exception:
+            pass
+        dlg = FeedbackDialog(self, app_version=ver)
         dlg.exec()
 
     # ── Slide view toggle ─────────────────────────────────────────────────────
