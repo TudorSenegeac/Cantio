@@ -10,7 +10,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel,
-    QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
+    QListWidget, QListView, QListWidgetItem, QPushButton, QTextEdit,
+    QVBoxLayout, QWidget,
 )
 
 from translations import t
@@ -125,6 +126,11 @@ class BibleControlTab(QWidget):
         )
         self.verse_queue.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.verse_queue.itemClicked.connect(self._send_verse_live)
+        # Versetul intreg trebuie sa se vada (nu o singura linie taiata).
+        self.verse_queue.setWordWrap(True)
+        self.verse_queue.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.verse_queue.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.verse_queue.setResizeMode(QListView.ResizeMode.Adjust)
         layout.addWidget(self.verse_queue, 1)
 
         # ── Currently-live verse box ──────────────────────────────────────────

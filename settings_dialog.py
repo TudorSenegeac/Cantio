@@ -165,7 +165,7 @@ class WindowPerSettingsDialog(QDialog):
         ff.addRow(t("font_family") + ":", self.pw_font_combo)
 
         self.pw_font_size = QSpinBox()
-        self.pw_font_size.setRange(12, 200)
+        self.pw_font_size.setRange(12, 2000)
         self.pw_font_size.setValue(int(s.get("font_size", 48)))
         ff.addRow(t("size_pt") + ":", self.pw_font_size)
 
@@ -578,7 +578,7 @@ class SettingsDialog(QDialog):
         ff.addRow(t("font_family") + ":", self.font_combo)
 
         self.font_size_spin = QSpinBox()
-        self.font_size_spin.setRange(12, 200)
+        self.font_size_spin.setRange(12, 2000)
         self.font_size_spin.valueChanged.connect(self._preview_update)
         ff.addRow(t("size_pt") + ":", self.font_size_spin)
 

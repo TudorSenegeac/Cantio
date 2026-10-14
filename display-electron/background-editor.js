@@ -1049,7 +1049,7 @@ function buildTickerProps(p, L) {
   grpH(p, 'TEXT DERULANT');
   p.appendChild(row('Text', mkText(L, 'text')));
   p.appendChild(row('Font', mkFontPicker(L, 'font')));
-  p.appendChild(row('Mărime', mkRange(L, 'size', 12, 400, 1)));
+  p.appendChild(row('Mărime', mkRange(L, 'size', 12, 2000, 1)));
   p.appendChild(row('Culoare', mkColor(L, 'color')));
   p.appendChild(row('Îngroșat', mkCheck(L, 'bold')));
   p.appendChild(row('Viteză', mkRange(L, 'speed', 10, 500, 5)));

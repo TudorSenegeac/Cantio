@@ -1447,10 +1447,9 @@ class SongEditorDialog(QDialog):
             self.notes_edit.setPlainText(song.get("notes", ""))
         layout.addWidget(self.notes_edit)
 
-        hint = QLabel(t("lyrics_editor") + ":")
-        hint.setObjectName("muted")
-        layout.addWidget(hint)
-
+        # La CANTARE NOUA nu mai aratam campul de versuri — doar date generale.
+        # Versurile se adauga dupa, in Editorul de Versuri. La EDITARE il pastram.
+        self._is_new = song is None
         self.content_edit = QTextEdit()
         self.content_edit.setFont(QFont("Consolas", 11))
         self.content_edit.setPlaceholderText(
@@ -1458,7 +1457,18 @@ class SongEditorDialog(QDialog):
         )
         if song:
             self.content_edit.setPlainText(song["content"])
-        layout.addWidget(self.content_edit, 1)
+        if self._is_new:
+            self.content_edit.hide()
+            info = QLabel("Versurile le adaugi după, în „Editor Versuri”.")
+            info.setObjectName("muted")
+            info.setWordWrap(True)
+            layout.addWidget(info)
+            layout.addStretch(1)
+        else:
+            hint = QLabel(t("lyrics_editor") + ":")
+            hint.setObjectName("muted")
+            layout.addWidget(hint)
+            layout.addWidget(self.content_edit, 1)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save |
@@ -2219,6 +2229,7 @@ class ControlWindow(QMainWindow):
         m_svc.addSeparator()
         # Recent services submenu
         self._m_recent = m_svc.addMenu("Servicii recente →")
+        self._m_recent.aboutToShow.connect(self._refresh_recent_menu)
         self._refresh_recent_menu()
         m_svc.addSeparator()
         m_svc.addAction(_act("Închide Serviciu", self._clear_service))
@@ -2258,21 +2269,76 @@ class ControlWindow(QMainWindow):
             QUrl("https://cantioapp.com/helpdesk")
         )))
 
+    def _autosave_service_path(self) -> str:
+        """Fixed per-profile file where the current (possibly unsaved) service is
+        auto-persisted, so it shows in Recent even if never saved manually."""
+        try:
+            prof = getattr(self, "_profile_name", None) or db.get_active_profile() or "Default"
+        except Exception:
+            prof = "Default"
+        d = os.path.join(os.path.expanduser("~"), "Cantio", "profiles", prof)
+        try:
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+        return os.path.join(d, "autosave_service.gps")
+
+    def _autosave_service(self):
+        """Persist the current service to the autosave file (best-effort)."""
+        try:
+            items = getattr(self, "_service_items", None)
+            if not items:
+                return
+            sm.save_service(self._autosave_service_path(), items,
+                            getattr(self, "_profile_name", "Default"))
+        except Exception:
+            pass
+
+    def _push_recent_service(self, path: str):
+        """Add a manually-saved/opened service file to the Recent list."""
+        if not path:
+            return
+        try:
+            cache = db.get_cache()
+            recent = [p for p in cache.get("recent_services", []) if p != path]
+            recent.insert(0, path)
+            cache["recent_services"] = recent[:8]
+            db.save_cache(cache)
+        except Exception:
+            pass
+        self._refresh_recent_menu()
+
     def _refresh_recent_menu(self):
         """Populate the Recent Services submenu."""
         if not hasattr(self, '_m_recent'):
             return
         self._m_recent.clear()
+        any_entry = False
         try:
+            # Top entry: the current service auto-saved even if never saved by hand.
+            auto = self._autosave_service_path()
+            cur_saved = getattr(self, "_service_path", "")
+            if (os.path.exists(auto) and not cur_saved
+                    and getattr(self, "_service_items", None)):
+                self._m_recent.addAction(
+                    QAction("⟳ Ultimul serviciu (nesalvat)", self,
+                            triggered=lambda checked=False, _p=auto: self._open_service_path(_p))
+                )
+                self._m_recent.addSeparator()
+                any_entry = True
+
             cache = db.get_cache()
             recent = cache.get("recent_services", [])
-            for path in recent[:5]:
+            for path in recent[:8]:
+                if not os.path.exists(path):
+                    continue
                 p = path
                 self._m_recent.addAction(
                     QAction(os.path.basename(p), self,
                             triggered=lambda checked=False, _p=p: self._open_service_path(_p))
                 )
-            if not recent:
+                any_entry = True
+            if not any_entry:
                 a = QAction("(niciun serviciu recent)", self)
                 a.setEnabled(False)
                 self._m_recent.addAction(a)
@@ -2335,10 +2401,16 @@ class ControlWindow(QMainWindow):
 
     def _open_service_path(self, path: str):
         if os.path.exists(path):
-            self._service_path = path
+            is_autosave = (path == self._autosave_service_path())
+            self._service_path = "" if is_autosave else path
             try:
                 items = sm.load_service(path)
                 self._on_service_loaded(items)
+                if is_autosave:
+                    # E serviciul nesalvat recuperat — ramane marcat ca nesalvat.
+                    self._mark_service_modified(True)
+                else:
+                    self._push_recent_service(path)
             except Exception as e:
                 QMessageBox.warning(self, "Eroare", f"Nu s-a putut deschide serviciul:\n{e}")
 
@@ -3421,6 +3493,14 @@ class ControlWindow(QMainWindow):
         clear_fmt_btn = _fmt_btn("✕", "Clear formatting")
         clear_fmt_btn.clicked.connect(self._fmt_clear_formatting)
         rt_tb_layout.addWidget(clear_fmt_btn)
+
+        rt_tb_layout.addWidget(_vsep())
+
+        # Marcaj de repetare /: … :/ (notatie bisericeasca pentru text repetat)
+        repeat_btn = _fmt_btn("/:", "Marchează textul selectat ca repetare  /: … :/")
+        repeat_btn.setFixedSize(30, 22)
+        repeat_btn.clicked.connect(self._fmt_wrap_repeat)
+        rt_tb_layout.addWidget(repeat_btn)
 
         rt_tb_layout.addStretch()
 
@@ -5046,6 +5126,17 @@ class ControlWindow(QMainWindow):
         """Set/clear the unsaved-service marker in the status bar."""
         self._service_modified = modified
         self._status_unsaved_lbl.setText(t("unsaved_service") if modified else "")
+        if modified:
+            # Auto-salvare (debounce) ca ultimul serviciu sa apara in Recent
+            # chiar nesalvat manual.
+            try:
+                if not hasattr(self, "_autosave_timer"):
+                    self._autosave_timer = QTimer(self)
+                    self._autosave_timer.setSingleShot(True)
+                    self._autosave_timer.timeout.connect(self._autosave_service)
+                self._autosave_timer.start(800)
+            except Exception:
+                pass
 
     def _increment_warnings(self, delta: int = 1):
         """Track warning count for the status bar indicator."""
@@ -7045,6 +7136,27 @@ class ControlWindow(QMainWindow):
         fmt.setForeground(QColor("#e0e0e0"))
         cursor.mergeCharFormat(fmt)
         self.editor.mergeCurrentCharFormat(fmt)
+        self.editor.setFocus()
+
+    def _fmt_wrap_repeat(self):
+        """Încadrează textul selectat cu marcajul de repetare bisericesc /: … :/
+        (ex: /: Isus cu slavă îmbrăcat :/). Dacă nu e selecție, inserează un
+        șablon gol la cursor."""
+        cursor = self.editor.textCursor()
+        if cursor.hasSelection():
+            sel = cursor.selectedText()
+            # Nu dubla marcajul daca e deja pus.
+            s = sel.strip()
+            if s.startswith("/:") and s.endswith(":/"):
+                self.editor.setFocus()
+                return
+            cursor.insertText(f"/: {sel} :/")
+        else:
+            cursor.insertText("/:  :/")
+            # Pozitioneaza cursorul intre marcaje.
+            cursor.movePosition(QTextCursor.MoveOperation.Left,
+                                QTextCursor.MoveMode.MoveAnchor, 3)
+            self.editor.setTextCursor(cursor)
         self.editor.setFocus()
 
     def _on_cursor_pos_changed(self):
@@ -11313,6 +11425,7 @@ class ControlWindow(QMainWindow):
             count = sm.save_service(path, self._service_items, self._profile_name)
             self._service_path = path
             self._mark_service_modified(False)
+            self._push_recent_service(path)
             self._update_status(song_msg=f"Serviciu salvat: {os.path.basename(path)} ({count} items)")
             self._toasts.success(f"Serviciu salvat: {os.path.basename(path)}")
         except Exception as e:
@@ -11329,6 +11442,7 @@ class ControlWindow(QMainWindow):
             result = sm.load_service(path)
             self._service_items = result["items"]
             self._service_path = path
+            self._push_recent_service(path)
             self._refresh_service_list()
             meta = result.get("metadata", {})
             self._update_status(

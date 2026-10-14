@@ -1014,7 +1014,7 @@ class ThemeVisualEditor(QMainWindow):
         form.addRow("Font:", self.p_font)
 
         self.p_size = QSpinBox()
-        self.p_size.setRange(12, 200)
+        self.p_size.setRange(12, 2000)
         self.p_size.setValue(48)
         self.p_size.valueChanged.connect(self._update_canvas)
         form.addRow("Mărime:", self.p_size)
@@ -1121,7 +1121,7 @@ class ThemeVisualEditor(QMainWindow):
         rf.addRow("Font:", self.p_ref_font)
 
         self.p_ref_size = QSpinBox()
-        self.p_ref_size.setRange(8, 80)
+        self.p_ref_size.setRange(8, 2000)   # fara plafon practic (poate ocupa tot ecranul)
         self.p_ref_size.setValue(24)
         self.p_ref_size.valueChanged.connect(self._update_canvas)
         rf.addRow("Mărime:", self.p_ref_size)
