@@ -213,6 +213,20 @@ def get_available_translations(profile: str = "default") -> list[dict]:
         return []
 
 
+def delete_translation(translation_id: int, profile: str = "default") -> bool:
+    """Delete a Bible translation (its books + verses) from a profile DB."""
+    try:
+        conn = get_bible_db_for_profile(profile)
+        conn.execute("DELETE FROM bible_verses WHERE translation_id=?", (translation_id,))
+        conn.execute("DELETE FROM bible_books  WHERE translation_id=?", (translation_id,))
+        conn.execute("DELETE FROM bible_translations WHERE id=?", (translation_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
 def import_bible_to_profile(
     books: list,
     verses: list,

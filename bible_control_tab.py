@@ -268,6 +268,20 @@ class BibleControlTab(QWidget):
         self.prev_btn.setText(t("bible_prev"))
         self.next_btn.setText(t("bible_next"))
 
+    def set_translations(self, primary_id, secondary_id, dual: bool):
+        """Sync the translation combos from the „Mai multe…” Bible manager."""
+        if primary_id not in (None, "", "None"):
+            i = self._trans1_combo.findData(int(primary_id))
+            if i >= 0:
+                self._trans1_combo.setCurrentIndex(i)
+        self._dual_check.setChecked(bool(dual))
+        self._dual_enabled = bool(dual)
+        self._trans2_combo.setEnabled(bool(dual))
+        if dual and secondary_id not in (None, "", "None"):
+            i = self._trans2_combo.findData(int(secondary_id))
+            if i >= 0:
+                self._trans2_combo.setCurrentIndex(i)
+
     def _on_dual_toggled(self, checked: bool):
         self._dual_enabled = checked
         self._trans2_combo.setEnabled(checked)

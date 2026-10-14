@@ -3710,6 +3710,16 @@ class ControlWindow(QMainWindow):
             self._overlays_tab = None
             print(f"[OVERLAYS TAB] init failed: {_e}")
 
+        # ── Tab „Mai multe…” (listă stânga / conținut dreapta; start: Biblii) ──
+        self._more_tab = None
+        try:
+            from more_tab import MoreTab
+            self._more_tab = MoreTab(parent_control=self)
+            self._center_tab_widget.addTab(self._more_tab, "⋯ Mai multe")
+        except Exception as _e:
+            self._more_tab = None
+            print(f"[MORE TAB] init failed: {_e}")
+
         # ── Tab sync: Left Biblie ↔ Center Control Bible ──────────────────────
         self._center_tab_widget.currentChanged.connect(
             self._on_center_tab_changed)
