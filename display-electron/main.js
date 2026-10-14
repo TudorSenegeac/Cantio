@@ -191,12 +191,12 @@ function handleCommand(msg, ws) {
     }
 
     case 'render_thumb': {
-      // Render a bg-engine slide doc to a PNG (WYSIWYG operator thumbnail) using
-      // an ALREADY-running renderer (preview, else a live window) — no new proc.
-      const win = (previewWin && !previewWin.isDestroyed())
-        ? previewWin
-        : (windows.size ? windows.values().next().value : null);
-      if (win && !win.isDestroyed()) {
+      // Render a bg-engine slide doc to a PNG (WYSIWYG thumbnail). Preferам o
+      // fereastra deja deschisa (preview / live); daca nu exista, folosim un
+      // renderer OFFSCREEN ascuns dedicat — asa miniaturile se genereaza si
+      // fara Display deschis (cerut de user).
+      const runThumb = (win) => {
+        if (!win || win.isDestroyed()) return;
         const js = 'window._renderThumb ? window._renderThumb('
           + JSON.stringify(msg.doc) + ',' + (msg.w | 0) + ',' + (msg.h | 0) + ") : ''";
         win.webContents.executeJavaScript(js).then((url) => {
@@ -205,6 +205,14 @@ function handleCommand(msg, ws) {
             wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} } });
           }
         }).catch(() => {});
+      };
+      const existing = (previewWin && !previewWin.isDestroyed())
+        ? previewWin
+        : (windows.size ? windows.values().next().value : null);
+      if (existing) {
+        runThumb(existing);
+      } else {
+        ensureThumbWin().then(() => runThumb(thumbWin)).catch(() => {});
       }
       return { type: 'ok' };
     }
@@ -426,6 +434,29 @@ function _sendPreviewHwnd() {
     wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} } });
   } catch (e) {}
 }
+// Renderer OFFSCREEN ascuns, dedicat generarii de miniaturi cand nu e deschisa
+// nicio fereastra preview/live. Nu apare pe ecran si nu e in taskbar.
+let thumbWin = null;
+let thumbReady = null;
+function ensureThumbWin() {
+  if (thumbWin && !thumbWin.isDestroyed() && thumbReady) return thumbReady;
+  thumbWin = new BrowserWindow({
+    width: 480, height: 270, x: -4000, y: -4000,
+    backgroundColor: '#000000', frame: false, show: false, skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: true, contextIsolation: false,
+      webSecurity: false, allowRunningInsecureContent: true,
+      offscreen: false,
+    },
+  });
+  thumbReady = new Promise((resolve) => {
+    thumbWin.webContents.once('did-finish-load', () => resolve());
+  });
+  thumbWin.loadFile(path.join(__dirname, 'display.html'), { query: { preview: '1' } });
+  thumbWin.on('closed', () => { thumbWin = null; thumbReady = null; });
+  return thumbReady;
+}
+
 function openPreview() {
   if (previewWin && !previewWin.isDestroyed()) { _sendPreviewHwnd(); return previewWin; }
   previewWin = new BrowserWindow({

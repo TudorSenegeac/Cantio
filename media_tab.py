@@ -1001,7 +1001,7 @@ class MediaTab(QWidget):
             if force and self._control is not None:
                 try:
                     self._control.statusBar().showMessage(
-                        "Deschide mai întâi Display-ul ca să pot reface miniaturile.", 4000)
+                        "Motorul de randare nu e disponibil momentan.", 4000)
                 except Exception:
                     pass
             return

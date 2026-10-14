@@ -1248,6 +1248,17 @@ function _crossfade(p, W, H) {
   ctxC.save(); ctxC.globalAlpha = 1 - p; ctxC.drawImage(bufOld, 0, 0); ctxC.restore();
   ctxC.save(); ctxC.globalAlpha = p;     ctxC.drawImage(bufNew, 0, 0); ctxC.restore();
 }
+// Fade "dip": textul vechi dispare COMPLET in prima jumatate, apoi cel nou
+// reapare cu fade in a doua jumatate (nu cross-dissolve suprapus). Cerut de user.
+function _fadeThrough(p, W, H) {
+  if (p < 0.5) {
+    ctxC.save(); ctxC.globalAlpha = 1 - (p / 0.5);   // 1 -> 0 (vechiul iese)
+    ctxC.drawImage(bufOld, 0, 0); ctxC.restore();
+  } else {
+    ctxC.save(); ctxC.globalAlpha = (p - 0.5) / 0.5; // 0 -> 1 (noul intra)
+    ctxC.drawImage(bufNew, 0, 0); ctxC.restore();
+  }
+}
 function _clipRectNew(x, y, w, h) {
   ctxC.drawImage(bufOld, 0, 0);
   ctxC.save(); ctxC.beginPath(); ctxC.rect(x, y, w, h); ctxC.clip();
@@ -1398,10 +1409,11 @@ function _renderTransition(type, p, W, H) {
       ctxC.restore();
       break;
     }
-    // ── Defaults: fade / crossfade / blur ────────────────────────────────────
-    case 'blur':
+    // ── Fade: textul dispare complet, apoi reapare (dip) ─────────────────────
     case 'fade':
-    case 'crossfade':
+    case 'crossfade':  _fadeThrough(p, W, H); break;
+    // ── Defaults: blur / necunoscut ──────────────────────────────────────────
+    case 'blur':
     default: _crossfade(p, W, H); break;
   }
   ctxC.globalAlpha = 1;
