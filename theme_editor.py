@@ -169,8 +169,18 @@ QGroupBox::title { subcontrol-origin:margin; left:8px; }
 QLabel           { color:#cdd6f4; }
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     background:#313244; border:1px solid #45475a;
-    border-radius:4px; padding:4px; color:#cdd6f4; }
+    border-radius:4px; padding:4px; color:#cdd6f4; min-height:24px; }
 QLineEdit:focus, QSpinBox:focus, QComboBox:focus { border-color:#cba6f7; }
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin:border; subcontrol-position:top right;
+    width:22px; border-left:1px solid #45475a; }
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin:border; subcontrol-position:bottom right;
+    width:22px; border-left:1px solid #45475a; }
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover { background:#45475a; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { width:10px; height:10px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { width:10px; height:10px; }
 QPushButton {
     background:#313244; color:#cdd6f4;
     border:1px solid #45475a; border-radius:6px; padding:6px 12px; }

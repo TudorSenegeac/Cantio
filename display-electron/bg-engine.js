@@ -359,6 +359,9 @@
       }
     }
 
+    // Metricile in px (umbra/blur) sunt autorate @1080 — scalam dupa inaltime
+    // ca thumbnail-urile si ecranele non-1080 sa pastreze proportiile.
+    const _k = H / 1080;
     // Shadow
     const sh = L.shadow;
     if (sh && sh.enabled) {
@@ -366,17 +369,17 @@
       if (a.glow && a.glow.enabled)
         blur = lerp(a.glow.min, a.glow.max, osc(t, a.glow.speed));
       ctx.shadowColor   = sh.color || '#000';
-      ctx.shadowBlur    = blur;
-      ctx.shadowOffsetX = sh.x || 0;
-      ctx.shadowOffsetY = sh.y || 0;
+      ctx.shadowBlur    = blur * _k;
+      ctx.shadowOffsetX = (sh.x || 0) * _k;
+      ctx.shadowOffsetY = (sh.y || 0) * _k;
     }
     if (reactGlow > 0) {              // beat glow even without a base shadow
       ctx.shadowColor = (L.color || L.hlColor || '#ffffff');
-      ctx.shadowBlur  = (ctx.shadowBlur || 0) + reactGlow;
+      ctx.shadowBlur  = (ctx.shadowBlur || 0) + reactGlow * _k;
     }
     const totalBlur = (L.blur || 0) + (pm ? pm.blur : 0);
     if (totalBlur > 0) {
-      try { ctx.filter = `blur(${totalBlur}px)`; } catch (e) {}
+      try { ctx.filter = `blur(${totalBlur * _k}px)`; } catch (e) {}
     }
 
     // Apply entrance/exit scale to the animated scale
@@ -560,15 +563,15 @@
   function drawTicker(ctx, W, H, L, t) {
     const text = String(L.text || '');
     if (!text) return;
-    const size = L.size || 48;
+    const size = (L.size || 48) * (H / 1080);
     ctx.font = `${L.bold ? 'bold ' : ''}${size}px "${L.font || 'Montserrat'}", sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     const tw = ctx.measureText(text).width || 1;
-    const gap = (L.gap != null ? L.gap : 200);
+    const gap = (L.gap != null ? L.gap : 200) * (H / 1080);
     const period = tw + gap;
     const y = (L.y != null ? L.y : 0.9) * H;
-    const speed = (L.speed != null ? L.speed : 80);
+    const speed = (L.speed != null ? L.speed : 80) * (H / 1080);
     const offset = (((t * speed) % period) + period) % period;
     if (L.bgEnabled) {
       ctx.save();
@@ -797,9 +800,10 @@
 
   function drawShape(ctx, W, H, L, t) {
     const w = (L.w || 0.3) * W, h = (L.h || 0.3) * H;
+    const _sk = H / 1080;   // grosimea conturului e px @1080
 
     if (L.shape === 'line') {
-      ctx.lineWidth = (L.strokeWidth || 6);
+      ctx.lineWidth = (L.strokeWidth || 6) * _sk;
       ctx.strokeStyle = L.color || '#fff';
       ctx.beginPath(); ctx.moveTo(-w / 2, 0); ctx.lineTo(w / 2, 0); ctx.stroke();
       return;
@@ -821,7 +825,7 @@
       if (L.strokeWidth) {
         builder(ctx, w, h, L);
         ctx.strokeStyle = L.strokeColor || '#fff';
-        ctx.lineWidth = L.strokeWidth;
+        ctx.lineWidth = L.strokeWidth * _sk;
         ctx.stroke();
       }
       return;
@@ -830,7 +834,7 @@
     const fill = shapeFill(ctx, L, w, h, t);
     ctx.fillStyle = fill || 'transparent';
     ctx.strokeStyle = L.strokeColor || '#fff';
-    ctx.lineWidth = (L.strokeWidth || 0);
+    ctx.lineWidth = (L.strokeWidth || 0) * _sk;
 
     builder(ctx, w, h, L);
     if (fill) ctx.fill(EVENODD[L.shape] ? 'evenodd' : 'nonzero');
@@ -875,7 +879,10 @@
   }
 
   function drawText(ctx, W, H, L, t) {
-    const sizePx = (L.size || 96);
+    // Dimensiunile de text sunt autorate la inaltimea de referinta 1080px.
+    // Scalam dupa inaltimea reala a canvas-ului => identic pe 1080 (k=1),
+    // dar corect (proportional) pe thumbnail-uri si ecrane non-1080.
+    const sizePx = (L.size || 96) * (H / 1080);
     let str = L.text || '';
     // Word-by-word reveal (dynamic presentations): show only the first
     // ceil(words * _reveal) words of this layer when flagged `reveal:true`.
@@ -902,7 +909,7 @@
       ctx.font = buildFont(L, es);
       ctx.globalAlpha *= (L.echo.opacity != null ? L.echo.opacity : 0.14);
       ctx.fillStyle = (L.colorType === 'solid') ? (L.color || '#fff') : '#ffffff';
-      if (L.echo.blur) { try { ctx.filter = `blur(${L.echo.blur}px)`; } catch (e) {} }
+      if (L.echo.blur) { try { ctx.filter = `blur(${L.echo.blur * (H / 1080)}px)`; } catch (e) {} }
       const elines = wrapLines(ctx, str, maxW * 1.6);
       const elh = es * (L.lineHeight || 1.15);
       const ey0 = -((elines.length - 1) * elh) / 2;
@@ -916,7 +923,7 @@
     const lh = sizePx * (L.lineHeight || 1.15);
     const y0 = -((lines.length - 1) * lh) / 2;
     lines.forEach((ln, i) => {
-      if (L.letterSpacing) ctx.letterSpacing = (L.letterSpacing + 'px');
+      if (L.letterSpacing) ctx.letterSpacing = ((L.letterSpacing * (H / 1080)) + 'px');
       ctx.fillText(ln, 0, y0 + i * lh);
     });
   }
@@ -955,12 +962,12 @@
     if (L.prefix) str = L.prefix + str;
     if (L.suffix) str = str + L.suffix;
     if (L.uppercase) str = String(str).toUpperCase();
-    const sizePx = L.size || 140;
+    const sizePx = (L.size || 140) * (H / 1080);
     ctx.textAlign = L.align || 'center';
     ctx.textBaseline = 'middle';
     ctx.font = buildFont(L, sizePx);
     ctx.fillStyle = textFill(ctx, L, sizePx, t);
-    if (L.letterSpacing) { try { ctx.letterSpacing = (L.letterSpacing + 'px'); } catch (e) {} }
+    if (L.letterSpacing) { try { ctx.letterSpacing = ((L.letterSpacing * (H / 1080)) + 'px'); } catch (e) {} }
     ctx.fillText(str, 0, 0);
   }
 
@@ -984,7 +991,7 @@
     L._scroll += (index - L._scroll) * Math.min(1, (L.scrollSpeed || 8) * 0.016);
     const curr = L._scroll;
 
-    const size = L.size || 64;
+    const size = (L.size || 64) * (H / 1080);
     const lineH = size * (L.lineGap || 1.7);
     const half = Math.floor((L.visibleLines || 5) / 2);
     ctx.textAlign = L.align || 'center';

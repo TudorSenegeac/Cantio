@@ -162,6 +162,27 @@ QComboBox QAbstractItemView {
     border: 1px solid #2e2e2e; selection-background-color: #1c3a5a;
 }
 
+/* Spinbox-uri: butoane sus/jos mai mari si mai usor de apasat (erau prea mici).
+   Doar dimensionare — pastram sagetile native Qt, ca sa ramana mereu vizibile. */
+QSpinBox, QDoubleSpinBox {
+    background: #1c1c1c; color: #e0e0e0;
+    border: 1px solid #262626; border-radius: 4px;
+    padding: 2px 4px; min-height: 26px;
+}
+QSpinBox:focus, QDoubleSpinBox:focus { border-color: #5294e2; }
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: border; subcontrol-position: top right;
+    width: 22px; border-left: 1px solid #2e2e2e;
+}
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border; subcontrol-position: bottom right;
+    width: 22px; border-left: 1px solid #2e2e2e;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover { background: #333333; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { width: 10px; height: 10px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { width: 10px; height: 10px; }
+
 QGroupBox {
     border: 1px solid #222222; border-radius: 6px;
     margin-top: 6px; padding: 10px 8px 8px 8px;
@@ -508,7 +529,9 @@ class SplitLinesDialog(QDialog):
             "QDialog { background:#181818; color:#e0e0e0; }"
             "QLabel { color:#e0e0e0; }"
             "QSpinBox { background:#1c1c1c; color:#e0e0e0; border:1px solid #333; "
-            "border-radius:4px; padding:4px; }"
+            "border-radius:4px; padding:4px; min-height:24px; }"
+            "QSpinBox::up-button { subcontrol-position: top right; width:20px; }"
+            "QSpinBox::down-button { subcontrol-position: bottom right; width:20px; }"
             "QRadioButton { color:#e0e0e0; padding:4px; }"
             "QComboBox { background:#1c1c1c; color:#e0e0e0; border:1px solid #333; "
             "border-radius:4px; padding:4px; }"
@@ -3347,12 +3370,16 @@ class ControlWindow(QMainWindow):
         self._fmt_size_spin = QSpinBox()
         self._fmt_size_spin.setRange(8, 120)
         self._fmt_size_spin.setValue(24)
-        self._fmt_size_spin.setFixedSize(54, 22)
+        self._fmt_size_spin.setFixedSize(66, 26)
         self._fmt_size_spin.setToolTip("Font size (pt)")
         self._fmt_size_spin.setStyleSheet(
             "QSpinBox { background: #1c1c1c; color: #ccc; border: 1px solid #2a2a2a; "
-            "border-radius: 3px; font-size: 10px; padding-left: 2px; }"
-            "QSpinBox::up-button, QSpinBox::down-button { width: 14px; }"
+            "border-radius: 3px; font-size: 10px; padding-left: 4px; }"
+            "QSpinBox::up-button { subcontrol-position: top right; width: 18px; "
+            "border-left: 1px solid #2a2a2a; }"
+            "QSpinBox::down-button { subcontrol-position: bottom right; width: 18px; "
+            "border-left: 1px solid #2a2a2a; }"
+            "QSpinBox::up-button:hover, QSpinBox::down-button:hover { background: #333; }"
         )
         self._fmt_size_spin.valueChanged.connect(self._fmt_set_size)
         rt_tb_layout.addWidget(self._fmt_size_spin)
@@ -7507,6 +7534,16 @@ class ControlWindow(QMainWindow):
                 pass
 
     def _on_thumb_ready(self, req_id, data_url):
+        # Background-thumbnail regeneration (Media > Fundal) is routed by a
+        # distinct "bg#" prefix so it never collides with the slide thumbnails.
+        if req_id.startswith("bg#"):
+            mt = getattr(self, "_media_tab", None)
+            if mt is not None and hasattr(mt, "_on_bg_thumb_rendered"):
+                try:
+                    mt._on_bg_thumb_rendered(req_id, data_url)
+                except Exception:
+                    pass
+            return
         try:
             token_s, idx_s = req_id.split(":", 1)
             token, idx = int(token_s), int(idx_s)

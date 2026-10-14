@@ -465,6 +465,10 @@ class MediaTab(QWidget):
         # new previews saved by the editor).
         if idx == getattr(self, "_bg_tab_index", -1):
             self._bg_refresh_list()
+            # O singura data pe sesiune, reface miniaturile vechi (coapte cu
+            # motorul vechi, inainte de scalarea dupa inaltime) via Electron.
+            if not getattr(self, "_bg_regenerated_once", False):
+                QTimer.singleShot(250, lambda: self._bg_regenerate_thumbs(force=False))
 
     # ── HELPERS ───────────────────────────────────────────────────────────────
 
@@ -726,6 +730,16 @@ class MediaTab(QWidget):
         new_btn.clicked.connect(self._bg_create)
         top.addWidget(new_btn)
 
+        regen_btn = QPushButton("♻ Reface miniaturile")
+        regen_btn.setToolTip("Regenerează miniaturile tuturor fundalurilor (WYSIWYG)")
+        regen_btn.setStyleSheet(
+            "QPushButton { background: #1c1c1c; color: #aaa; border: 1px solid #2a2a2a; "
+            "border-radius: 4px; padding: 5px 12px; font-size: 11px; }"
+            "QPushButton:hover { background: #252525; color: #fff; }"
+        )
+        regen_btn.clicked.connect(lambda: self._bg_regenerate_thumbs(force=True))
+        top.addWidget(regen_btn)
+
         imp_btn = QPushButton("📥 Import")
         imp_btn.setStyleSheet(
             "QPushButton { background: #1c1c1c; color: #aaa; border: 1px solid #2a2a2a; "
@@ -765,6 +779,9 @@ class MediaTab(QWidget):
 
         self._bg_cards = {}
         self._bg_pending_live = None
+        self._bg_thumb_pending = {}        # req_id -> json path (regenerare WYSIWYG)
+        self._bg_thumb_counter = 0
+        self._bg_regenerated_once = False  # regenerare automata o data pe sesiune
         self._bg_click_timer = QTimer(self)
         self._bg_click_timer.setSingleShot(True)
         self._bg_click_timer.timeout.connect(self._bg_click_fire)
@@ -964,6 +981,99 @@ class MediaTab(QWidget):
                     Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                     Qt.TransformationMode.SmoothTransformation)
         return self._bg_make_placeholder(data)
+
+    # ── Regenerare miniaturi WYSIWYG (via Electron) ───────────────────────────
+    def _bg_renderer(self):
+        """Returneaza managerul Electron daca poate randa miniaturi, altfel None."""
+        mgr = getattr(self._control, "electron_display", None) if self._control else None
+        if mgr is not None and hasattr(mgr, "render_thumb"):
+            return mgr
+        return None
+
+    def _bg_regenerate_thumbs(self, force: bool = False):
+        """Re-randeaza miniaturile .jpg ale tuturor fundalurilor folosind motorul
+        bg-engine curent (prin fereastra Electron de preview/live). Best-effort:
+        daca niciun renderer nu e activ, nu se intampla nimic si cardurile raman
+        pe miniatura veche pana la urmatorul salvat din editor."""
+        import json as _json
+        mgr = self._bg_renderer()
+        if mgr is None:
+            if force and self._control is not None:
+                try:
+                    self._control.statusBar().showMessage(
+                        "Deschide mai întâi Display-ul ca să pot reface miniaturile.", 4000)
+                except Exception:
+                    pass
+            return
+        try:
+            jsons = [os.path.join(self._bg_dir(), fn)
+                     for fn in sorted(os.listdir(self._bg_dir()))
+                     if fn.lower().endswith(".json")]
+        except Exception:
+            jsons = []
+        if not jsons:
+            self._bg_regenerated_once = True
+            return
+        # Aspectul miniaturii = aspectul ecranului conectat (implicit 16:9).
+        aspect = 16 / 9
+        try:
+            a = float(getattr(self._control, "_display_aspect", 0) or 0)
+            if a > 0:
+                aspect = a
+        except Exception:
+            pass
+        tw = 384
+        th = max(24, int(round(tw / aspect)))
+        self._bg_regenerated_once = True
+        for path in jsons:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    doc = _json.load(f)
+            except Exception:
+                continue
+            if not isinstance(doc, dict) or not doc.get("layers"):
+                continue
+            self._bg_thumb_counter += 1
+            req_id = f"bg#{self._bg_thumb_counter}"
+            self._bg_thumb_pending[req_id] = path
+            try:
+                mgr.render_thumb(doc, tw, th, req_id, 0)
+            except Exception:
+                self._bg_thumb_pending.pop(req_id, None)
+
+    def _on_bg_thumb_rendered(self, req_id: str, data_url: str):
+        """Primeste un PNG data-URL de la Electron si il salveaza ca .jpg langa
+        fundal, apoi reimprospateaza grila."""
+        path = self._bg_thumb_pending.pop(req_id, None)
+        if not path or not data_url:
+            return
+        try:
+            import base64
+            b64 = data_url.split(",", 1)[1] if "," in data_url else data_url
+            raw = base64.b64decode(b64)
+            pix = QPixmap()
+            if not pix.loadFromData(raw, "PNG") or pix.isNull():
+                return
+            jpg = path[:-5] + ".jpg"
+            # Salvam ca JPEG (acelasi format ca editorul) — fundal negru sub
+            # eventualele zone transparente, ca preview-ul sa fie lizibil.
+            out = QPixmap(pix.size())
+            out.fill(QColor("#000000"))
+            pntr = QPainter(out)
+            pntr.drawPixmap(0, 0, pix)
+            pntr.end()
+            out.save(jpg, "JPG", 85)
+        except Exception:
+            return
+        # Reimprospatare amanata (grupeaza mai multe rezultate).
+        try:
+            if not hasattr(self, "_bg_regen_refresh_timer"):
+                self._bg_regen_refresh_timer = QTimer(self)
+                self._bg_regen_refresh_timer.setSingleShot(True)
+                self._bg_regen_refresh_timer.timeout.connect(self._bg_refresh_list)
+            self._bg_regen_refresh_timer.start(200)
+        except Exception:
+            pass
 
     def _bg_make_placeholder(self, data: dict) -> QPixmap:
         """Render a quick gradient preview from the first gradient layer."""
