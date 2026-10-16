@@ -2073,6 +2073,9 @@ class ControlWindow(QMainWindow):
     _dyn_audio_error = pyqtSignal(str)
     _dyn_pip_done    = pyqtSignal(bool, str)
     _dyn_align_done  = pyqtSignal(object)   # list[float] start times, or None
+    # Emitted (from the i18n fetch thread → GUI thread) when new translations are
+    # cached, so the UI can re-apply them.
+    _i18n_sig = pyqtSignal()
 
     def __init__(self, profile_name="Default"):
         super().__init__()
@@ -2080,6 +2083,7 @@ class ControlWindow(QMainWindow):
         self._dynamic_slide_received.connect(self._on_dynamic_slide)
         self._thumb_ready.connect(self._on_thumb_ready)
         self._media_time_sig.connect(self._on_media_time)
+        self._i18n_sig.connect(self._reapply_i18n)
         self._midi_received.connect(self._on_midi_event)
         self._midi_running = False
         self._midi_learn_cb = None
@@ -2695,6 +2699,13 @@ class ControlWindow(QMainWindow):
         self._notifications = []
         self._notif_fetcher = None
         QTimer.singleShot(2500, self._fetch_notifications)
+        # La pornire, daca limba salvata nu e romana, traduce tot UI-ul.
+        try:
+            from translations import get_language as _gl0
+            if _gl0() != "ro":
+                QTimer.singleShot(400, self._apply_i18n)
+        except Exception:
+            pass
 
         # ── Expandable spacer — pushes Display / Stage / Settings right ───
         spacer = QWidget()
@@ -12381,25 +12392,61 @@ class ControlWindow(QMainWindow):
     # ── Language refresh ──────────────────────────────────────────────────────
 
     def _on_language_changed(self, lang: str):
-        """Called when the user changes the UI language in settings. Restarts so
-        the ENTIRE UI (menubar, tabs, editors, all dialogs) rebuilds in the new
-        language — far more reliable than live-retranslating hundreds of widgets."""
+        """Schimbă limba LIVE (fără restart): întâi textele îngrijite (t()), apoi
+        traduce automat TOT restul (texte hardcodate) via i18n (cache offline +
+        completare online în fundal)."""
         from translations import set_language
         set_language(lang)
         try:
             db.save_setting("language", lang)
         except Exception:
             pass
-        self._refresh_all_ui_texts()   # immediate partial refresh (before restart)
-        r = QMessageBox.question(
-            self, "Limbă / Language",
-            "Schimbarea limbii repornește aplicația pentru a traduce tot.\n"
-            "Changing the language restarts the app to translate everything.\n\n"
-            "Continui acum? / Restart now?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes)
-        if r == QMessageBox.StandardButton.Yes:
-            self._restart_with_profile(self._profile_name)
+        self._refresh_all_ui_texts()   # cheile îngrijite din translations.py
+        self._apply_i18n(lang)         # tot restul, automat
+        if lang != "ro":
+            try:
+                self._toasts.info("Se traduc textele… (o singură dată, apoi offline)")
+            except Exception:
+                pass
+
+    def _apply_i18n(self, lang: str = None):
+        """Traduce tot UI-ul vizibil în limba activă (fereastra principală +
+        dialogurile deschise). Textele lipsă se completează online în fundal."""
+        try:
+            import i18n
+        except Exception:
+            return
+        try:
+            from translations import get_language as _gl
+            lang = lang or _gl()
+        except Exception:
+            lang = lang or "ro"
+        srcs = []
+        try:
+            srcs += i18n.retranslate_tree(self)
+            for w in QApplication.topLevelWidgets():
+                if w is not self and w.isVisible():
+                    srcs += i18n.retranslate_tree(w)
+        except Exception:
+            pass
+        if lang != "ro" and srcs:
+            try:
+                i18n.fill_missing_async(
+                    srcs, lang,
+                    on_done=lambda changed: self._i18n_sig.emit() if changed else None)
+            except Exception:
+                pass
+
+    def _reapply_i18n(self):
+        """Re-aplică traducerile după ce completarea online a adus texte noi."""
+        try:
+            import i18n
+            i18n.retranslate_tree(self)
+            for w in QApplication.topLevelWidgets():
+                if w is not self and w.isVisible():
+                    i18n.retranslate_tree(w)
+        except Exception:
+            pass
 
     def _refresh_all_ui_texts(self):
         """Update visible UI text labels after a language change (no restart needed)."""
