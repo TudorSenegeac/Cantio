@@ -155,21 +155,25 @@ class BibleControlTab(QWidget):
         )
         current_layout.addWidget(self.current_verse_label)
 
-        # Rand evidentiere: selectezi text in versetul de mai sus -> Evidentiaza.
-        hl_row = QHBoxLayout()
-        hl_row.setContentsMargins(0, 0, 0, 0)
-        hl_hint = QLabel("Selectează text în verset →")
-        hl_hint.setStyleSheet("color:#6c7086; font-size:10px;")
-        hl_row.addWidget(hl_hint)
-        hl_row.addStretch()
+        # Un singur rand: referinta + Evidentiaza + ✖ + Trimite Live.
+        ref_row = QHBoxLayout()
+        ref_row.setContentsMargins(0, 0, 0, 0)
+        ref_row.setSpacing(6)
+        self.ref_label = QLabel("")
+        self.ref_label.setStyleSheet("color:#89b4fa; font-size:12px;")
+        ref_row.addWidget(self.ref_label)
+        ref_row.addStretch()
+
         self._hl_btn = QPushButton("✨ Evidențiază")
+        self._hl_btn.setToolTip("Selectează text în verset, apoi evidențiază-l pe ecran")
         self._hl_btn.setStyleSheet(
             "QPushButton { background:#3a3410; color:#f9e2af; border:1px solid #5a5020; "
             "border-radius:5px; padding:4px 10px; font-size:11px; } "
             "QPushButton:hover { background:#4a4418; }")
         self._hl_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._hl_btn.clicked.connect(self._highlight_selection)
-        hl_row.addWidget(self._hl_btn)
+        ref_row.addWidget(self._hl_btn)
+
         self._hl_clear_btn = QPushButton("✖")
         self._hl_clear_btn.setFixedWidth(28)
         self._hl_clear_btn.setToolTip("Fără evidențiere")
@@ -179,15 +183,7 @@ class BibleControlTab(QWidget):
             "QPushButton:hover { background:#252525; }")
         self._hl_clear_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._hl_clear_btn.clicked.connect(self._clear_highlight)
-        hl_row.addWidget(self._hl_clear_btn)
-        current_layout.addLayout(hl_row)
-
-        ref_row = QHBoxLayout()
-        ref_row.setContentsMargins(0, 0, 0, 0)
-        self.ref_label = QLabel("")
-        self.ref_label.setStyleSheet("color:#89b4fa; font-size:12px;")
-        ref_row.addWidget(self.ref_label)
-        ref_row.addStretch()
+        ref_row.addWidget(self._hl_clear_btn)
 
         self._send_live_btn = QPushButton(t("bible_send_live"))
         self._send_live_btn.setStyleSheet(
