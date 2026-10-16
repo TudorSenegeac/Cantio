@@ -2772,20 +2772,16 @@ class ControlWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(2)
-        # Panourile se pot restrange COMPLET (ca la o lista) — cand devin prea
-        # mici, continutul se deruleaza in loc sa blocheze splitter-ul.
-        splitter.setChildrenCollapsible(True)
         self._main_splitter = splitter
         root.addWidget(splitter)
 
         left_frame = QFrame()
         left_frame.setObjectName("side_panel")
-        left_frame.setMinimumWidth(0)      # se poate trage pana aproape de 0;
+        # Min mic -> panoul se poate ingusta mult, iar butoanele se comprima.
+        left_frame.setMinimumWidth(60)
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
-        # FARA scroll aici — ca butoanele din SERVICIU sa se COMPRIME la ingustare
-        # (scroll-ul le bloca la marimea lor naturala).
         left_layout.addWidget(self._build_left_panel())
         splitter.addWidget(left_frame)
 
@@ -2799,19 +2795,13 @@ class ControlWindow(QMainWindow):
 
         right_frame = QFrame()
         right_frame.setObjectName("right_panel")
-        right_frame.setMinimumWidth(0)     # se poate trage pana aproape de 0
+        right_frame.setMinimumWidth(60)
         right_layout = QVBoxLayout(right_frame)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
-        # Panoul drept contine preview-ul embed (Electron) — NU-l punem in scroll
-        # (ar strica pozitionarea embed-ului). Se poate insa colapsa complet.
         right_layout.addWidget(self._build_right_panel())
         splitter.addWidget(right_frame)
 
-        # Nu colapsa centrul (preview/editor); lateralele da.
-        splitter.setCollapsible(0, True)
-        splitter.setCollapsible(1, False)
-        splitter.setCollapsible(2, True)
         splitter.setSizes([265, 640, 305])
         self._wire_splitter_menu(splitter, [265, 640, 305])
 
@@ -3470,7 +3460,7 @@ class ControlWindow(QMainWindow):
 
         # Top pane: the stacked slides widget
         slides_pane = QWidget()
-        slides_pane.setMinimumHeight(0)   # se poate face oricat de mic (colapsabil)
+        slides_pane.setMinimumHeight(60)
         sp_layout = QVBoxLayout(slides_pane)
         sp_layout.setContentsMargins(0, 0, 0, 0)
         sp_layout.setSpacing(0)
@@ -12399,17 +12389,33 @@ class ControlWindow(QMainWindow):
 
     # ── Splitere: meniu click-dreapta (poziția anterioară / implicită) ────────
     def _wire_splitter_menu(self, splitter, default_sizes):
-        """Adaugă pe fiecare mâner de spliter un meniu la click-dreapta cu
-        'Poziția anterioară' și 'Poziția implicită'. Reține poziția dinainte de
-        tragere ca să poată reveni."""
+        """Meniu la click-dreapta pe mânerele unui spliter: 'Poziția anterioară'
+        și 'Poziția implicită'. NU folosește event filter (ca să nu afecteze
+        tragerea) — doar semnalul de context-menu + un timer de 'settle' pentru
+        poziția anterioară."""
         try:
             splitter._default_sizes = list(default_sizes)
             splitter._prev_sizes = list(default_sizes)
+            splitter._settled_sizes = list(default_sizes)
+            t = QTimer(splitter)
+            t.setSingleShot(True)
+            t.setInterval(450)
+
+            def _settle(sp=splitter):
+                # Dupa ce tragerea se opreste: 'anterioara' = pozitia dinainte.
+                sp._prev_sizes = sp._settled_sizes
+                sp._settled_sizes = sp.sizes()
+            t.timeout.connect(_settle)
+            splitter._settle_timer = t
+            splitter.splitterMoved.connect(lambda *a, tt=t: tt.start())
+
             for i in range(1, splitter.count()):
                 h = splitter.handle(i)
                 if h is not None:
-                    h._owner_splitter = splitter
-                    h.installEventFilter(self)
+                    h.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                    h.customContextMenuRequested.connect(
+                        lambda pos, sp=splitter, hh=h:
+                            self._show_splitter_menu(sp, hh.mapToGlobal(pos)))
         except Exception:
             pass
 
@@ -12436,23 +12442,6 @@ class ControlWindow(QMainWindow):
 
     def eventFilter(self, obj, event):
         from PyQt6.QtCore import QEvent
-        # Mânerele de spliter: captează poziția dinainte de tragere + meniu dreapta.
-        if hasattr(obj, "_owner_splitter"):
-            sp = obj._owner_splitter
-            et = event.type()
-            if et == QEvent.Type.MouseButtonPress:
-                try:
-                    if event.button() == Qt.MouseButton.LeftButton:
-                        sp._prev_sizes = sp.sizes()
-                except Exception:
-                    pass
-            elif et == QEvent.Type.ContextMenu:
-                try:
-                    from PyQt6.QtGui import QCursor
-                    self._show_splitter_menu(sp, QCursor.pos())
-                    return True
-                except Exception:
-                    pass
         # Traduce orice fereastra de nivel-superior cand se arata (alta limba).
         if event.type() == QEvent.Type.Show:
             try:
