@@ -144,13 +144,14 @@ class BibleControlTab(QWidget):
         current_layout.setContentsMargins(8, 4, 8, 6)
         current_layout.setSpacing(3)
 
-        self.current_verse_label = QLabel(t("bible_no_verse"))
-        self.current_verse_label.setWordWrap(True)
-        # Selectabil cu mouse-ul -> poti selecta o parte din verset si o evidentiezi.
-        self.current_verse_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
+        # QTextEdit read-only (selectie fiabila cu mouse-ul -> evidentiere).
+        self.current_verse_label = QTextEdit()
+        self.current_verse_label.setReadOnly(True)
+        self.current_verse_label.setPlainText(t("bible_no_verse"))
+        self.current_verse_label.setFixedHeight(84)
         self.current_verse_label.setStyleSheet(
-            "font-size:13px; color:#cdd6f4; padding:4px;"
+            "QTextEdit { font-size:13px; color:#cdd6f4; background:#181825; "
+            "border:1px solid #313244; border-radius:6px; padding:4px; }"
         )
         current_layout.addWidget(self.current_verse_label)
 
@@ -351,7 +352,7 @@ class BibleControlTab(QWidget):
             if text2:
                 text = f"{text}\n\n── ── ── ──\n\n{text2}"
 
-        self.current_verse_label.setText(text)
+        self.current_verse_label.setPlainText(text)
         self.ref_label.setText(ref)
         # Retinem textul live ca sa putem re-trimite cu evidentiere.
         self._live_verse_text = text
@@ -374,11 +375,16 @@ class BibleControlTab(QWidget):
 
     def _highlight_selection(self):
         """Evidentiaza in output portiunea selectata din versetul curent."""
-        sel = self.current_verse_label.selectedText().strip()
+        cur = self.current_verse_label.textCursor()
+        sel = cur.selectedText().strip()
         base = getattr(self, "_live_verse_text", "") or ""
         if not sel or not base:
+            try:
+                self.parent_control._toasts.info("Selectează întâi un text în verset.")
+            except Exception:
+                pass
             return
-        # QLabel.selectedText() foloseste U+2029 pentru paragrafe — normalizam.
+        # textCursor().selectedText() foloseste U+2029 pentru linii — normalizam.
         sel = sel.replace(" ", "\n")
         idx = base.find(sel)
         if idx < 0:
@@ -388,7 +394,7 @@ class BibleControlTab(QWidget):
             color = _db.get_settings().get("bible_highlight_color", "#f9e2af") or "#f9e2af"
         except Exception:
             color = "#f9e2af"
-        marked = (base[:idx] + "\u0003" + color + ";" + sel + "\u0004" + base[idx + len(sel):])
+        marked = (base[:idx] + "[[h:" + color + "]]" + sel + "[[/h]]" + base[idx + len(sel):])
         self._send_live_marked(marked)
 
     def _clear_highlight(self):

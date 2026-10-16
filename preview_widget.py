@@ -134,11 +134,11 @@ def render_text_on_painter(
     if not text or not text.strip():
         return
     # Curata marcajele de stil (italic/evidentiere) folosite pe output-ul live,
-    # ca sa nu apara caractere de control in preview/thumbnails.
-    if "\u0001" in text or "\u0003" in text:
+    # ca sa nu apara in preview/thumbnails.
+    if "[[i]]" in text or "[[h:" in text or "[[/" in text:
         import re as _re_mk
-        text = _re_mk.sub(r"\u0003[^;]*;", "", text)
-        text = text.replace("\u0001", "").replace("\u0002", "").replace("\u0004", "")
+        text = _re_mk.sub(r"\[\[h:[^\]]*\]\]", "", text)
+        text = text.replace("[[i]]", "").replace("[[/i]]", "").replace("[[/h]]", "")
     if scale is None:
         scale = w / 1920.0
 

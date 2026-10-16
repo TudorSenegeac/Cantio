@@ -1810,28 +1810,26 @@ function processText(text, s) {
 
 // ── Draw text (word-wrap + auto font-size so text never overflows) ────────────
 // ── Text stilizat pe "run-uri" (italic per-selectie + evidentiere) ───────────
-// Marcaje invizibile injectate de Python:
-//   \u0001 .. \u0002  = italic ON/OFF
-//   \u0003#rrggbb;.. \u0004  = evidentiere (culoare) ON/OFF
+// Marcaje ASCII injectate de Python (robuste pe transport):
+//   [[i]] .. [[/i]]            = italic ON/OFF
+//   [[h:#rrggbb]] .. [[/h]]    = evidentiere (culoare) ON/OFF
 // Textul NORMAL (fara aceste marcaje) merge pe calea rapida clasica din drawText.
-const _MARK_RE = /[\u0001\u0003]/;
+const _MARK_RE = /\[\[\/?[ih]/;
 
 function _parseStyledRuns(raw) {
   const runs = [];
   let italic = false, hl = null, buf = '';
   const flush = () => { if (buf) { runs.push({ text: buf, italic, hl }); buf = ''; } };
-  for (let i = 0; i < raw.length; i++) {
-    const c = raw[i];
-    if (c === '\u0001')      { flush(); italic = true; }
-    else if (c === '\u0002') { flush(); italic = false; }
-    else if (c === '\u0003') {                                   // \u0003#rrggbb;
-      flush();
-      const semi = raw.indexOf(';', i);
-      hl = (semi > i) ? raw.slice(i + 1, semi) : '#f9e2af';
-      i = (semi > i) ? semi : i;
+  let i = 0;
+  while (i < raw.length) {
+    if (raw.startsWith('[[i]]', i))        { flush(); italic = true;  i += 5; continue; }
+    if (raw.startsWith('[[/i]]', i))       { flush(); italic = false; i += 6; continue; }
+    if (raw.startsWith('[[/h]]', i))       { flush(); hl = null;      i += 6; continue; }
+    if (raw.startsWith('[[h:', i)) {
+      const end = raw.indexOf(']]', i);
+      if (end > i) { flush(); hl = raw.slice(i + 4, end) || '#f9e2af'; i = end + 2; continue; }
     }
-    else if (c === '\u0004') { flush(); hl = null; }
-    else buf += c;
+    buf += raw[i]; i++;
   }
   flush();
   return runs;
@@ -1998,7 +1996,10 @@ function drawText(text, opacity, dx, dy) {
   if (!text || opacity <= 0) return;
   if (!ctxC || !cvCurr) return;
   // Text cu marcaje de stil (italic / evidentiere) -> randare pe run-uri.
-  if (_MARK_RE.test(text)) { drawStyledText(text, opacity, dx, dy); return; }
+  if (_MARK_RE.test(text)) {
+    try { drawStyledText(text, opacity, dx, dy); return; }
+    catch (e) { console.error('[drawStyledText]', e); /* cade pe randarea normala */ }
+  }
 
   const s = state.settings;
   const w = cvCurr.width  || window.innerWidth;

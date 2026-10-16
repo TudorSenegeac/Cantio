@@ -7790,8 +7790,8 @@ class ControlWindow(QMainWindow):
         if not s:
             return s
         import re as _re_sm
-        s = _re_sm.sub("\u0003[^;]*;", "", s)
-        return s.replace("\u0001", "").replace("\u0002", "").replace("\u0004", "")
+        s = _re_sm.sub(r"\[\[h:[^\]]*\]\]", "", s)
+        return (s.replace("[[i]]", "").replace("[[/i]]", "").replace("[[/h]]", ""))
 
     def _editor_marked_slides(self) -> list:
         """Construiește slide-urile din editorul de versuri cu marcaje \u0001..\u0002
@@ -7810,7 +7810,7 @@ class ControlWindow(QMainWindow):
                 if frag.isValid():
                     txt = frag.text().replace(" ", "\n")   # soft break -> newline
                     if frag.charFormat().fontItalic():
-                        s += "\u0001" + txt + "\u0002"
+                        s += "[[i]]" + txt + "[[/i]]"
                     else:
                         s += txt
                 it += 1
@@ -7833,7 +7833,7 @@ class ControlWindow(QMainWindow):
             norm = lambda x: " ".join((x or "").split())
             target = norm(plain)
             for ms in marked:
-                if "\u0001" in ms and norm(self._strip_style_markers(ms)) == target:
+                if "[[i]]" in ms and norm(self._strip_style_markers(ms)) == target:
                     return ms
             return None
         except Exception:
