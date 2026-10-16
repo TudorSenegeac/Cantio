@@ -2706,6 +2706,12 @@ class ControlWindow(QMainWindow):
                 QTimer.singleShot(400, self._apply_i18n)
         except Exception:
             pass
+        # Traduce AUTOMAT orice fereastra noua la deschidere (Setari, editor teme,
+        # dialoguri) — filtru de evenimente pe aplicatie, reactie doar la Show.
+        try:
+            QApplication.instance().installEventFilter(self)
+        except Exception:
+            pass
 
         # ── Expandable spacer — pushes Display / Stage / Settings right ───
         spacer = QWidget()
@@ -2766,17 +2772,28 @@ class ControlWindow(QMainWindow):
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(2)
+        # Panourile se pot restrange COMPLET (ca la o lista) — cand devin prea
+        # mici, continutul se deruleaza in loc sa blocheze splitter-ul.
+        splitter.setChildrenCollapsible(True)
         self._main_splitter = splitter
         root.addWidget(splitter)
 
+        def _scroll_wrap(inner):
+            sc = QScrollArea()
+            sc.setWidgetResizable(True)
+            sc.setFrameShape(QFrame.Shape.NoFrame)
+            sc.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            sc.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            sc.setWidget(inner)
+            return sc
+
         left_frame = QFrame()
         left_frame.setObjectName("side_panel")
-        # No max width + a low min → the operator can drag the splitter freely.
-        left_frame.setMinimumWidth(150)
+        left_frame.setMinimumWidth(0)      # se poate trage pana aproape de 0
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
-        left_layout.addWidget(self._build_left_panel())
+        left_layout.addWidget(_scroll_wrap(self._build_left_panel()))
         splitter.addWidget(left_frame)
 
         center_frame = QFrame()
@@ -2789,14 +2806,19 @@ class ControlWindow(QMainWindow):
 
         right_frame = QFrame()
         right_frame.setObjectName("right_panel")
-        # No max width + a low min → the operator can drag the splitter freely.
-        right_frame.setMinimumWidth(160)
+        right_frame.setMinimumWidth(0)     # se poate trage pana aproape de 0
         right_layout = QVBoxLayout(right_frame)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
+        # Panoul drept contine preview-ul embed (Electron) — NU-l punem in scroll
+        # (ar strica pozitionarea embed-ului). Se poate insa colapsa complet.
         right_layout.addWidget(self._build_right_panel())
         splitter.addWidget(right_frame)
 
+        # Nu colapsa centrul (preview/editor); lateralele da.
+        splitter.setCollapsible(0, True)
+        splitter.setCollapsible(1, False)
+        splitter.setCollapsible(2, True)
         splitter.setSizes([265, 640, 305])
 
     # ── Left Panel ────────────────────────────────────────────────────────────
@@ -12381,6 +12403,16 @@ class ControlWindow(QMainWindow):
 
     def eventFilter(self, obj, event):
         from PyQt6.QtCore import QEvent
+        # Traduce orice fereastra de nivel-superior cand se arata (alta limba).
+        if event.type() == QEvent.Type.Show:
+            try:
+                if (isinstance(obj, QWidget) and obj is not self
+                        and obj.isWindow()):
+                    from translations import get_language as _gl
+                    if _gl() != "ro":
+                        QTimer.singleShot(0, lambda w=obj: self._retranslate_window(w))
+            except Exception:
+                pass
         if obj is self.slides_container and event.type() == QEvent.Type.Resize:
             self._reflow_thumbnails()
         elif obj is getattr(self, "_preview_wrap", None) and \
@@ -12445,6 +12477,25 @@ class ControlWindow(QMainWindow):
             for w in QApplication.topLevelWidgets():
                 if w is not self and w.isVisible():
                     i18n.retranslate_tree(w)
+        except Exception:
+            pass
+
+    def _retranslate_window(self, w):
+        """Traduce o fereastră nou-deschisă (Setări, editor teme, dialog…)."""
+        try:
+            import i18n
+            from translations import get_language as _gl
+        except Exception:
+            return
+        try:
+            if w is None or not w.isVisible():
+                return
+            srcs = i18n.retranslate_tree(w)
+            lang = _gl()
+            if lang != "ro" and srcs:
+                i18n.fill_missing_async(
+                    srcs, lang,
+                    on_done=lambda changed: self._i18n_sig.emit() if changed else None)
         except Exception:
             pass
 
