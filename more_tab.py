@@ -11,9 +11,10 @@ traducere duală, cu care se împerechează (secundară).
 """
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QStackedWidget, QPushButton, QComboBox, QCheckBox, QMessageBox, QFrame,
+    QStackedWidget, QMessageBox, QMenu,
 )
 
 import database as db
@@ -38,147 +39,167 @@ class _BibleManager(QWidget):
     def _build_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(14, 12, 14, 12)
-        root.setSpacing(10)
+        root.setSpacing(8)
 
         title = QLabel("📖 Biblii importate")
         title.setStyleSheet("font-size:15px; font-weight:600; color:#cba6f7;")
         root.addWidget(title)
 
+        hint = QLabel("Click dreapta pe o versiune pentru comenzi "
+                      "(principală / a doua limbă / șterge).")
+        hint.setStyleSheet("color:#8a8a95; font-size:11px;")
+        hint.setWordWrap(True)
+        root.addWidget(hint)
+
         self._list = QListWidget()
+        self._list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._list.customContextMenuRequested.connect(self._show_menu)
         self._list.setStyleSheet(
             "QListWidget { background:#1e1e1e; border:1px solid #2a2a2a; border-radius:6px; }"
-            "QListWidget::item { padding:8px 10px; border-bottom:1px solid #262626; }"
+            "QListWidget::item { padding:10px 12px; border-bottom:1px solid #262626; }"
             "QListWidget::item:selected { background:#313244; color:#cba6f7; }"
         )
         root.addWidget(self._list, 1)
 
-        del_row = QHBoxLayout()
-        self._del_btn = QPushButton("🗑 Șterge biblia selectată")
-        self._del_btn.setStyleSheet(
-            "QPushButton { background:#2a1a1a; color:#f38ba8; border:1px solid #3a2020; "
-            "border-radius:5px; padding:7px 14px; } QPushButton:hover { background:#3a2020; }")
-        self._del_btn.clicked.connect(self._delete_selected)
-        del_row.addWidget(self._del_btn)
-        del_row.addStretch()
-        root.addLayout(del_row)
-
-        sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color:#2a2a2a;")
-        root.addWidget(sep)
-
-        # ── Ce se afișează ────────────────────────────────────────────────────
-        disp = QLabel("Ce se afișează")
-        disp.setStyleSheet("font-size:13px; font-weight:600; color:#cdd6f4;")
-        root.addWidget(disp)
-
-        prim_row = QHBoxLayout()
-        prim_row.addWidget(QLabel("Principală:"))
-        self._primary = QComboBox()
-        self._primary.setMinimumWidth(220)
-        prim_row.addWidget(self._primary)
-        prim_row.addStretch()
-        root.addLayout(prim_row)
-
-        self._dual = QCheckBox("Traducere duală (afișează două traduceri simultan)")
-        self._dual.toggled.connect(lambda v: self._secondary.setEnabled(v))
-        root.addWidget(self._dual)
-
-        sec_row = QHBoxLayout()
-        sec_row.addWidget(QLabel("Secundară:"))
-        self._secondary = QComboBox()
-        self._secondary.setMinimumWidth(220)
-        self._secondary.setEnabled(False)
-        sec_row.addWidget(self._secondary)
-        sec_row.addStretch()
-        root.addLayout(sec_row)
-
-        apply_row = QHBoxLayout()
-        apply_row.addStretch()
-        self._apply_btn = QPushButton("✓ Aplică")
-        self._apply_btn.setStyleSheet(
-            "QPushButton { background:#5294e2; color:#fff; border:none; border-radius:5px; "
-            "padding:7px 18px; font-weight:600; } QPushButton:hover { background:#6ba5f0; }")
-        self._apply_btn.clicked.connect(self._apply_selection)
-        apply_row.addWidget(self._apply_btn)
-        root.addLayout(apply_row)
-
-        for c in (self._primary, self._secondary):
-            c.setStyleSheet(
-                "QComboBox { background:#1a1a1a; color:#e0e0e0; border:1px solid #2a2a2a; "
-                "border-radius:4px; padding:5px 8px; }")
+        legend = QLabel("⭐ principală    ②  a doua limbă (duală)")
+        legend.setStyleSheet("color:#6c7086; font-size:11px;")
+        root.addWidget(legend)
 
     # ── Data ──────────────────────────────────────────────────────────────
+    def _saved(self):
+        """(primary_id, secondary_id, dual) din settings (int sau None)."""
+        try:
+            s = db.get_settings()
+            def _i(v):
+                return int(v) if v not in (None, "", "None") else None
+            pid = _i(s.get("bible_primary_translation"))
+            sid = _i(s.get("bible_secondary_translation"))
+            dual = str(s.get("bible_dual_enabled", "false")) == "true"
+            return pid, sid, dual
+        except Exception:
+            return None, None, False
+
     def refresh(self):
         prof = self._profile()
         try:
             trans = db.get_available_translations(prof)
         except Exception:
             trans = []
+        pid, sid, dual = self._saved()
         self._list.clear()
-        self._primary.blockSignals(True); self._secondary.blockSignals(True)
-        self._primary.clear(); self._secondary.clear()
-        self._secondary.addItem("— (niciuna)", None)
+        if not trans:
+            it = QListWidgetItem("(nicio biblie importată — folosește Fișier → Import Biblie)")
+            it.setFlags(Qt.ItemFlag.NoItemFlags)
+            it.setForeground(Qt.GlobalColor.gray)
+            self._list.addItem(it)
+            return
         for tr in trans:
-            label = f"{tr['name']}  ({tr.get('abbreviation', '')})"
+            name = f"{tr['name']}  ({tr.get('abbreviation', '')})"
+            badges = []
+            if pid == tr["id"]:
+                badges.append("⭐")
+            if dual and sid == tr["id"]:
+                badges.append("②")
+            label = (("  ".join(badges) + "   ") if badges else "") + name
             it = QListWidgetItem(label)
             it.setData(Qt.ItemDataRole.UserRole, tr["id"])
             self._list.addItem(it)
-            self._primary.addItem(label, tr["id"])
-            self._secondary.addItem(label, tr["id"])
-        if not trans:
-            self._list.addItem(QListWidgetItem("(nicio biblie importată — folosește Fișier → Import Biblie)"))
-        # Restore saved selection
+
+    # ── Context menu (click dreapta) ──────────────────────────────────────
+    def _show_menu(self, pos):
+        it = self._list.itemAt(pos)
+        if it is None or it.data(Qt.ItemDataRole.UserRole) is None:
+            return
+        tid = int(it.data(Qt.ItemDataRole.UserRole))
+        pid, sid, dual = self._saved()
+
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background:#1e1e1e; color:#e0e0e0; border:1px solid #333; }"
+            "QMenu::item { padding:7px 18px; } "
+            "QMenu::item:selected { background:#313244; color:#cba6f7; }")
+
+        act_primary = QAction("⭐ Afișează ca principală", self)
+        act_primary.setEnabled(pid != tid)
+        act_primary.triggered.connect(lambda: self._set_primary(tid))
+        menu.addAction(act_primary)
+
+        act_second = QAction("②  Afișează ca a doua limbă (duală)", self)
+        act_second.setEnabled(pid != tid)   # nu poate fi si principala si secundara
+        act_second.triggered.connect(lambda: self._set_secondary(tid))
+        menu.addAction(act_second)
+
+        if dual and (sid is not None or pid is not None):
+            act_off = QAction("✖ Oprește a doua limbă", self)
+            act_off.triggered.connect(self._clear_dual)
+            menu.addAction(act_off)
+
+        menu.addSeparator()
+        act_del = QAction("🗑 Șterge biblia", self)
+        act_del.triggered.connect(lambda: self._delete(tid, it.text()))
+        menu.addAction(act_del)
+
+        menu.exec(self._list.mapToGlobal(pos))
+
+    # ── Acțiuni ───────────────────────────────────────────────────────────
+    def _apply(self, pid, sid, dual):
         try:
-            s = db.get_settings()
-            pid = s.get("bible_primary_translation")
-            sid = s.get("bible_secondary_translation")
-            dual = str(s.get("bible_dual_enabled", "false")) == "true"
-            if pid not in (None, "", "None"):
-                i = self._primary.findData(int(pid))
-                if i >= 0:
-                    self._primary.setCurrentIndex(i)
-            self._dual.setChecked(dual)
-            self._secondary.setEnabled(dual)
-            if sid not in (None, "", "None"):
-                i = self._secondary.findData(int(sid))
-                if i >= 0:
-                    self._secondary.setCurrentIndex(i)
+            db.save_setting("bible_primary_translation", "" if pid is None else str(pid))
+            db.save_setting("bible_secondary_translation", "" if sid is None else str(sid))
+            db.save_setting("bible_dual_enabled", "true" if dual else "false")
         except Exception:
             pass
-        self._primary.blockSignals(False); self._secondary.blockSignals(False)
+        bct = getattr(self._ctrl, "_bible_control_tab", None)
+        if bct is not None and hasattr(bct, "set_translations"):
+            try:
+                bct.set_translations(pid, sid, dual)
+            except Exception:
+                pass
+        self.refresh()
 
-    def _delete_selected(self):
-        it = self._list.currentItem()
-        tid = it.data(Qt.ItemDataRole.UserRole) if it else None
-        if tid is None:
+    def _set_primary(self, tid):
+        pid, sid, dual = self._saved()
+        if sid == tid:          # era secundara -> eliberam secundara
+            sid = None
+            dual = False
+        self._apply(tid, sid, dual)
+        self._toast(f"Principală setată.")
+
+    def _set_secondary(self, tid):
+        pid, sid, dual = self._saved()
+        if pid is None:
+            self._toast("Alege întâi o traducere principală.", ok=False)
             return
+        self._apply(pid, tid, True)
+        self._toast("A doua limbă (duală) setată.")
+
+    def _clear_dual(self):
+        pid, sid, dual = self._saved()
+        self._apply(pid, None, False)
+        self._toast("A doua limbă oprită.")
+
+    def _delete(self, tid, label):
         if QMessageBox.question(
             self, "Șterge biblia",
-            f"Ștergi definitiv „{it.text()}”?\nVersetele acestei traduceri vor fi eliminate.",
+            f"Ștergi definitiv „{label}”?\nVersetele acestei traduceri vor fi eliminate.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         ) != QMessageBox.StandardButton.Yes:
             return
         db.delete_translation(int(tid), self._profile())
-        self.refresh()
+        # Curata referintele daca stergem una activa
+        pid, sid, dual = self._saved()
+        if pid == tid:
+            pid = None
+        if sid == tid:
+            sid = None; dual = False
+        self._apply(pid, sid, dual)
 
-    def _apply_selection(self):
-        pid = self._primary.currentData()
-        sid = self._secondary.currentData() if self._dual.isChecked() else None
+    def _toast(self, msg, ok=True):
         try:
-            db.save_setting("bible_primary_translation", "" if pid is None else str(pid))
-            db.save_setting("bible_secondary_translation", "" if sid is None else str(sid))
-            db.save_setting("bible_dual_enabled", "true" if self._dual.isChecked() else "false")
-        except Exception:
-            pass
-        # Sincronizeaza tab-ul Control Bible daca exista.
-        bct = getattr(self._ctrl, "_bible_control_tab", None)
-        if bct is not None and hasattr(bct, "set_translations"):
-            try:
-                bct.set_translations(pid, sid, self._dual.isChecked())
-            except Exception:
-                pass
-        try:
-            self._ctrl._toasts.success("Setări biblii aplicate.")
+            if ok:
+                self._ctrl._toasts.success(msg)
+            else:
+                self._ctrl._toasts.warning(msg)
         except Exception:
             pass
 
