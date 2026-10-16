@@ -2820,6 +2820,7 @@ class ControlWindow(QMainWindow):
         splitter.setCollapsible(1, False)
         splitter.setCollapsible(2, True)
         splitter.setSizes([265, 640, 305])
+        self._wire_splitter_menu(splitter, [265, 640, 305])
 
     # ── Left Panel ────────────────────────────────────────────────────────────
 
@@ -2850,6 +2851,7 @@ class ControlWindow(QMainWindow):
 
         # Default proportions: ~35% service / ~65% tabs
         self._left_splitter.setSizes([230, 430])
+        self._wire_splitter_menu(self._left_splitter, [230, 430])
 
         layout.addWidget(self._left_splitter)
         return w
@@ -3772,6 +3774,7 @@ class ControlWindow(QMainWindow):
 
         # Default proportions: ~57% slides / ~43% editor+tabs
         self._center_splitter.setSizes([400, 300])
+        self._wire_splitter_menu(self._center_splitter, [400, 300])
         layout.addWidget(self._center_splitter, 1)
 
         root_layout.addWidget(bottom_w)
@@ -12401,8 +12404,62 @@ class ControlWindow(QMainWindow):
             for i, thumb in enumerate(self._thumbnails):
                 self.slides_grid.addWidget(thumb, i // cols, i % cols)
 
+    # ── Splitere: meniu click-dreapta (poziția anterioară / implicită) ────────
+    def _wire_splitter_menu(self, splitter, default_sizes):
+        """Adaugă pe fiecare mâner de spliter un meniu la click-dreapta cu
+        'Poziția anterioară' și 'Poziția implicită'. Reține poziția dinainte de
+        tragere ca să poată reveni."""
+        try:
+            splitter._default_sizes = list(default_sizes)
+            splitter._prev_sizes = list(default_sizes)
+            for i in range(1, splitter.count()):
+                h = splitter.handle(i)
+                if h is not None:
+                    h._owner_splitter = splitter
+                    h.installEventFilter(self)
+        except Exception:
+            pass
+
+    def _show_splitter_menu(self, splitter, global_pos):
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            "QMenu { background:#1e1e1e; color:#e0e0e0; border:1px solid #333; }"
+            "QMenu::item { padding:6px 18px; } "
+            "QMenu::item:selected { background:#313244; color:#cba6f7; }")
+        a_prev = menu.addAction("↶ Poziția anterioară")
+        a_def = menu.addAction("⟳ Poziția implicită")
+        act = menu.exec(global_pos)
+        if act is a_prev:
+            cur = splitter.sizes()
+            prev = getattr(splitter, "_prev_sizes", None)
+            if prev and len(prev) == splitter.count():
+                splitter.setSizes(prev)
+                splitter._prev_sizes = cur
+        elif act is a_def:
+            splitter._prev_sizes = splitter.sizes()
+            df = getattr(splitter, "_default_sizes", None)
+            if df and len(df) == splitter.count():
+                splitter.setSizes(df)
+
     def eventFilter(self, obj, event):
         from PyQt6.QtCore import QEvent
+        # Mânerele de spliter: captează poziția dinainte de tragere + meniu dreapta.
+        if hasattr(obj, "_owner_splitter"):
+            sp = obj._owner_splitter
+            et = event.type()
+            if et == QEvent.Type.MouseButtonPress:
+                try:
+                    if event.button() == Qt.MouseButton.LeftButton:
+                        sp._prev_sizes = sp.sizes()
+                except Exception:
+                    pass
+            elif et == QEvent.Type.ContextMenu:
+                try:
+                    from PyQt6.QtGui import QCursor
+                    self._show_splitter_menu(sp, QCursor.pos())
+                    return True
+                except Exception:
+                    pass
         # Traduce orice fereastra de nivel-superior cand se arata (alta limba).
         if event.type() == QEvent.Type.Show:
             try:
