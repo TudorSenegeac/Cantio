@@ -7818,7 +7818,18 @@ class ControlWindow(QMainWindow):
             b = b.next()
         full = "\n".join(block_strs)
         import re as _re_ms
-        return [blk.strip() for blk in _re_ms.split(r"\n[ \t]*\n", full) if blk.strip()]
+        _label_re = _re_ms.compile(r"^\s*\[[^\]\n]+\]\s*$")
+        out = []
+        for blk in _re_ms.split(r"\n[ \t]*\n", full):
+            if not blk.strip():
+                continue
+            # Eliminam liniile de tip [Eticheta] (nu apar pe output, ca in aplicatie)
+            kept = [ln for ln in blk.split("\n")
+                    if not _label_re.match(self._strip_style_markers(ln))]
+            s2 = "\n".join(kept).strip()
+            if s2:
+                out.append(s2)
+        return out
 
     def _slide_text_with_italics(self, idx: int):
         """Returneaza textul slide-ului `idx` cu marcaje italic daca editorul
@@ -7830,10 +7841,28 @@ class ControlWindow(QMainWindow):
             if not plain:
                 return None
             marked = self._editor_marked_slides()
+            if not marked:
+                return None
             norm = lambda x: " ".join((x or "").split())
             target = norm(plain)
+            # 1) potrivire exacta (dupa normalizarea spatiilor)
             for ms in marked:
                 if "[[i]]" in ms and norm(self._strip_style_markers(ms)) == target:
+                    return ms
+            # 2) pe index, daca numarul de slide-uri se aliniaza
+            if len(marked) == len(self.current_slides):
+                ms = marked[idx]
+                if "[[i]]" in ms:
+                    sm = norm(self._strip_style_markers(ms))
+                    if sm and (sm == target or sm in target or target in sm
+                               or sm[:12] == target[:12]):
+                        return ms
+            # 3) fuzzy: primul slide cu italic care se suprapune cu textul
+            for ms in marked:
+                if "[[i]]" not in ms:
+                    continue
+                sm = norm(self._strip_style_markers(ms))
+                if sm and (sm in target or target in sm or sm[:15] == target[:15]):
                     return ms
             return None
         except Exception:
@@ -10213,6 +10242,8 @@ class ControlWindow(QMainWindow):
             pass
 
     def _fetch_notifications(self):
+        if getattr(self, "_closing", False):
+            return
         try:
             from notifications import NotificationsFetcher
             self._notif_fetcher = NotificationsFetcher()
@@ -10222,6 +10253,8 @@ class ControlWindow(QMainWindow):
             logger.debug("[Notif] fetch failed: %s", e)
 
     def _on_notifications_fetched(self, items: list):
+        if getattr(self, "_closing", False):
+            return
         self._notifications = items or []
         self._update_notif_badge()
         # La pornire, daca sunt notificari NOI, deschidem automat fereastra
@@ -12560,6 +12593,17 @@ class ControlWindow(QMainWindow):
                 self._auto_advance_timer.start()
 
     def closeEvent(self, event):
+        # Marcam inchiderea ca sa oprim callback-uri intarziate (notificari,
+        # thumbnails) care altfel acceseaza widget-uri/timere deja distruse.
+        self._closing = True
+        try:
+            fetcher = getattr(self, "_notif_fetcher", None)
+            if fetcher is not None and fetcher.isRunning():
+                fetcher.requestInterruption()
+                fetcher.quit()
+                fetcher.wait(1500)
+        except Exception:
+            pass
         # Warn about unsaved service
         if self._service_modified and self._service_items:
             reply = QMessageBox.question(
