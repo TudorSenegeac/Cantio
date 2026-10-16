@@ -289,6 +289,11 @@ def copy_assets():
         shutil.copytree("mdbtools", "dist/Cantio/mdbtools", dirs_exist_ok=True)
         print("  ✅ mdbtools/")
 
+    # Pachete de limbă (traduceri OFFLINE gata de folosit)
+    if os.path.exists("langpacks"):
+        shutil.copytree("langpacks", "dist/Cantio/langpacks", dirs_exist_ok=True)
+        print("  ✅ langpacks/")
+
 
 # ── Installer builders ────────────────────────────────────────────────────────
 

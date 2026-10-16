@@ -25,6 +25,7 @@ Pentru texte dinamice (mesaje/toasturi) folosește `T("text romanesc")`.
 import json
 import os
 import re
+import sys
 import threading
 import urllib.request
 import urllib.parse
@@ -43,7 +44,28 @@ except Exception:  # pragma: no cover
         return "ro"
 
 SOURCE_LANG = "ro"
+# Cache editabil per-utilizator (completat la rulare).
 _DIR = os.path.join(os.path.expanduser("~"), "Cantio", "i18n")
+# Pachete de limbă LIVRATE cu aplicația (langpacks/<lang>.json) — oferă traduceri
+# OFFLINE gata de folosit la instalare, fără internet. Căutăm în mai multe locuri
+# (sursă + build împachetat cu PyInstaller).
+def _find_bundled_dir() -> str:
+    cands = []
+    if getattr(sys, "frozen", False):
+        exe_dir = os.path.dirname(sys.executable)
+        cands.append(os.path.join(exe_dir, "langpacks"))
+        cands.append(os.path.join(exe_dir, "_internal", "langpacks"))
+        mei = getattr(sys, "_MEIPASS", None)
+        if mei:
+            cands.append(os.path.join(mei, "langpacks"))
+    cands.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "langpacks"))
+    cands.append(os.path.join(os.getcwd(), "langpacks"))
+    for c in cands:
+        if os.path.isdir(c):
+            return c
+    return cands[-1]
+
+_BUNDLED_DIR = _find_bundled_dir()
 _ENDPOINT = "https://translate.googleapis.com/translate_a/single"
 
 _tm: dict = {}            # lang -> {src: translated}
@@ -52,18 +74,26 @@ _lock = threading.Lock()
 
 # ── Reguli: ce merită tradus (sarim peste date dinamice) ─────────────────────
 _RATIO_RE = re.compile(r"\d+\s*[/:]\s*\d+")
+_HEX_RE = re.compile(r"^#[0-9a-fA-F]{3,8}$")
 
 def _should_translate(s: str) -> bool:
     if not s or not s.strip():
         return False
     if len(s) > 240:
         return False
+    t = s.strip()
+    if _HEX_RE.match(t):
+        return False                       # culori #ffffff
     if sum(1 for c in s if c.isalpha()) < 2:
         return False                       # doar cifre/simboluri/emoji
     if _RATIO_RE.search(s):
         return False                       # "3/10", "12:30" etc.
     if "\\" in s or s.startswith("http") or s.startswith("~/"):
         return False                       # căi / URL-uri
+    if "{" in s and "}" in s:
+        return False                       # format strings / CSS / JSON
+    if t.startswith("#") and " " not in t:
+        return False                       # #tag fără spațiu
     return True
 
 
@@ -71,18 +101,25 @@ def _should_translate(s: str) -> bool:
 def _cache_file(lang: str) -> str:
     return os.path.join(_DIR, f"{lang}.json")
 
+def _load_json(path: str) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                return {str(k): str(v) for k, v in data.items()}
+    except Exception:
+        pass
+    return {}
+
 def _ensure(lang: str):
     if lang in _tm:
         return
     tm = {}
-    try:
-        with open(_cache_file(lang), encoding="utf-8") as f:
-            data = json.load(f)
-            if isinstance(data, dict):
-                tm.update({str(k): str(v) for k, v in data.items()})
-    except Exception:
-        pass
-    # Seed din traducerile ingrijite (au prioritate -> suprascriu cache-ul masina)
+    # 1) pachet livrat cu aplicatia (OFFLINE, la instalare)
+    tm.update(_load_json(os.path.join(_BUNDLED_DIR, f"{lang}.json")))
+    # 2) cache-ul utilizatorului (completat la rulare) suprascrie pachetul livrat
+    tm.update(_load_json(_cache_file(lang)))
+    # 3) Seed din traducerile ingrijite (au prioritate -> suprascriu cache-ul masina)
     try:
         ro = TRANSLATIONS.get("ro", {})
         tgt = TRANSLATIONS.get(lang, {})
