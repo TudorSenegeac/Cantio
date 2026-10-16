@@ -2778,22 +2778,15 @@ class ControlWindow(QMainWindow):
         self._main_splitter = splitter
         root.addWidget(splitter)
 
-        def _scroll_wrap(inner):
-            sc = QScrollArea()
-            sc.setWidgetResizable(True)
-            sc.setFrameShape(QFrame.Shape.NoFrame)
-            sc.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            sc.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            sc.setWidget(inner)
-            return sc
-
         left_frame = QFrame()
         left_frame.setObjectName("side_panel")
-        left_frame.setMinimumWidth(0)      # se poate trage pana aproape de 0
+        left_frame.setMinimumWidth(0)      # se poate trage pana aproape de 0;
         left_layout = QVBoxLayout(left_frame)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
-        left_layout.addWidget(_scroll_wrap(self._build_left_panel()))
+        # FARA scroll aici — ca butoanele din SERVICIU sa se COMPRIME la ingustare
+        # (scroll-ul le bloca la marimea lor naturala).
+        left_layout.addWidget(self._build_left_panel())
         splitter.addWidget(left_frame)
 
         center_frame = QFrame()
@@ -3477,7 +3470,7 @@ class ControlWindow(QMainWindow):
 
         # Top pane: the stacked slides widget
         slides_pane = QWidget()
-        slides_pane.setMinimumHeight(80)
+        slides_pane.setMinimumHeight(0)   # se poate face oricat de mic (colapsabil)
         sp_layout = QVBoxLayout(slides_pane)
         sp_layout.setContentsMargins(0, 0, 0, 0)
         sp_layout.setSpacing(0)
