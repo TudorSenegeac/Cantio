@@ -7784,6 +7784,61 @@ class ControlWindow(QMainWindow):
     def _slide_text(self, slide):
         return slide.get("text", "") if isinstance(slide, dict) else str(slide)
 
+    # ── Italic per-selectie din editor -> marcaje pentru output (#6) ───────────
+    @staticmethod
+    def _strip_style_markers(s: str) -> str:
+        if not s:
+            return s
+        import re as _re_sm
+        s = _re_sm.sub("\u0003[^;]*;", "", s)
+        return s.replace("\u0001", "").replace("\u0002", "").replace("\u0004", "")
+
+    def _editor_marked_slides(self) -> list:
+        """Construiește slide-urile din editorul de versuri cu marcaje \u0001..\u0002
+        in jurul textului italic. Imparte pe slide-uri la linie goala (ca editorul)."""
+        try:
+            doc = self.editor.document()
+        except Exception:
+            return []
+        block_strs = []
+        b = doc.begin()
+        while b.isValid():
+            s = ""
+            it = b.begin()
+            while not it.atEnd():
+                frag = it.fragment()
+                if frag.isValid():
+                    txt = frag.text().replace(" ", "\n")   # soft break -> newline
+                    if frag.charFormat().fontItalic():
+                        s += "\u0001" + txt + "\u0002"
+                    else:
+                        s += txt
+                it += 1
+            block_strs.append(s)
+            b = b.next()
+        full = "\n".join(block_strs)
+        import re as _re_ms
+        return [blk.strip() for blk in _re_ms.split(r"\n[ \t]*\n", full) if blk.strip()]
+
+    def _slide_text_with_italics(self, idx: int):
+        """Returneaza textul slide-ului `idx` cu marcaje italic daca editorul
+        contine italic si textul se aliniaza; altfel None (fallback la plain)."""
+        try:
+            if not (0 <= idx < len(self.current_slides)):
+                return None
+            plain = self._slide_text(self.current_slides[idx]).strip()
+            if not plain:
+                return None
+            marked = self._editor_marked_slides()
+            norm = lambda x: " ".join((x or "").split())
+            target = norm(plain)
+            for ms in marked:
+                if "\u0001" in ms and norm(self._strip_style_markers(ms)) == target:
+                    return ms
+            return None
+        except Exception:
+            return None
+
     def _slide_group_label(self, slide, idx, total):
         """Canonical group label for a slide. Uses the explicit section label
         (from [Label] markers / dict slides) so 'Strofa 1' and 'Strofa 2' stay
@@ -9580,15 +9635,21 @@ class ControlWindow(QMainWindow):
             _rich = self._send_rich_slide_live(self.current_slide_idx)
             if not _rich:
                 self._apply_custom_bg_from_settings(_live_settings)
+            # #6: italic per-selectie din editor -> marcaje pt. output (daca exista)
+            _out_text = text
+            _marked = self._slide_text_with_italics(self.current_slide_idx)
+            if _marked and not self._dual_lang_active:
+                _out_text = _marked
             for dw in targets:
                 dw.apply_settings(_live_settings)
-                dw.show_text("" if getattr(self, "_rich_text_in_design", False) else text,
+                dw.show_text("" if getattr(self, "_rich_text_in_design", False) else _out_text,
                              _live_fmt, metadata=self._current_metadata)
             # Push metadata into LiveState so preview copyright overlay works
             from live_state import get_state as _gs
             _gs()._metadata = dict(self._current_metadata or {})
-            # Sync render engine so preview shows same text
-            self.render_engine.set_text(text, _live_fmt)
+            # Sync render engine so preview shows same text (markerele de stil
+            # sunt curatate in preview_widget; output-ul live le randeaza).
+            self.render_engine.set_text(_out_text, _live_fmt)
             self._is_live = True
             if not self._live_timer.isActive():
                 self._live_timer.start(600)

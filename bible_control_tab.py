@@ -146,10 +146,40 @@ class BibleControlTab(QWidget):
 
         self.current_verse_label = QLabel(t("bible_no_verse"))
         self.current_verse_label.setWordWrap(True)
+        # Selectabil cu mouse-ul -> poti selecta o parte din verset si o evidentiezi.
+        self.current_verse_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
         self.current_verse_label.setStyleSheet(
             "font-size:13px; color:#cdd6f4; padding:4px;"
         )
         current_layout.addWidget(self.current_verse_label)
+
+        # Rand evidentiere: selectezi text in versetul de mai sus -> Evidentiaza.
+        hl_row = QHBoxLayout()
+        hl_row.setContentsMargins(0, 0, 0, 0)
+        hl_hint = QLabel("Selectează text în verset →")
+        hl_hint.setStyleSheet("color:#6c7086; font-size:10px;")
+        hl_row.addWidget(hl_hint)
+        hl_row.addStretch()
+        self._hl_btn = QPushButton("✨ Evidențiază")
+        self._hl_btn.setStyleSheet(
+            "QPushButton { background:#3a3410; color:#f9e2af; border:1px solid #5a5020; "
+            "border-radius:5px; padding:4px 10px; font-size:11px; } "
+            "QPushButton:hover { background:#4a4418; }")
+        self._hl_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._hl_btn.clicked.connect(self._highlight_selection)
+        hl_row.addWidget(self._hl_btn)
+        self._hl_clear_btn = QPushButton("✖")
+        self._hl_clear_btn.setFixedWidth(28)
+        self._hl_clear_btn.setToolTip("Fără evidențiere")
+        self._hl_clear_btn.setStyleSheet(
+            "QPushButton { background:#1c1c1c; color:#888; border:1px solid #2a2a2a; "
+            "border-radius:5px; padding:4px; font-size:11px; } "
+            "QPushButton:hover { background:#252525; }")
+        self._hl_clear_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._hl_clear_btn.clicked.connect(self._clear_highlight)
+        hl_row.addWidget(self._hl_clear_btn)
+        current_layout.addLayout(hl_row)
 
         ref_row = QHBoxLayout()
         ref_row.setContentsMargins(0, 0, 0, 0)
@@ -323,6 +353,9 @@ class BibleControlTab(QWidget):
 
         self.current_verse_label.setText(text)
         self.ref_label.setText(ref)
+        # Retinem textul live ca sa putem re-trimite cu evidentiere.
+        self._live_verse_text = text
+        self._live_ref = ref
 
         self.verse_sent_live.emit(text, ref)
 
@@ -330,6 +363,39 @@ class BibleControlTab(QWidget):
             self.parent_control, "_send_bible_verse_live"
         ):
             self.parent_control._send_bible_verse_live(text, ref)
+
+    def _send_live_marked(self, marked_text: str):
+        """Re-trimite versetul curent live cu marcaje de evidentiere (invizibile
+        in caseta, randate colorat pe output)."""
+        ref = getattr(self, "_live_ref", "")
+        self.verse_sent_live.emit(marked_text, ref)
+        if self.parent_control and hasattr(self.parent_control, "_send_bible_verse_live"):
+            self.parent_control._send_bible_verse_live(marked_text, ref)
+
+    def _highlight_selection(self):
+        """Evidentiaza in output portiunea selectata din versetul curent."""
+        sel = self.current_verse_label.selectedText().strip()
+        base = getattr(self, "_live_verse_text", "") or ""
+        if not sel or not base:
+            return
+        # QLabel.selectedText() foloseste U+2029 pentru paragrafe — normalizam.
+        sel = sel.replace(" ", "\n")
+        idx = base.find(sel)
+        if idx < 0:
+            return
+        import database as _db
+        try:
+            color = _db.get_settings().get("bible_highlight_color", "#f9e2af") or "#f9e2af"
+        except Exception:
+            color = "#f9e2af"
+        marked = (base[:idx] + "\u0003" + color + ";" + sel + "\u0004" + base[idx + len(sel):])
+        self._send_live_marked(marked)
+
+    def _clear_highlight(self):
+        """Re-trimite versetul fara evidentiere."""
+        base = getattr(self, "_live_verse_text", "") or ""
+        if base:
+            self._send_live_marked(base)
 
     # ── Navigation ────────────────────────────────────────────────────────────
 

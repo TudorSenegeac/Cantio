@@ -1809,9 +1809,196 @@ function processText(text, s) {
 }
 
 // ── Draw text (word-wrap + auto font-size so text never overflows) ────────────
+// ── Text stilizat pe "run-uri" (italic per-selectie + evidentiere) ───────────
+// Marcaje invizibile injectate de Python:
+//   \u0001 .. \u0002  = italic ON/OFF
+//   \u0003#rrggbb;.. \u0004  = evidentiere (culoare) ON/OFF
+// Textul NORMAL (fara aceste marcaje) merge pe calea rapida clasica din drawText.
+const _MARK_RE = /[\u0001\u0003]/;
+
+function _parseStyledRuns(raw) {
+  const runs = [];
+  let italic = false, hl = null, buf = '';
+  const flush = () => { if (buf) { runs.push({ text: buf, italic, hl }); buf = ''; } };
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === '\u0001')      { flush(); italic = true; }
+    else if (c === '\u0002') { flush(); italic = false; }
+    else if (c === '\u0003') {                                   // \u0003#rrggbb;
+      flush();
+      const semi = raw.indexOf(';', i);
+      hl = (semi > i) ? raw.slice(i + 1, semi) : '#f9e2af';
+      i = (semi > i) ? semi : i;
+    }
+    else if (c === '\u0004') { flush(); hl = null; }
+    else buf += c;
+  }
+  flush();
+  return runs;
+}
+
+// Tokenuri (cuvant + stil) pentru wrap-ul care tine cont de stiluri.
+function _runsToTokens(runs) {
+  const toks = [];
+  for (const r of runs) {
+    const parts = r.text.split(/(\s+)/);   // pastreaza spatiile
+    for (const p of parts) {
+      if (p === '') continue;
+      toks.push({ text: p, italic: r.italic, hl: r.hl, space: /^\s+$/.test(p) });
+    }
+  }
+  return toks;
+}
+
+function _fontFor(italic, bold, size, family) {
+  return `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${size}px "${family}"`;
+}
+
+function _tokW(ctx, tok, bold, size, family) {
+  ctx.font = _fontFor(tok.italic, bold, size, family);
+  return ctx.measureText(tok.text).width;
+}
+
+// Wrap tokenurile unui paragraf -> linii (fiecare linie = lista de run-uri).
+function _wrapTokens(ctx, toks, maxW, bold, size, family) {
+  const lines = [];
+  let cur = [], curW = 0;
+  const pushLine = () => {
+    // scoate spatiile de la capete
+    while (cur.length && cur[0].space) cur.shift();
+    while (cur.length && cur[cur.length - 1].space) cur.pop();
+    lines.push(cur); cur = []; curW = 0;
+  };
+  for (const tok of toks) {
+    const tw = _tokW(ctx, tok, bold, size, family);
+    if (!tok.space && curW + tw > maxW && cur.some(t => !t.space)) pushLine();
+    cur.push(tok); curW += tw;
+  }
+  if (cur.length) pushLine();
+  // combina tokenuri adiacente cu acelasi stil intr-un singur run
+  return lines.map(line => {
+    const merged = [];
+    for (const t of line) {
+      const last = merged[merged.length - 1];
+      if (last && last.italic === t.italic && last.hl === t.hl) last.text += t.text;
+      else merged.push({ text: t.text, italic: t.italic, hl: t.hl });
+    }
+    return merged;
+  });
+}
+
+function _lineW(ctx, runs, bold, size, family) {
+  let wsum = 0;
+  for (const r of runs) { ctx.font = _fontFor(r.italic, bold, size, family); wsum += ctx.measureText(r.text).width; }
+  return wsum;
+}
+
+function drawStyledText(rawText, opacity, dx, dy) {
+  const s = state.settings;
+  const w = cvCurr.width || window.innerWidth;
+  const h = cvCurr.height || window.innerHeight;
+  const size0   = parseInt(s.font_size || 48);
+  const bold    = s.font_bold   === 'true' || s.font_bold   === true;
+  const italic0 = s.font_italic === 'true' || s.font_italic === true;
+  const family  = s.font_family || 'Arial';
+  const color   = s.text_color  || '#ffffff';
+  const shadow  = s.text_shadow !== 'false';
+  const outW    = parseInt(s.outline_width || 2);
+  const outC    = s.outline_color || '#000000';
+  const lsp     = parseFloat(s.line_spacing || 1.4);
+  const rawMargin = parseFloat(s.margin || 0.06);
+  const margin  = rawMargin < 2 ? Math.round(Math.min(w, h) * rawMargin) : parseInt(rawMargin);
+
+  // Paragrafe -> run-uri (aplicam italic-ul global peste cel per-run)
+  const paragraphs = rawText.split('\n').map(line => {
+    const runs = _parseStyledRuns(line);
+    if (italic0) runs.forEach(r => { r.italic = true; });
+    // aplicam procesarea (uppercase / cuvinte sacre) per run
+    runs.forEach(r => { r.text = processText(r.text, s); });
+    return runs;
+  });
+
+  const maxW = w - margin * 2;
+  // banda referinta biblica (ca in drawText)
+  let _reserveTop = 0, _reserveBottom = 0;
+  const _isBible = (s.source === 'bible' || (state.metadata && state.metadata.source === 'bible'));
+  const _hasRef = _isBible && ((state.metadata && state.metadata.reference) || s.bible_reference);
+  if (_hasRef && !(s.bible_ref_zone && typeof s.bible_ref_zone === 'object')) {
+    const _band = parseInt(s.ref_font_size || 24) +
+                  parseInt(s.ref_padding != null ? s.ref_padding : 8) * 2 +
+                  Math.round(Math.min(w, h) * 0.035);
+    if ((s.ref_position || 'bottom_right').indexOf('top') === 0) _reserveTop = _band;
+    else _reserveBottom = _band;
+  }
+  const maxH = h - margin * 2 - _reserveTop - _reserveBottom;
+
+  // shrink-to-fit
+  let currentSize = size0, lines = [], lineH = 0, totalH = 0;
+  while (currentSize >= 10) {
+    lines = [];
+    for (const pruns of paragraphs) {
+      if (!pruns.length || (pruns.length === 1 && !pruns[0].text.trim())) { lines.push([]); continue; }
+      const toks = _runsToTokens(pruns);
+      _wrapTokens(ctxC, toks, maxW, bold, currentSize, family).forEach(l => lines.push(l));
+    }
+    lineH = currentSize * lsp; totalH = lineH * lines.length;
+    const maxLineW = lines.length ? Math.max(0, ...lines.map(l => _lineW(ctxC, l, bold, currentSize, family))) : 0;
+    if (totalH <= maxH && maxLineW <= maxW) break;
+    currentSize -= 2;
+  }
+
+  const valign = s.text_valign || s.valign || 'center';
+  let startY;
+  if (valign === 'top')         startY = margin + _reserveTop + currentSize * 0.85;
+  else if (valign === 'bottom') startY = h - margin - _reserveBottom - totalH + currentSize * 0.85;
+  else                          startY = margin + _reserveTop + (maxH - totalH) / 2 + currentSize * 0.85;
+
+  const align = s.text_align || 'center';
+
+  ctxC.save();
+  ctxC.globalAlpha = Math.max(0, Math.min(1, opacity));
+  if (dx) ctxC.translate(dx, 0);
+  if (dy) ctxC.translate(0, dy);
+  ctxC.textAlign = 'left';
+  ctxC.textBaseline = 'alphabetic';
+
+  lines.forEach((runs, i) => {
+    if (!runs.length) return;
+    const y  = startY + i * lineH;
+    const lw = _lineW(ctxC, runs, bold, currentSize, family);
+    let x = align === 'left' ? margin : align === 'right' ? (w - margin - lw) : (w / 2 - lw / 2);
+    for (const run of runs) {
+      ctxC.font = _fontFor(run.italic, bold, currentSize, family);
+      const rw = ctxC.measureText(run.text).width;
+      // Outline
+      if (outW > 0) {
+        ctxC.shadowColor = 'transparent'; ctxC.shadowBlur = 0; ctxC.shadowOffsetX = 0; ctxC.shadowOffsetY = 0;
+        ctxC.strokeStyle = outC; ctxC.lineWidth = outW * 2; ctxC.lineJoin = 'round';
+        ctxC.strokeText(run.text, x, y);
+      }
+      // Glow / shadow
+      if (s.text_glow === true || s.text_glow === 'true') {
+        ctxC.shadowColor = s.text_glow_color || color; ctxC.shadowBlur = parseInt(s.text_glow_size || 26);
+        ctxC.shadowOffsetX = 0; ctxC.shadowOffsetY = 0;
+      } else if (shadow) {
+        ctxC.shadowColor = _rgbaFromHex(s.shadow_color, 0.85) || 'rgba(0,0,0,0.85)';
+        ctxC.shadowBlur = 8; ctxC.shadowOffsetX = 3; ctxC.shadowOffsetY = 3;
+      } else { ctxC.shadowColor = 'transparent'; ctxC.shadowBlur = 0; }
+      // Evidentiere: pulsatie usoara a culorii (glow) + culoarea de highlight
+      ctxC.fillStyle = run.hl ? run.hl : color;
+      if (run.hl) { ctxC.shadowColor = run.hl; ctxC.shadowBlur = Math.max(ctxC.shadowBlur, 18); }
+      ctxC.fillText(run.text, x, y);
+      x += rw;
+    }
+  });
+  ctxC.restore();
+}
+
 function drawText(text, opacity, dx, dy) {
   if (!text || opacity <= 0) return;
   if (!ctxC || !cvCurr) return;
+  // Text cu marcaje de stil (italic / evidentiere) -> randare pe run-uri.
+  if (_MARK_RE.test(text)) { drawStyledText(text, opacity, dx, dy); return; }
 
   const s = state.settings;
   const w = cvCurr.width  || window.innerWidth;
