@@ -12470,7 +12470,7 @@ class ControlWindow(QMainWindow):
                         QTimer.singleShot(0, lambda w=obj: self._retranslate_window(w))
             except Exception:
                 pass
-        if obj is self.slides_container and event.type() == QEvent.Type.Resize:
+        if obj is getattr(self, "slides_container", None) and event.type() == QEvent.Type.Resize:
             self._reflow_thumbnails()
         elif obj is getattr(self, "_preview_wrap", None) and \
                 event.type() == QEvent.Type.Resize and \
