@@ -19,6 +19,7 @@ folosind doar urllib din biblioteca standard (fără dependințe noi).
 """
 
 import json
+import os
 import platform
 import urllib.request
 import urllib.error
@@ -27,8 +28,39 @@ import urllib.parse
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox,
-    QTextEdit, QPushButton, QWidget,
+    QTextEdit, QPushButton, QWidget, QCheckBox, QSpinBox,
 )
+
+
+def _logs_dir() -> str:
+    return os.path.join(os.path.expanduser("~"), "Cantio", "logs")
+
+
+def _recent_log_files(n: int) -> list:
+    """Cele mai recente n fișiere de log (cale completă)."""
+    d = _logs_dir()
+    try:
+        files = [os.path.join(d, f) for f in os.listdir(d)
+                 if f.lower().endswith(".log")]
+        files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return files[:max(1, n)]
+    except Exception:
+        return []
+
+
+def _read_logs_text(n: int, per_file_cap: int = 40000) -> str:
+    """Conținutul ultimelor n loguri (cozile lor), plafonat ca mărime."""
+    out = []
+    for path in _recent_log_files(n):
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                data = f.read()
+            if len(data) > per_file_cap:
+                data = "…(trunchiat)…\n" + data[-per_file_cap:]
+            out.append(f"===== {os.path.basename(path)} =====\n{data}")
+        except Exception:
+            pass
+    return "\n\n".join(out)
 
 # Adresa pe care se primește feedback-ul. Expusă doar prin serviciul de
 # forwardare — poate fi schimbată aici fără alte modificări.
@@ -184,6 +216,32 @@ class FeedbackDialog(QDialog):
         self._msg.setMinimumHeight(130)
         root.addWidget(self._msg)
 
+        # ── Atașare loguri (doar pentru Bug) ──────────────────────────────────
+        self._log_box = QWidget()
+        _lb = QVBoxLayout(self._log_box)
+        _lb.setContentsMargins(0, 0, 0, 0)
+        _lb.setSpacing(4)
+        self._log_chk = QCheckBox("Atașează fișierele de log (ajută la diagnoză)")
+        self._log_chk.setChecked(True)
+        _lb.addWidget(self._log_chk)
+        _lr = QHBoxLayout()
+        _lr.setContentsMargins(18, 0, 0, 0)
+        _lr.addWidget(QLabel("Câte fișiere (ultimele):"))
+        self._log_count = QSpinBox()
+        self._log_count.setRange(1, 10)
+        self._log_count.setValue(1)
+        self._log_count.setFixedWidth(70)
+        _lr.addWidget(self._log_count)
+        _lr.addStretch()
+        _lr_w = QWidget(); _lr_w.setLayout(_lr)
+        _lb.addWidget(_lr_w)
+        self._log_count.setEnabled(True)
+        self._log_chk.toggled.connect(self._log_count.setEnabled)
+        root.addWidget(self._log_box)
+        self._log_box.setVisible(False)
+        self._cat.currentIndexChanged.connect(self._on_cat_changed)
+        self._on_cat_changed(0)
+
         # Status
         self._status = QLabel("")
         self._status.setObjectName("status")
@@ -210,6 +268,13 @@ class FeedbackDialog(QDialog):
     def _lbl(text: str) -> QLabel:
         lbl = QLabel(text)
         return lbl
+
+    def _is_bug(self) -> bool:
+        return self._cat.currentIndex() == 0   # 🐞 Problemă / Bug
+
+    def _on_cat_changed(self, _idx):
+        # Optiunea de log apare doar la Bug.
+        self._log_box.setVisible(self._is_bug())
 
     # ── Trimitere ───────────────────────────────────────────────────────────
     def _set_status(self, text: str, color: str = "#9a9a9a"):
@@ -247,6 +312,15 @@ class FeedbackDialog(QDialog):
         # FormSubmit folosește câmpul 'email' ca Reply-To, dacă e valid.
         if email:
             payload["email"] = email
+
+        # Loguri (doar la Bug, dacă bifat) — conținutul ultimelor N fișiere.
+        if self._is_bug() and self._log_chk.isChecked():
+            try:
+                logs = _read_logs_text(self._log_count.value())
+                if logs:
+                    payload["Loguri"] = logs
+            except Exception:
+                pass
 
         self._send_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
