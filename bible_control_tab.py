@@ -142,61 +142,79 @@ class BibleControlTab(QWidget):
         )
         current_layout = QVBoxLayout(current_group)
         current_layout.setContentsMargins(8, 4, 8, 6)
-        current_layout.setSpacing(3)
+        current_layout.setSpacing(4)
 
-        # QTextEdit read-only (selectie fiabila cu mouse-ul -> evidentiere).
+        # Referinta (sus)
+        self.ref_label = QLabel("")
+        self.ref_label.setStyleSheet("color:#89b4fa; font-size:12px;")
+        current_layout.addWidget(self.ref_label)
+
+        # Corp: text (stanga, cu scroll) + 3 butoane in COLOANA (dreapta).
+        body_row = QHBoxLayout()
+        body_row.setContentsMargins(0, 0, 0, 0)
+        body_row.setSpacing(6)
+
+        # QTextEdit read-only (selectie fiabila -> evidentiere) + scroll vertical.
         self.current_verse_label = QTextEdit()
         self.current_verse_label.setReadOnly(True)
         self.current_verse_label.setPlainText(t("bible_no_verse"))
-        self.current_verse_label.setFixedHeight(84)
+        self.current_verse_label.setMinimumHeight(70)
+        self.current_verse_label.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.current_verse_label.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.current_verse_label.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.current_verse_label.setStyleSheet(
             "QTextEdit { font-size:13px; color:#cdd6f4; background:#181825; "
             "border:1px solid #313244; border-radius:6px; padding:4px; }"
         )
-        current_layout.addWidget(self.current_verse_label)
+        body_row.addWidget(self.current_verse_label, 1)
 
-        # Un singur rand: referinta + Evidentiaza + ✖ + Trimite Live.
-        ref_row = QHBoxLayout()
-        ref_row.setContentsMargins(0, 0, 0, 0)
-        ref_row.setSpacing(6)
-        self.ref_label = QLabel("")
-        self.ref_label.setStyleSheet("color:#89b4fa; font-size:12px;")
-        ref_row.addWidget(self.ref_label)
-        ref_row.addStretch()
-
-        self._hl_btn = QPushButton("✨ Evidențiază")
-        self._hl_btn.setToolTip("Selectează text în verset, apoi evidențiază-l pe ecran")
-        self._hl_btn.setStyleSheet(
-            "QPushButton { background:#3a3410; color:#f9e2af; border:1px solid #5a5020; "
-            "border-radius:5px; padding:4px 10px; font-size:11px; } "
-            "QPushButton:hover { background:#4a4418; }")
-        self._hl_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._hl_btn.clicked.connect(self._highlight_selection)
-        ref_row.addWidget(self._hl_btn)
-
-        self._hl_clear_btn = QPushButton("✖")
-        self._hl_clear_btn.setFixedWidth(28)
-        self._hl_clear_btn.setToolTip("Fără evidențiere")
-        self._hl_clear_btn.setStyleSheet(
-            "QPushButton { background:#1c1c1c; color:#888; border:1px solid #2a2a2a; "
-            "border-radius:5px; padding:4px; font-size:11px; } "
-            "QPushButton:hover { background:#252525; }")
-        self._hl_clear_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self._hl_clear_btn.clicked.connect(self._clear_highlight)
-        ref_row.addWidget(self._hl_clear_btn)
+        # Coloana de butoane (unul sub altul)
+        btn_col = QVBoxLayout()
+        btn_col.setContentsMargins(0, 0, 0, 0)
+        btn_col.setSpacing(5)
 
         self._send_live_btn = QPushButton(t("bible_send_live"))
         self._send_live_btn.setStyleSheet(
             "QPushButton { background:#1c3a5a; color:#89b4fa; "
-            "border:1px solid #2a5a8a; border-radius:5px; padding:4px 10px; }"
+            "border:1px solid #2a5a8a; border-radius:5px; padding:6px 10px; font-size:11px; }"
             "QPushButton:hover { background:#2a5a8a; color:#cdd6f4; }"
         )
         self._send_live_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self._send_live_btn.clicked.connect(
             lambda: self._send_verse_live(self.verse_queue.currentItem())
         )
-        ref_row.addWidget(self._send_live_btn)
-        current_layout.addLayout(ref_row)
+        btn_col.addWidget(self._send_live_btn)
+
+        self._hl_btn = QPushButton("✨ Evidențiază")
+        self._hl_btn.setToolTip("Selectează text în verset, apoi evidențiază-l pe ecran")
+        self._hl_btn.setStyleSheet(
+            "QPushButton { background:#3a3410; color:#f9e2af; border:1px solid #5a5020; "
+            "border-radius:5px; padding:6px 10px; font-size:11px; } "
+            "QPushButton:hover { background:#4a4418; }")
+        self._hl_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._hl_btn.clicked.connect(self._highlight_selection)
+        btn_col.addWidget(self._hl_btn)
+
+        self._hl_clear_btn = QPushButton("✖ Fără evidențiere")
+        self._hl_clear_btn.setToolTip("Fără evidențiere")
+        self._hl_clear_btn.setStyleSheet(
+            "QPushButton { background:#1c1c1c; color:#888; border:1px solid #2a2a2a; "
+            "border-radius:5px; padding:6px 10px; font-size:11px; } "
+            "QPushButton:hover { background:#252525; }")
+        self._hl_clear_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._hl_clear_btn.clicked.connect(self._clear_highlight)
+        btn_col.addWidget(self._hl_clear_btn)
+
+        btn_col.addStretch()
+
+        _btn_col_w = QWidget()
+        _btn_col_w.setLayout(btn_col)
+        _btn_col_w.setFixedWidth(130)
+        body_row.addWidget(_btn_col_w)
+
+        current_layout.addLayout(body_row)
         layout.addWidget(current_group)
 
         # ── Keyboard hint ─────────────────────────────────────────────────────
