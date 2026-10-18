@@ -135,6 +135,7 @@ class BibleControlTab(QWidget):
 
         # ── Currently-live verse box ──────────────────────────────────────────
         current_group = QGroupBox(t("bible_current"))
+        self._current_group = current_group   # ascuns pana se alege un verset
         current_group.setStyleSheet(
             "QGroupBox { border:1px solid #313244; border-radius:6px; "
             "margin-top:8px; padding-top:6px; color:#a6adc8; font-size:11px; }"
@@ -216,6 +217,7 @@ class BibleControlTab(QWidget):
 
         current_layout.addLayout(body_row)
         layout.addWidget(current_group)
+        current_group.hide()   # apare doar cand e un verset selectat/live
 
         # ── Keyboard hint ─────────────────────────────────────────────────────
         self._hint_label = QLabel(t("bible_kb_hint"))
@@ -237,6 +239,9 @@ class BibleControlTab(QWidget):
         `verses` is a list of dicts with at minimum {'verse': int, 'text': str}.
         """
         self.verse_queue.clear()
+        # Capitol nou -> ascunde 'Curent pe ecran' pana se alege un verset.
+        if hasattr(self, "_current_group"):
+            self._current_group.hide()
         self._verses_data = verses
         self._book_name   = book_name
         self._chapter     = chapter
@@ -368,6 +373,9 @@ class BibleControlTab(QWidget):
 
         self.current_verse_label.setPlainText(text)
         self.ref_label.setText(ref)
+        # Sectiunea 'Curent pe ecran' apare doar cand e un verset ales.
+        if hasattr(self, "_current_group"):
+            self._current_group.show()
         # Retinem textul live ca sa putem re-trimite cu evidentiere.
         self._live_verse_text = text
         self._live_ref = ref
