@@ -655,6 +655,37 @@ def _keyword_label(text: str) -> str:
     return ""
 
 
+import re as _re_mk2
+_RE_MARK_REF = _re_mk2.compile(r"^\s*R\s*[.:)]", _re_mk2.I)
+_RE_MARK_NUM = _re_mk2.compile(r"^\s*(\d+)\s*[.:)]")
+
+
+def _marker_label(raw: str) -> str:
+    """Eticheta din marcaje bisericesti la inceputul primei linii:
+    'R.' / 'R:' / 'R)' -> Refren ; '1.' / '2)' -> Strofa N."""
+    if not raw:
+        return ""
+    first = str(raw).split("\n")[0]
+    if _RE_MARK_REF.match(first):
+        return "Refren"
+    m = _RE_MARK_NUM.match(first)
+    if m:
+        try:
+            return f"Strofa {int(m.group(1))}"
+        except Exception:
+            return "Strofa"
+    return ""
+
+
+def has_structure_markers(slides: list) -> bool:
+    """Adevarat daca macar un slide incepe cu un marcaj R./numerotat."""
+    for s in slides:
+        raw = s.get("text", "") if isinstance(s, dict) else str(s or "")
+        if _marker_label(raw):
+            return True
+    return False
+
+
 def _normalize_slide_text(slide) -> str:
     """Normalize a slide's text for repeat-detection (lowercase, strip
     punctuation/accents-insensitive-ish, collapse whitespace)."""
@@ -672,10 +703,11 @@ def _normalize_slide_text(slide) -> str:
     return txt
 
 
-def detect_smart_labels(slides: list) -> list:
+def detect_smart_labels(slides: list, use_markers: bool = True) -> list:
     """Smart section labels: a text block that repeats (≥2 identical slides) is
     the CHORUS ('Refren'); unique blocks become 'Strofa N' in order. Explicit
-    labels (dict 'label') and keyword headers are respected first.
+    labels (dict 'label'), structure markers (R./1./2. — when use_markers) and
+    keyword headers are respected first.
     Returns a list of label strings aligned with `slides`."""
     n = len(slides)
     norm = [_normalize_slide_text(s) for s in slides]
@@ -694,7 +726,13 @@ def detect_smart_labels(slides: list) -> list:
             labels[i] = str(s["label"])
             continue
         raw = s.get("text", "") if isinstance(s, dict) else str(s or "")
-        # 2) keyword header (Refren:, Strofa 2, Bridge…)
+        # 2a) marcaje de structura (R. = Refren, 1./2. = Strofa N)
+        if use_markers:
+            ml = _marker_label(raw)
+            if ml:
+                labels[i] = ml
+                continue
+        # 2b) keyword header (Refren:, Strofa 2, Bridge…)
         kw = _keyword_label(raw)
         if kw:
             labels[i] = kw
@@ -7654,8 +7692,25 @@ class ControlWindow(QMainWindow):
         by_label = getattr(self, "_slides_by_label", False)
         transp   = getattr(self, "_thumbs_transparent", False)
         # Etichete inteligente: refren detectat prin repetitie, strofe numerotate.
+        # Daca gasim marcaje de structura (R./1./2.), intrebam o data pe cantare.
         try:
-            smart_labels = detect_smart_labels(slides)
+            use_markers = True
+            if has_structure_markers(slides):
+                if not hasattr(self, "_marker_label_answers"):
+                    self._marker_label_answers = {}
+                sid = getattr(self, "current_song_id", None)
+                ans = self._marker_label_answers.get(sid)
+                if ans is None:
+                    reply = QMessageBox.question(
+                        self, "Etichete automate",
+                        "Am detectat structura cântării (R. = Refren, 1./2. = Strofe).\n\n"
+                        "Aplici etichetele automat?",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.Yes)
+                    ans = (reply == QMessageBox.StandardButton.Yes)
+                    self._marker_label_answers[sid] = ans
+                use_markers = ans
+            smart_labels = detect_smart_labels(slides, use_markers=use_markers)
         except Exception:
             smart_labels = [""] * len(slides)
         _row = 0
