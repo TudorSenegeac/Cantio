@@ -656,18 +656,26 @@ def _keyword_label(text: str) -> str:
 
 
 import re as _re_mk2
-_RE_MARK_REF = _re_mk2.compile(r"^\s*R\s*[.:)]", _re_mk2.I)
 _RE_MARK_NUM = _re_mk2.compile(r"^\s*(\d+)\s*[.:)]")
+# Litera de marcaj (la inceputul primei linii) -> eticheta.
+_MARK_LETTERS = {
+    "R": "Refren",      # Refren / refrain
+    "C": "Cor",         # Cor / chorus
+    "B": "Punte",       # Bridge
+    "P": "Pre-refren",  # Pre-refren / pre-chorus
+}
+_RE_MARK_LETTER = _re_mk2.compile(r"^\s*([RCBP])\s*[.:)]", _re_mk2.I)
 
 
 def _marker_label(raw: str) -> str:
     """Eticheta din marcaje bisericesti la inceputul primei linii:
-    'R.' / 'R:' / 'R)' -> Refren ; '1.' / '2)' -> Strofa N."""
+    'R.'->Refren, 'C.'->Cor, 'B.'->Punte, 'P.'->Pre-refren ; '1.'/'2)' -> Strofa N."""
     if not raw:
         return ""
     first = str(raw).split("\n")[0]
-    if _RE_MARK_REF.match(first):
-        return "Refren"
+    m = _RE_MARK_LETTER.match(first)
+    if m:
+        return _MARK_LETTERS.get(m.group(1).upper(), "")
     m = _RE_MARK_NUM.match(first)
     if m:
         try:
@@ -8129,6 +8137,9 @@ class ControlWindow(QMainWindow):
         left.addWidget(avail)
         add_btn = QPushButton("→ Adaugă în secvență")
         left.addWidget(add_btn)
+        preset_btn = QPushButton("↻ Refren după fiecare strofă")
+        preset_btn.setToolTip("Generează secvența: Strofa 1, Refren, Strofa 2, Refren…")
+        left.addWidget(preset_btn)
         cols.addLayout(left, 1)
 
         right.addWidget(QLabel("Secvența aranjamentului"))
@@ -8184,6 +8195,25 @@ class ControlWindow(QMainWindow):
             seqw.addItem(lbl)
         add_btn.clicked.connect(do_add)
         avail.itemDoubleClicked.connect(lambda _: do_add())
+
+        def do_refrain_each():
+            if not state["cur"]:
+                self._toasts.warning("Creează sau alege un aranjament întâi."); return
+            refrain = next((l for l in order if "refren" in l.lower()), None)
+            if not refrain:
+                self._toasts.warning("Cântarea nu are un „Refren” detectat."); return
+            seq = []
+            for l in order:
+                if l == refrain:
+                    continue
+                low = l.lower()
+                is_verse = low.startswith(("strofa", "verse")) or (l[:1].isdigit())
+                seq.append(l)
+                if is_verse:
+                    seq.append(refrain)
+            state["arr"][state["cur"]] = seq
+            load_seq(state["cur"])
+        preset_btn.clicked.connect(do_refrain_each)
 
         def move(delta):
             r = seqw.currentRow()
