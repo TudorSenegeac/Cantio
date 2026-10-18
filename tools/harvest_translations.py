@@ -75,6 +75,41 @@ def harvest_file(path: str, out: set):
                 out.add(kw.value.value)
 
 
+import re as _re
+
+def harvest_web(out: set):
+    """Texte UI din ferestrele Electron (HTML + JS din display-electron/)."""
+    webdir = os.path.join(ROOT, "display-electron")
+    if not os.path.isdir(webdir):
+        return
+    for fn in os.listdir(webdir):
+        path = os.path.join(webdir, fn)
+        try:
+            src = open(path, encoding="utf-8").read()
+        except Exception:
+            continue
+        if fn.endswith(".html"):
+            html = _re.sub(r"<script[\s\S]*?</script>", "", src)
+            html = _re.sub(r"<style[\s\S]*?</style>", "", html)
+            for m in _re.finditer(r'(?:placeholder|title)="([^"]+)"', html):
+                out.add(m.group(1))
+            for m in _re.finditer(r">([^<>]+)<", html):
+                txt = m.group(1).strip()
+                if txt:
+                    out.add(txt)
+        elif fn.endswith(".js"):
+            pats = [
+                r"\brow\(\s*['\"]([^'\"]{2,60})['\"]",
+                r"\bgrpH\(\s*\w+\s*,\s*['\"]([^'\"]{2,60})['\"]",
+                r"\.textContent\s*=\s*['\"]([^'\"]{2,60})['\"]",
+                r"\.title\s*=\s*['\"]([^'\"]{2,60})['\"]",
+                r"\bname:\s*['\"]([^'\"]{2,60})['\"]",
+            ]
+            for p in pats:
+                for m in _re.finditer(p, src):
+                    out.add(m.group(1))
+
+
 def harvest_all() -> list:
     strings = set()
     # 1) textele din cod
@@ -86,6 +121,8 @@ def harvest_all() -> list:
         for fn in files:
             if fn.endswith(".py"):
                 harvest_file(os.path.join(dirpath, fn), strings)
+    # 1b) texte din ferestrele Electron (HTML/JS)
+    harvest_web(strings)
     # 2) toate valorile romanesti din translations.py
     try:
         from translations import TRANSLATIONS

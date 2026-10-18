@@ -2702,6 +2702,8 @@ class ControlWindow(QMainWindow):
         # La pornire, daca limba salvata nu e romana, traduce tot UI-ul.
         try:
             from translations import get_language as _gl0
+            import i18n as _i18n0
+            _i18n0.write_active_lang(_gl0())   # pt. ferestrele Electron
             if _gl0() != "ro":
                 QTimer.singleShot(400, self._apply_i18n)
         except Exception:
@@ -12470,6 +12472,11 @@ class ControlWindow(QMainWindow):
         set_language(lang)
         try:
             db.save_setting("language", lang)
+        except Exception:
+            pass
+        try:
+            import i18n as _i18n
+            _i18n.write_active_lang(lang)   # pt. ferestrele Electron (editor fundal)
         except Exception:
             pass
         self._refresh_all_ui_texts()   # cheile îngrijite din translations.py

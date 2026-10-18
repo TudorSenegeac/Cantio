@@ -140,6 +140,18 @@ def _save(lang: str):
         pass
 
 
+def write_active_lang(lang: str = None):
+    """Scrie limba activă într-un fișier, ca ferestrele Electron (editor fundal)
+    să știe în ce limbă să traducă DOM-ul (display-electron/i18n.js îl citește)."""
+    try:
+        lang = lang or get_language()
+        os.makedirs(_DIR, exist_ok=True)
+        with open(os.path.join(_DIR, "_active_lang.txt"), "w", encoding="utf-8") as f:
+            f.write(str(lang or "ro"))
+    except Exception:
+        pass
+
+
 def translate(text: str, lang: str = None) -> str:
     """Traducere sincronă din cache; dacă lipsește, întoarce textul românesc."""
     if text is None:
