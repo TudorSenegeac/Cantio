@@ -7812,7 +7812,9 @@ class ControlWindow(QMainWindow):
             return s
         import re as _re_sm
         s = _re_sm.sub(r"\[\[h:[^\]]*\]\]", "", s)
-        return (s.replace("[[i]]", "").replace("[[/i]]", "").replace("[[/h]]", ""))
+        for m in ("[[i]]", "[[/i]]", "[[u]]", "[[/u]]", "[[s]]", "[[/s]]", "[[/h]]"):
+            s = s.replace(m, "")
+        return s
 
     def _editor_marked_slides(self) -> list:
         """Construiește slide-urile din editorul de versuri cu marcaje \u0001..\u0002
@@ -7830,10 +7832,15 @@ class ControlWindow(QMainWindow):
                 frag = it.fragment()
                 if frag.isValid():
                     txt = frag.text().replace(" ", "\n")   # soft break -> newline
-                    if frag.charFormat().fontItalic():
-                        s += "[[i]]" + txt + "[[/i]]"
-                    else:
-                        s += txt
+                    cf = frag.charFormat()
+                    pre, post = "", ""
+                    if cf.fontItalic():
+                        pre += "[[i]]"; post = "[[/i]]" + post
+                    if cf.fontUnderline():
+                        pre += "[[u]]"; post = "[[/u]]" + post
+                    if cf.fontStrikeOut():
+                        pre += "[[s]]"; post = "[[/s]]" + post
+                    s += pre + txt + post
                 it += 1
             block_strs.append(s)
             b = b.next()
@@ -7866,21 +7873,22 @@ class ControlWindow(QMainWindow):
                 return None
             norm = lambda x: " ".join((x or "").split())
             target = norm(plain)
+            _has_mark = lambda x: ("[[i]]" in x or "[[u]]" in x or "[[s]]" in x)
             # 1) potrivire exacta (dupa normalizarea spatiilor)
             for ms in marked:
-                if "[[i]]" in ms and norm(self._strip_style_markers(ms)) == target:
+                if _has_mark(ms) and norm(self._strip_style_markers(ms)) == target:
                     return ms
             # 2) pe index, daca numarul de slide-uri se aliniaza
             if len(marked) == len(self.current_slides):
                 ms = marked[idx]
-                if "[[i]]" in ms:
+                if _has_mark(ms):
                     sm = norm(self._strip_style_markers(ms))
                     if sm and (sm == target or sm in target or target in sm
                                or sm[:12] == target[:12]):
                         return ms
-            # 3) fuzzy: primul slide cu italic care se suprapune cu textul
+            # 3) fuzzy: primul slide cu marcaje care se suprapune cu textul
             for ms in marked:
-                if "[[i]]" not in ms:
+                if not _has_mark(ms):
                     continue
                 sm = norm(self._strip_style_markers(ms))
                 if sm and (sm in target or target in sm or sm[:15] == target[:15]):

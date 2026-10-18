@@ -1812,19 +1812,27 @@ function processText(text, s) {
 // ── Text stilizat pe "run-uri" (italic per-selectie + evidentiere) ───────────
 // Marcaje ASCII injectate de Python (robuste pe transport):
 //   [[i]] .. [[/i]]            = italic ON/OFF
+//   [[u]] .. [[/u]]            = subliniat ON/OFF
+//   [[s]] .. [[/s]]            = taiat ON/OFF
 //   [[h:#rrggbb]] .. [[/h]]    = evidentiere (culoare) ON/OFF
 // Textul NORMAL (fara aceste marcaje) merge pe calea rapida clasica din drawText.
-const _MARK_RE = /\[\[\/?[ih]/;
+const _MARK_RE = /\[\[\/?[ihus]/;
 
 function _parseStyledRuns(raw) {
   const runs = [];
-  let italic = false, hl = null, buf = '';
-  const flush = () => { if (buf) { runs.push({ text: buf, italic, hl }); buf = ''; } };
+  let italic = false, underline = false, strike = false, hl = null, buf = '';
+  const flush = () => {
+    if (buf) { runs.push({ text: buf, italic, underline, strike, hl }); buf = ''; }
+  };
   let i = 0;
   while (i < raw.length) {
-    if (raw.startsWith('[[i]]', i))        { flush(); italic = true;  i += 5; continue; }
-    if (raw.startsWith('[[/i]]', i))       { flush(); italic = false; i += 6; continue; }
-    if (raw.startsWith('[[/h]]', i))       { flush(); hl = null;      i += 6; continue; }
+    if (raw.startsWith('[[i]]', i))        { flush(); italic = true;     i += 5; continue; }
+    if (raw.startsWith('[[/i]]', i))       { flush(); italic = false;    i += 6; continue; }
+    if (raw.startsWith('[[u]]', i))        { flush(); underline = true;  i += 5; continue; }
+    if (raw.startsWith('[[/u]]', i))       { flush(); underline = false; i += 6; continue; }
+    if (raw.startsWith('[[s]]', i))        { flush(); strike = true;     i += 5; continue; }
+    if (raw.startsWith('[[/s]]', i))       { flush(); strike = false;    i += 6; continue; }
+    if (raw.startsWith('[[/h]]', i))       { flush(); hl = null;         i += 6; continue; }
     if (raw.startsWith('[[h:', i)) {
       const end = raw.indexOf(']]', i);
       if (end > i) { flush(); hl = raw.slice(i + 4, end) || '#f9e2af'; i = end + 2; continue; }
@@ -1842,7 +1850,8 @@ function _runsToTokens(runs) {
     const parts = r.text.split(/(\s+)/);   // pastreaza spatiile
     for (const p of parts) {
       if (p === '') continue;
-      toks.push({ text: p, italic: r.italic, hl: r.hl, space: /^\s+$/.test(p) });
+      toks.push({ text: p, italic: r.italic, underline: r.underline,
+                  strike: r.strike, hl: r.hl, space: /^\s+$/.test(p) });
     }
   }
   return toks;
@@ -1878,8 +1887,13 @@ function _wrapTokens(ctx, toks, maxW, bold, size, family) {
     const merged = [];
     for (const t of line) {
       const last = merged[merged.length - 1];
-      if (last && last.italic === t.italic && last.hl === t.hl) last.text += t.text;
-      else merged.push({ text: t.text, italic: t.italic, hl: t.hl });
+      if (last && last.italic === t.italic && last.hl === t.hl
+          && last.underline === t.underline && last.strike === t.strike) {
+        last.text += t.text;
+      } else {
+        merged.push({ text: t.text, italic: t.italic, underline: t.underline,
+                      strike: t.strike, hl: t.hl });
+      }
     }
     return merged;
   });
@@ -1986,6 +2000,26 @@ function drawStyledText(rawText, opacity, dx, dy) {
       ctxC.fillStyle = run.hl ? run.hl : color;
       if (run.hl) { ctxC.shadowColor = run.hl; ctxC.shadowBlur = Math.max(ctxC.shadowBlur, 18); }
       ctxC.fillText(run.text, x, y);
+      // Subliniat / taiat — linii desenate manual (fontul canvas nu le are).
+      if (run.underline || run.strike) {
+        ctxC.save();
+        ctxC.shadowColor = 'transparent'; ctxC.shadowBlur = 0;
+        ctxC.strokeStyle = ctxC.fillStyle;
+        ctxC.lineWidth = Math.max(1, currentSize / 16);
+        if (run.underline) {
+          ctxC.beginPath();
+          ctxC.moveTo(x, y + currentSize * 0.12);
+          ctxC.lineTo(x + rw, y + currentSize * 0.12);
+          ctxC.stroke();
+        }
+        if (run.strike) {
+          ctxC.beginPath();
+          ctxC.moveTo(x, y - currentSize * 0.30);
+          ctxC.lineTo(x + rw, y - currentSize * 0.30);
+          ctxC.stroke();
+        }
+        ctxC.restore();
+      }
       x += rw;
     }
   });

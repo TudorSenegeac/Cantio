@@ -135,10 +135,11 @@ def render_text_on_painter(
         return
     # Curata marcajele de stil (italic/evidentiere) folosite pe output-ul live,
     # ca sa nu apara in preview/thumbnails.
-    if "[[i]]" in text or "[[h:" in text or "[[/" in text:
+    if "[[" in text:
         import re as _re_mk
         text = _re_mk.sub(r"\[\[h:[^\]]*\]\]", "", text)
-        text = text.replace("[[i]]", "").replace("[[/i]]", "").replace("[[/h]]", "")
+        for _m in ("[[i]]", "[[/i]]", "[[u]]", "[[/u]]", "[[s]]", "[[/s]]", "[[/h]]"):
+            text = text.replace(_m, "")
     if scale is None:
         scale = w / 1920.0
 
