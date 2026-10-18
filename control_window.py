@@ -2745,6 +2745,8 @@ class ControlWindow(QMainWindow):
         self._notifications = []
         self._notif_fetcher = None
         QTimer.singleShot(2500, self._fetch_notifications)
+        # Prima pornire: fereastra de bun venit + newsletter (o singura data).
+        QTimer.singleShot(900, self._maybe_show_welcome)
         # La pornire, daca limba salvata nu e romana, traduce tot UI-ul.
         try:
             from translations import get_language as _gl0
@@ -10354,6 +10356,30 @@ class ControlWindow(QMainWindow):
                 f"Notificări — {c} necitite" if c > 0 else "Notificări")
         except Exception:
             pass
+
+    def _maybe_show_welcome(self):
+        """La prima pornire: fereastra de bun venit cu abonare la newsletter."""
+        try:
+            cache = db.get_cache()
+            if cache.get("welcome_shown"):
+                return
+            # Marcam ca aratat INAINTE (sa nu reapara nici daca pica ceva).
+            cache["welcome_shown"] = True
+            db.save_cache(cache)
+        except Exception:
+            pass
+        try:
+            from welcome_dialog import WelcomeDialog
+            ver = "1.5.2"
+            try:
+                app = QApplication.instance()
+                if app and app.applicationVersion():
+                    ver = app.applicationVersion()
+            except Exception:
+                pass
+            WelcomeDialog(self, app_version=ver).exec()
+        except Exception as e:
+            logger.debug("[Welcome] %s", e)
 
     def _fetch_notifications(self):
         if getattr(self, "_closing", False):
