@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Cantio Build Script
+CantioPresenter Build Script
 Compilează aplicația pentru Windows, Mac și Linux.
 
 Utilizare:
@@ -168,18 +168,18 @@ def build_python():
 
 
 def copy_electron_to_dist():
-    """Copiază Electron compilat (sau sursă fallback) în dist/Cantio/.
+    """Copiază Electron compilat (sau sursă fallback) în dist/CantioPresenter/.
 
     Structura finală preferată (compilat cu electron-packager):
-      dist/Cantio/
-        Cantio.exe
+      dist/CantioPresenter/
+        CantioPresenter.exe
         _internal/              ← PyInstaller
         CantioDisplay/          ← standalone, fără Node.js pe client
           CantioDisplay.exe
           resources/app/...
 
     Fallback (dacă compilat lipsește):
-      dist/Cantio/
+      dist/CantioPresenter/
         display-electron/       ← necesită Node.js instalat pe client
           main.js, display.html, display.js, package.json
           node_modules/electron/, ws/, ...
@@ -197,7 +197,7 @@ def copy_electron_to_dist():
 
     if compiled_src.exists():
         # ── Cale preferată: executabil compilat standalone ──────────────────
-        dst = Path("dist/Cantio/CantioDisplay")
+        dst = Path("dist/CantioPresenter/CantioDisplay")
         if dst.exists():
             shutil.rmtree(dst)
         shutil.copytree(compiled_src, dst)
@@ -215,12 +215,12 @@ def copy_electron_to_dist():
 
 
 def _copy_electron_source():
-    """Fallback: copiază display-electron/ cu node_modules în dist/Cantio/display-electron/.
+    """Fallback: copiază display-electron/ cu node_modules în dist/CantioPresenter/display-electron/.
 
     Necesită Node.js instalat pe mașina client (sau electron în node_modules).
     """
     src = Path("display-electron")
-    dst = Path("dist/Cantio/display-electron")
+    dst = Path("dist/CantioPresenter/display-electron")
 
     if not src.exists():
         print("  ❌ display-electron/ lipsește!")
@@ -269,7 +269,7 @@ def _copy_electron_source():
 
 
 def copy_assets():
-    """Copiază assets statice în dist/Cantio/."""
+    """Copiază assets statice în dist/CantioPresenter/."""
     print("\n── Copiere Assets ──")
 
     assets = ["GProICON.png", "SplashScreen.png", "LICENSE", "README.md"]
@@ -280,18 +280,18 @@ def copy_assets():
 
     for asset in assets:
         if os.path.exists(asset):
-            shutil.copy2(asset, "dist/Cantio/")
+            shutil.copy2(asset, "dist/CantioPresenter/")
             print(f"  ✅ {asset}")
         else:
             print(f"  ⚠ Lipsă (skip): {asset}")
 
     if os.path.exists("mdbtools"):
-        shutil.copytree("mdbtools", "dist/Cantio/mdbtools", dirs_exist_ok=True)
+        shutil.copytree("mdbtools", "dist/CantioPresenter/mdbtools", dirs_exist_ok=True)
         print("  ✅ mdbtools/")
 
     # Pachete de limbă (traduceri OFFLINE gata de folosit)
     if os.path.exists("langpacks"):
-        shutil.copytree("langpacks", "dist/Cantio/langpacks", dirs_exist_ok=True)
+        shutil.copytree("langpacks", "dist/CantioPresenter/langpacks", dirs_exist_ok=True)
         print("  ✅ langpacks/")
 
 
@@ -302,20 +302,20 @@ def build_installer_windows():
     print("\n── Build Instalator Windows (NSIS) ──")
 
     nsis_script = r"""
-; Cantio Installer — NSIS Script
+; CantioPresenter Installer — NSIS Script
 ; Genererat automat de build.py
 
-!define APP_NAME "Cantio"
+!define APP_NAME "CantioPresenter"
 !define APP_VERSION "1.5.2"
 !define APP_PUBLISHER "Senegeac Tudor"
 !define APP_URL "https://cantioapp.com"
-!define APP_EXE "Cantio.exe"
-!define REG_KEY "Software\Cantio"
+!define APP_EXE "CantioPresenter.exe"
+!define REG_KEY "Software\CantioPresenter"
 !define UNINSTALL_KEY \
-    "Software\Microsoft\Windows\CurrentVersion\Uninstall\Cantio"
+    "Software\Microsoft\Windows\CurrentVersion\Uninstall\CantioPresenter"
 
 Name "${APP_NAME} ${APP_VERSION}"
-OutFile "Cantio-Setup-v${APP_VERSION}-Windows.exe"
+OutFile "CantioPresenter-Setup-v${APP_VERSION}-Windows.exe"
 Unicode True
 SetCompressor /SOLID lzma
 
@@ -339,27 +339,27 @@ InstallDir "$PROGRAMFILES64\${APP_NAME}"
 !insertmacro MUI_LANGUAGE "English"
 
 ; ── Instalare ──────────────────────────────────────────────────────────────────
-Section "Cantio" SecMain
+Section "CantioPresenter" SecMain
     SectionIn RO
-    ; Copiază recursiv: Cantio.exe, _internal/, CantioDisplay/ (sau display-electron/), assets
+    ; Copiază recursiv: CantioPresenter.exe, _internal/, CantioDisplay/ (sau display-electron/), assets
     ; File /r copiază toate subdirectoarele — CantioDisplay/ e inclus automat
     SetOutPath "$INSTDIR"
-    File /r "dist\Cantio\*.*"
+    File /r "dist\CantioPresenter\*.*"
 
     ; Shortcut Desktop
     CreateShortcut \
-        "$DESKTOP\Cantio.lnk" \
-        "$INSTDIR\Cantio.exe" "" \
+        "$DESKTOP\CantioPresenter.lnk" \
+        "$INSTDIR\CantioPresenter.exe" "" \
         "$INSTDIR\GProICON.ico"
 
     ; Shortcut Start Menu
-    CreateDirectory "$SMPROGRAMS\Cantio"
+    CreateDirectory "$SMPROGRAMS\CantioPresenter"
     CreateShortcut \
-        "$SMPROGRAMS\Cantio\Cantio.lnk" \
-        "$INSTDIR\Cantio.exe" "" \
+        "$SMPROGRAMS\CantioPresenter\CantioPresenter.lnk" \
+        "$INSTDIR\CantioPresenter.exe" "" \
         "$INSTDIR\GProICON.ico"
     CreateShortcut \
-        "$SMPROGRAMS\Cantio\Dezinstaleaza.lnk" \
+        "$SMPROGRAMS\CantioPresenter\Dezinstaleaza.lnk" \
         "$INSTDIR\Uninstall.exe"
 
     ; Registry
@@ -382,14 +382,14 @@ SectionEnd
 ; ── Dezinstalare ───────────────────────────────────────────────────────────────
 Section "Uninstall"
     RMDir /r "$INSTDIR"
-    Delete   "$DESKTOP\Cantio.lnk"
-    RMDir /r "$SMPROGRAMS\Cantio"
+    Delete   "$DESKTOP\CantioPresenter.lnk"
+    RMDir /r "$SMPROGRAMS\CantioPresenter"
     DeleteRegKey HKLM "${REG_KEY}"
     DeleteRegKey HKLM "${UNINSTALL_KEY}"
 
     ; Datele utilizator NU se șterg ($USERPROFILE\Cantio)
     MessageBox MB_OK \
-        "Cantio a fost dezinstalat.$\n$\nDatele tale (cantari, setari) au fost pastrate in:$\n$PROFILE\Cantio"
+        "CantioPresenter a fost dezinstalat.$\n$\nDatele tale (cantari, setari) au fost pastrate in:$\n$PROFILE\Cantio"
 SectionEnd
 """
 
@@ -428,7 +428,7 @@ def build_installer_mac():
 
     script = """\
 #!/bin/bash
-APP_NAME="Cantio"
+APP_NAME="CantioPresenter"
 VERSION="1.5.2"
 DMG_NAME="${APP_NAME}-v${VERSION}-macOS.dmg"
 APP_PATH="dist/${APP_NAME}.app"
@@ -458,22 +458,22 @@ def build_installer_linux():
     """Creează AppImage pentru Linux."""
     print("\n── Build AppImage Linux ──")
 
-    appdir = Path("build/Cantio.AppDir")
+    appdir = Path("build/CantioPresenter.AppDir")
     appdir.mkdir(parents=True, exist_ok=True)
 
-    (appdir / "Cantio.desktop").write_text(
+    (appdir / "CantioPresenter.desktop").write_text(
         "[Desktop Entry]\n"
-        "Name=Cantio\n"
-        "Exec=Cantio\n"
+        "Name=CantioPresenter\n"
+        "Exec=CantioPresenter\n"
         "Icon=cantio\n"
         "Type=Application\n"
         "Categories=AudioVideo;Music;\n"
         "Comment=Software prezentare versuri\n"
     )
 
-    usr_bin = appdir / "usr" / "bin" / "Cantio"
-    if Path("dist/Cantio").exists():
-        shutil.copytree("dist/Cantio", str(usr_bin), dirs_exist_ok=True)
+    usr_bin = appdir / "usr" / "bin" / "CantioPresenter"
+    if Path("dist/CantioPresenter").exists():
+        shutil.copytree("dist/CantioPresenter", str(usr_bin), dirs_exist_ok=True)
 
     if Path("GProICON.png").exists():
         shutil.copy2("GProICON.png", str(appdir / "cantio.png"))
@@ -482,7 +482,7 @@ def build_installer_linux():
     apprun.write_text(
         '#!/bin/bash\n'
         'APPDIR="$(dirname "$(readlink -f "$0")")"\n'
-        'exec "$APPDIR/usr/bin/Cantio/Cantio" "$@"\n'
+        'exec "$APPDIR/usr/bin/CantioPresenter/CantioPresenter" "$@"\n'
     )
     apprun.chmod(0o755)
 
@@ -494,7 +494,7 @@ def build_installer_linux():
 """)
         return
 
-    run(["appimagetool", str(appdir), "Cantio-v1.5.2-Linux.AppImage"])
+    run(["appimagetool", str(appdir), "CantioPresenter-v1.5.2-Linux.AppImage"])
     print("  ✅ AppImage Linux creat!")
 
 
@@ -543,7 +543,7 @@ def main():
     print("=" * 60)
 
     if not os.path.exists("main.py"):
-        print("❌ Rulează build.py din folderul C:\\Cantio\\!")
+        print("❌ Rulează build.py din folderul C:\\CantioPresenter\\!")
         sys.exit(1)
 
     # Verifică PyInstaller
@@ -616,19 +616,19 @@ Ce vrei să buildezi?
     # Listează ce s-a creat
     print("\nFișiere create:")
     patterns = {
-        'win32':  "Cantio-Setup-*.exe",
-        'darwin': "Cantio-*-macOS.dmg",
+        'win32':  "CantioPresenter-Setup-*.exe",
+        'darwin': "CantioPresenter-*-macOS.dmg",
     }
-    pat = patterns.get(sys.platform, "Cantio-*-Linux.AppImage")
+    pat = patterns.get(sys.platform, "CantioPresenter-*-Linux.AppImage")
     found = list(Path(".").glob(pat))
     if found:
         for f in found:
             size_mb = f.stat().st_size / 1024 / 1024
             print(f"  📦 {f} ({size_mb:.1f} MB)")
     else:
-        dist = Path("dist/Cantio")
+        dist = Path("dist/CantioPresenter")
         if dist.exists():
-            print(f"  📁 dist/Cantio/ (instalator negenerat)")
+            print(f"  📁 dist/CantioPresenter/ (instalator negenerat)")
 
 
 if __name__ == "__main__":

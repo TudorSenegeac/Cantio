@@ -1,4 +1,4 @@
-# cantio.spec — PyInstaller build spec for Cantio
+# cantio.spec — PyInstaller build spec for CantioPresenter
 # Run with: pyinstaller --clean cantio.spec
 
 import sys
@@ -25,8 +25,8 @@ if os.path.exists('GPSPLASH-cutout.png'):
 if is_win and os.path.exists('mdbtools'):
     datas.append(('mdbtools', 'mdbtools'))
 
-# display-electron este compilat separat cu electron-packager → dist/Cantio/CantioDisplay/
-# Nu se include în PyInstaller datas; build.py copiază executabilul compilat lângă Cantio.exe.
+# display-electron este compilat separat cu electron-packager → dist/CantioPresenter/CantioDisplay/
+# Nu se include în PyInstaller datas; build.py copiază executabilul compilat lângă CantioPresenter.exe.
 
 # ── Hidden imports ────────────────────────────────────────────────────────────
 hiddenimports = [
@@ -126,7 +126,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Cantio',
+    name='CantioPresenter',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -149,21 +149,21 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='Cantio',
+    name='CantioPresenter',
 )
 
 if is_mac:
     app = BUNDLE(
         coll,
-        name='Cantio.app',
+        name='CantioPresenter.app',
         icon='GProICON.icns' if os.path.exists('GProICON.icns') else 'GProICON.png',
         bundle_identifier='com.cantio.app',
         info_plist={
             'NSHighResolutionCapable': True,
             'NSCameraUsageDescription':
-                'Cantio folosește camera pentru fundal video live.',
+                'CantioPresenter folosește camera pentru fundal video live.',
             'NSMicrophoneUsageDescription':
-                'Cantio poate accesa microfonul pentru audio.',
+                'CantioPresenter poate accesa microfonul pentru audio.',
             'CFBundleShortVersionString': '1.5.2',
             'CFBundleVersion': '1.5.2',
             'LSMinimumSystemVersion': '10.14',
