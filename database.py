@@ -2083,7 +2083,7 @@ def export_playlist_pdf(path):
 
     c.setFont("Helvetica-Bold", 20)
     c.setFillColorRGB(0.3, 0.6, 0.9)
-    c.drawString(2 * cm, h - 2 * cm, "Cantio — Service Order")
+    c.drawString(2 * cm, h - 2 * cm, "CantioPresenter — Service Order")
 
     c.setFont("Helvetica", 10)
     c.setFillColorRGB(0.5, 0.5, 0.5)

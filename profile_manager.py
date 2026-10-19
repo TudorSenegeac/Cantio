@@ -181,7 +181,7 @@ QLabel { color: #cccccc; }
 class ProfileSelectDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Cantio — {t('select_profile')}")
+        self.setWindowTitle(f"CantioPresenter — {t('select_profile')}")
         self.setMinimumSize(440, 520)
         self.setWindowFlags(
             self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint

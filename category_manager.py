@@ -48,7 +48,7 @@ class CategoryManagerDialog(QDialog):
 
     def __init__(self, parent=None, app_style: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("Gestionare Categorii — Cantio")
+        self.setWindowTitle("Gestionare Categorii — CantioPresenter")
         self.setMinimumSize(760, 500)
         self.setStyleSheet(app_style or _STYLE)
         self._counts:    dict[str, int] = {}

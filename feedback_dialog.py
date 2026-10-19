@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Cantio — Dialog Feedback
+CantioPresenter — Dialog Feedback
 ========================
 Permite utilizatorului să trimită feedback (bug / sugestie / întrebare)
 direct din aplicație către cantioapp@gmail.com.
@@ -115,7 +115,7 @@ class _SendWorker(QThread):
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Accept": "application/json",
-                    "User-Agent": "Mozilla/5.0 (Cantio Feedback)",
+                    "User-Agent": "Mozilla/5.0 (CantioPresenter Feedback)",
                     # Fara Origin/Referer, FormSubmit crede ca cererea vine
                     # dintr-un fisier local si o refuza.
                     "Origin": "https://cantioapp.com",
@@ -156,7 +156,7 @@ class FeedbackDialog(QDialog):
         super().__init__(parent)
         self._app_version = app_version
         self._worker = None
-        self.setWindowTitle("Trimite Feedback — Cantio")
+        self.setWindowTitle("Trimite Feedback — CantioPresenter")
         self.setModal(True)
         self.setMinimumWidth(480)
         self.setStyleSheet(_DIALOG_STYLE)
@@ -174,7 +174,7 @@ class FeedbackDialog(QDialog):
 
         sub = QLabel(
             "Spune-ne ce funcționează, ce nu, sau ce ai vrea să adăugăm. "
-            "Mesajul ajunge direct la echipa Cantio."
+            "Mesajul ajunge direct la echipa CantioPresenter."
         )
         sub.setObjectName("sub")
         sub.setWordWrap(True)
@@ -299,14 +299,14 @@ class FeedbackDialog(QDialog):
             os_info = "necunoscut"
 
         payload = {
-            "_subject": f"[Cantio Feedback] {category}",
+            "_subject": f"[CantioPresenter Feedback] {category}",
             "_template": "table",
             "_captcha": "false",
             "Tip": category,
             "Nume": name or "—",
             "Email_raspuns": email or "—",
             "Mesaj": text,
-            "Versiune_Cantio": self._app_version,
+            "Versiune_CantioPresenter": self._app_version,
             "Sistem": os_info,
         }
         # FormSubmit folosește câmpul 'email' ca Reply-To, dacă e valid.

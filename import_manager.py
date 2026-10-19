@@ -198,7 +198,7 @@ class ImportManagerWindow(QDialog):
 
     def __init__(self, parent=None, service_items=None, profile_name="Default"):
         super().__init__(parent)
-        self.setWindowTitle(f"{t('import')} — Cantio")
+        self.setWindowTitle(f"{t('import')} — CantioPresenter")
         self.setMinimumSize(680, 560)
         self.setStyleSheet(_STYLE)
         self._service_items = service_items or []

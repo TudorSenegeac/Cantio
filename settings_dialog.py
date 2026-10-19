@@ -327,7 +327,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None, current_settings=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Cantio — {t('settings')}")
+        self.setWindowTitle(f"CantioPresenter — {t('settings')}")
         self.setMinimumSize(860, 680)
         self.setStyleSheet(DIALOG_STYLE)
         self.s = current_settings or db.get_settings()

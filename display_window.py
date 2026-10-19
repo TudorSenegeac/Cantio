@@ -671,7 +671,7 @@ class DisplayWindow(QMainWindow):
         self._opening_anim    = None
         self._close_anim      = None
 
-        self.setWindowTitle(f"Cantio — {self.window_name}")
+        self.setWindowTitle(f"CantioPresenter — {self.window_name}")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint

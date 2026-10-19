@@ -1650,7 +1650,7 @@ class SlidesPlaceholder(QWidget):
         logo_lbl.setStyleSheet("color: #cba6f7; font-size: 42px; background: transparent;")
         layout.addWidget(logo_lbl)
 
-        title_lbl = QLabel("Cantio")
+        title_lbl = QLabel("CantioPresenter")
         title_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         title_lbl.setStyleSheet(
             "color: #e0e0e0; font-size: 18px; font-weight: 700; background: transparent;"
@@ -2205,7 +2205,7 @@ class ControlWindow(QMainWindow):
         self._autosave_debounce.setSingleShot(True)
         self._autosave_debounce.timeout.connect(self._do_autosave)
 
-        self.setWindowTitle(f"Cantio — {profile_name}")
+        self.setWindowTitle(f"CantioPresenter — {profile_name}")
         self.setMinimumSize(1240, 760)
         self.setStyleSheet(APP_STYLE)
 
@@ -2394,7 +2394,7 @@ class ControlWindow(QMainWindow):
 
         # ── 5. Ajutor ─────────────────────────────────────────────────────────
         m_help = menubar.addMenu("❓ Ajutor")
-        m_help.addAction(_act("Despre Cantio",    self._show_about))
+        m_help.addAction(_act("Despre CantioPresenter",    self._show_about))
         m_help.addAction(_act("Scurtături Tastatură", self._show_shortcuts))
         m_help.addAction(_act("Tutorial",             self._show_tutorial))
         m_help.addSeparator()
@@ -2482,7 +2482,7 @@ class ControlWindow(QMainWindow):
     def _save_service_as(self):
         """Save current service with a new filename."""
         path, _ = QFileDialog.getSaveFileName(
-            self, "Salvează Serviciu ca…", "", "Cantio Service (*.gps)"
+            self, "Salvează Serviciu ca…", "", "CantioPresenter Service (*.gps)"
         )
         if path:
             self._service_path = path
@@ -2680,7 +2680,7 @@ class ControlWindow(QMainWindow):
             return b
 
         # ── Logo / Name ────────────────────────────────────────────────────
-        name_lbl = QLabel("  Cantio  ")
+        name_lbl = QLabel("  CantioPresenter  ")
         name_lbl.setStyleSheet(
             "color: #5294e2; font-weight: 700; font-size: 14px; "
             "letter-spacing: 1px; padding: 0 6px;"
@@ -11103,7 +11103,7 @@ class ControlWindow(QMainWindow):
             db.init_db()
             self.settings = db.get_settings()
             self.preview.apply_settings(self.settings)
-            self.setWindowTitle(f"Cantio — {fallback}")
+            self.setWindowTitle(f"CantioPresenter — {fallback}")
             self._profile_btn.setText(f"👤 {fallback}")
             self._load_library()
         except Exception as _pe:
@@ -11890,7 +11890,7 @@ class ControlWindow(QMainWindow):
             return
         default = self._service_path or "serviciu.gps"
         path, _ = QFileDialog.getSaveFileName(
-            self, "Salvează Serviciu", default, "Cantio Service (*.gps)"
+            self, "Salvează Serviciu", default, "CantioPresenter Service (*.gps)"
         )
         if not path:
             return
@@ -11907,7 +11907,7 @@ class ControlWindow(QMainWindow):
     def _open_service(self):
         start = self._service_path or ""
         path, _ = QFileDialog.getOpenFileName(
-            self, "Deschide Serviciu", start, "Cantio Service (*.gps)"
+            self, "Deschide Serviciu", start, "CantioPresenter Service (*.gps)"
         )
         if not path:
             return
@@ -12100,7 +12100,7 @@ class ControlWindow(QMainWindow):
 
     def _show_remote_qr(self, url: str, qr_b64: str = ""):
         dlg = QDialog(self)
-        dlg.setWindowTitle("Cantio Remote Control")
+        dlg.setWindowTitle("CantioPresenter Remote Control")
         dlg.setMinimumSize(360, 360)
         dlg.setStyleSheet(APP_STYLE)
         lay = QVBoxLayout(dlg)

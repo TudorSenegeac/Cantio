@@ -731,7 +731,7 @@ class StageOutputWindow(QMainWindow):
         super().__init__(parent)
         self.widgets: list[dict] = []
         self.state = StageState()
-        self.setWindowTitle("Cantio — Stage Display")
+        self.setWindowTitle("CantioPresenter — Stage Display")
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint
@@ -791,7 +791,7 @@ class StageEditorWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"Cantio — {t('stage_monitor')}")
+        self.setWindowTitle(f"CantioPresenter — {t('stage_monitor')}")
         self.setMinimumSize(1100, 650)
         self.setStyleSheet(STAGE_STYLE)
 

@@ -1,5 +1,5 @@
 """
-Cantio - Splash Screen
+CantioPresenter - Splash Screen
 Shown at startup while loading.  Uses SplashScreen.png as full-bleed background
 (falls back to GPSPLASH-cutout.png → GProICON.png if missing).
 """

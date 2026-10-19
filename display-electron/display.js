@@ -515,7 +515,7 @@ function testRender() {
   ctxC.font = 'bold 48px Arial, sans-serif';
   ctxC.textAlign = 'center';
   ctxC.textBaseline = 'middle';
-  ctxC.fillText('Cantio Display — Gata', W / 2, H / 2);
+  ctxC.fillText('CantioPresenter Display — Gata', W / 2, H / 2);
   console.log('[Display.js] testRender OK');
 }
 

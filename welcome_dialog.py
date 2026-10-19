@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Cantio — Fereastră de bun venit (prima pornire)
+CantioPresenter — Fereastră de bun venit (prima pornire)
 ==============================================
 La prima pornire, întreabă utilizatorul dacă vrea să se aboneze la noutăți
 (newsletter). E-mailul se trimite GRATUIT prin FormSubmit (fără server, fără
-credențiale) pe adresa Cantio, de unde poți construi lista de abonați.
+credențiale) pe adresa CantioPresenter, de unde poți construi lista de abonați.
 
 Nu apare decât o singură dată (marcat în cache).
 """
@@ -41,7 +41,7 @@ class WelcomeDialog(QDialog):
         super().__init__(parent)
         self._app_version = app_version
         self._worker = None
-        self.setWindowTitle("Bun venit în Cantio")
+        self.setWindowTitle("Bun venit în CantioPresenter")
         self.setModal(True)
         self.setMinimumWidth(460)
         self.setStyleSheet(_STYLE)
@@ -52,12 +52,12 @@ class WelcomeDialog(QDialog):
         root.setContentsMargins(24, 22, 24, 18)
         root.setSpacing(10)
 
-        title = QLabel("🎉 Bun venit în Cantio!")
+        title = QLabel("🎉 Bun venit în CantioPresenter!")
         title.setObjectName("title")
         root.addWidget(title)
 
         sub = QLabel(
-            "Mulțumim că folosești Cantio — software gratuit de proiecție pentru biserici.\n"
+            "Mulțumim că folosești CantioPresenter — software gratuit de proiecție pentru biserici.\n"
             "Lasă-ne e-mailul tău ca să primești vești despre versiuni noi, cântări și funcții. "
             "Fără spam, te poți dezabona oricând."
         )
@@ -106,12 +106,12 @@ class WelcomeDialog(QDialog):
             self._set_status("Nu pot trimite acum. Încearcă mai târziu.", "#f38ba8")
             return
         payload = {
-            "_subject": "[Cantio Newsletter] Înscriere nouă",
+            "_subject": "[CantioPresenter Newsletter] Înscriere nouă",
             "_template": "table",
             "_captcha": "false",
             "Email": email,
             "Biserica": self._church.text().strip() or "—",
-            "Versiune_Cantio": self._app_version,
+            "Versiune_CantioPresenter": self._app_version,
             "email": email,   # Reply-To
         }
         self._go_btn.setEnabled(False)
@@ -124,7 +124,7 @@ class WelcomeDialog(QDialog):
     def _on_done(self, ok, message):
         self._later_btn.setEnabled(True)
         if ok:
-            self._set_status("✓ Mulțumim! Te-ai abonat la noutățile Cantio.", "#a6e3a1")
+            self._set_status("✓ Mulțumim! Te-ai abonat la noutățile CantioPresenter.", "#a6e3a1")
             self._go_btn.setText("Gata ✓")
             self._email.setReadOnly(True)
             self._church.setReadOnly(True)

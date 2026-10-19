@@ -42,7 +42,7 @@ def tooltip_for(description: str) -> str:
 class ShortcutsDialog(QDialog):
     def __init__(self, parent=None, app_style: str = ""):
         super().__init__(parent)
-        self.setWindowTitle("Keyboard Shortcuts — Cantio")
+        self.setWindowTitle("Keyboard Shortcuts — CantioPresenter")
         self.setMinimumSize(560, 480)
         if app_style:
             self.setStyleSheet(app_style)

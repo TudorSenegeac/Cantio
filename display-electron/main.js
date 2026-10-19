@@ -463,7 +463,7 @@ function openPreview() {
     width: 520, height: 300,
     x: -3000, y: -3000,           // off-screen until Qt reparents it
     backgroundColor: '#000000',
-    title: 'Cantio Preview',
+    title: 'CantioPresenter Preview',
     frame: false,
     show: false,
     skipTaskbar: true,
@@ -502,7 +502,7 @@ function openBgEditor(filePath) {
     height: Math.min(900,  b.height - 80),
     center: true,
     backgroundColor: '#181818',
-    title: 'Cantio — Editor Fundal',
+    title: 'CantioPresenter — Editor Fundal',
     icon: CANTIO_ICON,
     autoHideMenuBar: true,
     skipTaskbar: false,   // show in the Windows taskbar
@@ -556,7 +556,7 @@ function openThemeEditor(filePath) {
     height: Math.min(860,  b.height - 80),
     center: true,
     backgroundColor: '#14141c',
-    title: 'Cantio — Editor Teme',
+    title: 'CantioPresenter — Editor Teme',
     icon: CANTIO_ICON,
     autoHideMenuBar: true,
     skipTaskbar: false,

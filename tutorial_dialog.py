@@ -1,5 +1,5 @@
 """
-Cantio - Tutorial
+CantioPresenter - Tutorial
 Provides two modes:
   • TutorialDialog   — legacy modal dialog (used for "Tutorial" menu item fallback)
   • InteractiveTutorial — overlay-based interactive tour on the main window
@@ -23,9 +23,9 @@ from PyQt6.QtGui import (
 _STEPS = [
     {
         "icon":  "👋",
-        "title": "Bun venit în Cantio!",
+        "title": "Bun venit în CantioPresenter!",
         "text": (
-            "Cantio este un software profesional de afișare versuri\n"
+            "CantioPresenter este un software profesional de afișare versuri\n"
             "pentru servicii religioase și prezentări.\n\n"
             "Acest tutorial îți va arăta funcțiile principale\n"
             "în câțiva pași simpli."
@@ -134,7 +134,7 @@ _STEPS = [
         "icon":  "✅",
         "title": "Ești gata!",
         "text": (
-            "Cantio este acum configurat și gata de utilizare.\n\n"
+            "CantioPresenter este acum configurat și gata de utilizare.\n\n"
             "📖 Ajutor online:\n"
             "<a style='color:#5294e2;' href='https://cantioapp.com/helpdesk'>"
             "cantioapp.com/helpdesk</a>\n\n"
@@ -147,7 +147,7 @@ _STEPS = [
 class TutorialDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Tutorial Cantio")
+        self.setWindowTitle("Tutorial CantioPresenter")
         self.setFixedSize(640, 480)
         self.setModal(True)
         self.setStyleSheet("""
@@ -498,7 +498,7 @@ class InteractiveTutorial(QObject):
 
             # PAS 0 — Bun venit
             TutorialStep(
-                "👋 Bun venit în Cantio!",
+                "👋 Bun venit în CantioPresenter!",
                 "Acesta este un tur interactiv care\n"
                 "îți arată cum să folosești aplicația\n"
                 "pas cu pas.\n\n"
@@ -683,7 +683,7 @@ class InteractiveTutorial(QObject):
 
             # PAS 12 — Final
             TutorialStep(
-                "✅ Ești gata să folosești Cantio!",
+                "✅ Ești gata să folosești CantioPresenter!",
                 "Ai parcurs tot tutorialul! 🎉\n\n"
                 "Resurse utile:\n"
                 "✔ Ajutor online:\n"

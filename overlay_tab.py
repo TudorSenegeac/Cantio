@@ -976,7 +976,7 @@ class OverlayEditorWindow(QMainWindow):
                  parent_tab: "OverlayTab" = None,
                  parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Cantio — Editor Overlay vizual")
+        self.setWindowTitle("CantioPresenter — Editor Overlay vizual")
         self.setMinimumSize(1100, 660)
         self.setStyleSheet(self._STYLE)
 

@@ -46,7 +46,7 @@ def _global_exception_handler(exc_type, exc_value, exc_tb):
     try:
         from PyQt6.QtWidgets import QMessageBox
         msg = QMessageBox()
-        msg.setWindowTitle("Cantio — Eroare")
+        msg.setWindowTitle("CantioPresenter — Eroare")
         msg.setIcon(QMessageBox.Icon.Critical)
         msg.setText(
             "Aplicația a întâmpinat o eroare neașteptată și trebuie repornită.\n\n"
@@ -76,8 +76,9 @@ def _set_app_icon(app: QApplication):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName("Cantio")
-    app.setOrganizationName("Cantio")
+    app.setApplicationName("CantioPresenter")
+    app.setApplicationDisplayName("CantioPresenter")
+    app.setOrganizationName("CantioPresenter")
     app.setApplicationVersion("1.5.2")
 
     # Prevent Qt from quitting automatically when the splash (or any dialog)

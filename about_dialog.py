@@ -1,5 +1,5 @@
 """
-Cantio - About Dialog
+CantioPresenter - About Dialog
 Logo header, 4 tabs (Despre, Licență GPL-3.0, Termeni și Condiții, Credite),
 GitHub / website / close buttons.
 """
@@ -42,11 +42,11 @@ _TERMS = """\
 TERMENI ȘI CONDIȚII DE UTILIZARE
 
 1. ACCEPTUL TERMENILOR
-   Prin utilizarea Cantio acceptați în totalitate termenii și
+   Prin utilizarea CantioPresenter acceptați în totalitate termenii și
    condițiile prezentate în acest document.
 
 2. UTILIZARE PERMISĂ
-   Cantio este destinat exclusiv utilizării în context religios,
+   CantioPresenter este destinat exclusiv utilizării în context religios,
    eclesial și nonprofit. Orice utilizare comercială este interzisă
    fără acordul scris al autorilor.
 
@@ -86,7 +86,7 @@ Design inspirat din
 
 Mulțumiri speciale
   Comunității Creștine care a testat și susținut proiectul,
-  familiei și tuturor celor care au crezut în viziunea Cantio.
+  familiei și tuturor celor care au crezut în viziunea CantioPresenter.
 
 „Cântați Domnului o cântare nouă!" — Psalmul 96:1
 """
@@ -95,7 +95,7 @@ Mulțumiri speciale
 class AboutDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Despre Cantio")
+        self.setWindowTitle("Despre CantioPresenter")
         self.setFixedSize(520, 560)
         self.setStyleSheet("""
             QDialog          { background: #11111b; color: #cdd6f4; }
@@ -166,7 +166,7 @@ class AboutDialog(QDialog):
         title_v = QVBoxLayout()
         title_v.setSpacing(2)
 
-        name_lbl = QLabel("Cantio")
+        name_lbl = QLabel("CantioPresenter")
         name_lbl.setFont(QFont("Segoe UI", 22, QFont.Weight.Bold))
         name_lbl.setStyleSheet("color: #cba6f7;")
         title_v.addWidget(name_lbl)
@@ -238,11 +238,11 @@ class AboutDialog(QDialog):
         tb.setHtml("""
         <html><body style="font-family: 'Segoe UI', sans-serif;
                            color: #cdd6f4; background: #1e1e2e; font-size: 13px;">
-        <p><b style="color:#cba6f7;">Cantio</b> este un software modern de prezentare
+        <p><b style="color:#cba6f7;">CantioPresenter</b> este un software modern de prezentare
         destinat <b>bisericilor, corurilor și congregațiilor creștine</b>.</p>
 
         <p>Conceput să simplifice afișarea versetelor biblice, imnurilor și prezentărilor
-        de serviciu pe ecrane multiple, Cantio combină un editor intuitiv cu un
+        de serviciu pe ecrane multiple, CantioPresenter combină un editor intuitiv cu un
         motor de randare Electron de înaltă calitate.</p>
 
         <h4 style="color:#89b4fa;">Funcționalități principale</h4>

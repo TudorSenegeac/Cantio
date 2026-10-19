@@ -128,7 +128,7 @@ def show_migration_dialog(old_path: str, profile: str, parent=None) -> bool:
     class MigrationDialog(QDialog):
         def __init__(self):
             super().__init__(parent)
-            self.setWindowTitle("Cantio — Migrare bază de date")
+            self.setWindowTitle("CantioPresenter — Migrare bază de date")
             self.setFixedSize(460, 240)
             self.setStyleSheet("""
                 QDialog { background: #181818; color: #e0e0e0; }

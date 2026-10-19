@@ -284,7 +284,7 @@ class ElectronDisplayManager:
     # ── Display commands (enqueue) ────────────────────────────────────────────
 
     def open_display(self, screen_index: int = 0, window_id: int = 0,
-                     window_name: str = "Cantio Display",
+                     window_name: str = "CantioPresenter Display",
                      custom_w: int = 0, custom_h: int = 0):
         # Captează dimensiunile ecranului pentru metodele de geometrie Qt-compat.
         # Folosește aceeași logică primary/secondary ca main.js openDisplay():
@@ -1104,7 +1104,7 @@ class ElectronDisplayProxy:
         self,
         manager: ElectronDisplayManager,
         window_id: int = 0,
-        window_name: str = "Cantio Display",
+        window_name: str = "CantioPresenter Display",
         initial_settings: Optional[Dict] = None,
     ):
         self._mgr         = manager
