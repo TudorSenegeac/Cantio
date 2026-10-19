@@ -339,7 +339,7 @@ REMOTE_HTML = r"""<!DOCTYPE html>
 <meta name="viewport"
     content="width=device-width, initial-scale=1.0,
     maximum-scale=1.0, user-scalable=no">
-<title>Cantio Remote</title>
+<title>CantioPresenter Remote</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 * { box-sizing:border-box; margin:0; padding:0; }
@@ -508,7 +508,7 @@ body {
 <body>
 
 <div class="header">
-    <h1>🎵 Cantio</h1>
+    <h1>🎵 CantioPresenter</h1>
     <div>
         <span class="status-dot" id="statusDot"></span>
         <span id="statusText" style="font-size:12px;color:var(--subtext)">Conectare...</span>

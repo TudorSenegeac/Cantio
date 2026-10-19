@@ -197,7 +197,7 @@ class ProfileSelectDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(14)
 
-        logo = QLabel("Cantio")
+        logo = QLabel("CantioPresenter")
         logo.setStyleSheet(
             "color: #5294e2; font-size: 26px; font-weight: 700; letter-spacing: 2px;"
         )

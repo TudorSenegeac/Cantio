@@ -2369,7 +2369,7 @@ class PresentationEditor(QMainWindow):
 
         self._presentation_title = title or "Prezentare nouă"
         self.setWindowTitle(
-            f"Cantio — Editor Prezentări — {self._presentation_title}")
+            f"CantioPresenter — Editor Prezentări — {self._presentation_title}")
 
         self._current_slide = 0
         self._undo_stack: list[list] = []
@@ -2729,7 +2729,7 @@ class PresentationEditor(QMainWindow):
             pres = db.get_presentation(self._pres_id)
             if pres:
                 self.setWindowTitle(
-                    f"Cantio — {pres.get('title','Prezentare')}")
+                    f"CantioPresenter — {pres.get('title','Prezentare')}")
                 raw = pres.get("slides", pres.get("slides_json", []))
                 slides = (json.loads(raw)
                           if isinstance(raw, str) else raw)
@@ -2756,7 +2756,7 @@ class PresentationEditor(QMainWindow):
                 self._pres_id = db.add_presentation(title, self._slides)
                 self._presentation_title = title
                 self.setWindowTitle(
-                    f"Cantio — Editor Prezentări — {title}")
+                    f"CantioPresenter — Editor Prezentări — {title}")
             else:
                 pres = db.get_presentation(self._pres_id)
                 title = (pres.get("title", self._presentation_title)

@@ -1590,7 +1590,7 @@ class SettingsDialog(QDialog):
             self._bk_status_lbl.setText("⚠ Restaurare parțială:\n" + "\n".join(errors))
             self._bk_status_lbl.setStyleSheet("color:#ccaa44; font-size:11px;")
         else:
-            self._bk_status_lbl.setText("✅ Restaurare completă. Repornește Cantio.")
+            self._bk_status_lbl.setText("✅ Restaurare completă. Repornește CantioPresenter.")
             self._bk_status_lbl.setStyleSheet("color:#66cc66; font-size:11px;")
 
     def _open_backup_folder(self):
@@ -1652,7 +1652,7 @@ class SettingsDialog(QDialog):
         lg = QVBoxLayout(log_group)
 
         log_info = QLabel(
-            "Cantio salvează un jurnal zilnic în:\n"
+            "CantioPresenter salvează un jurnal zilnic în:\n"
             "~/Cantio/logs/\n"
             "Ultimele 7 fișiere sunt păstrate automat."
         )
