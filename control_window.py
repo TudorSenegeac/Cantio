@@ -1709,8 +1709,10 @@ class SlideListDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         text = self._safe_text(index)
         lines = max(1, text.count("\n") + 1)
+        lbl = index.data(Qt.ItemDataRole.UserRole + 2)
+        extra = 18 if lbl else 0
         return QSize(option.rect.width(),
-                     max(44, lines * self._LINE_H + self._PADDING * 2))
+                     max(44, lines * self._LINE_H + self._PADDING * 2 + extra))
 
     def paint(self, painter, option, index):
         painter.save()
@@ -1745,12 +1747,31 @@ class SlideListDelegate(QStyledItemDelegate):
         painter.setPen(QColor("#ffffff") if selected else QColor("#888888"))
         painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, num_str)
 
+        # ── Etichetă (chip colorat, dacă există) ──────────────────────────────
+        lbl = index.data(Qt.ItemDataRole.UserRole + 2)
+        lbl = str(lbl) if lbl else ""
+        label_h = 0
+        if lbl:
+            lcol = QColor(str(index.data(Qt.ItemDataRole.UserRole + 3) or "#6c7086"))
+            lf = QFont("Segoe UI", 7, QFont.Weight.Bold)
+            painter.setFont(lf)
+            fm = painter.fontMetrics()
+            lw = fm.horizontalAdvance(lbl) + 14
+            chip = QRect(r.left() + self._NUM_W, r.top() + pad, lw, 15)
+            # fundal nuanțat + text în culoarea etichetei
+            bg = QColor(lcol); bg.setAlpha(46)
+            painter.setBrush(QBrush(bg)); painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(chip, 4, 4)
+            painter.setPen(lcol)
+            painter.drawText(chip, Qt.AlignmentFlag.AlignCenter, lbl)
+            label_h = 20
+
         # ── Full slide text ───────────────────────────────────────────────────
         text_rect = QRect(
             r.left() + self._NUM_W,
-            r.top() + pad,
+            r.top() + pad + label_h,
             r.width() - self._NUM_W - 8,
-            r.height() - pad * 2,
+            r.height() - pad * 2 - label_h,
         )
         text_font = QFont("Consolas", 9)
         painter.setFont(text_font)
@@ -7039,10 +7060,20 @@ class ControlWindow(QMainWindow):
                 self._last_slide_per_song: dict[str, int] = {}
             self._last_slide_per_song[str(_saved_id)] = _pre_save_slide_idx
 
-        self._load_library()
-        # Auto-select the saved / newly created song in the list
+        # Reîncărcarea listei + reselecția pot eșua din motive de mediu (ex. render
+        # thumbnails pe laptopul bisericii) DUPĂ ce salvarea a reușit — nu lăsăm
+        # asta să arunce o eroare fatală peste o salvare reușită; o logăm.
+        try:
+            self._load_library()
+        except Exception as _reload_err:
+            logger.exception("[save] post-save reload failed: %s", _reload_err)
         if _saved_id:
-            QTimer.singleShot(150, lambda sid=_saved_id: self._select_song_in_list(sid))
+            def _sel_safe(sid=_saved_id):
+                try:
+                    self._select_song_in_list(sid)
+                except Exception as _e:
+                    logger.exception("[save] select-in-list failed: %s", _e)
+            QTimer.singleShot(150, _sel_safe)
         self._update_status(song_msg=f"Saved: {title}")
         self._toasts.success(f"Cântarea «{title}» a fost salvată.")
         # Offer to add to service when creating a new song
@@ -7061,6 +7092,11 @@ class ControlWindow(QMainWindow):
 
     def _load_content_to_editor(self, content: str):
         """Load song content (HTML or plain text) into the editor without triggering signals."""
+        try:
+            from importer import clean_imported_lyrics
+            content = clean_imported_lyrics(content)
+        except Exception:
+            pass
         self.editor.blockSignals(True)
         if content.strip().startswith("<!DOCTYPE") or content.strip().startswith("<html"):
             self.editor.setHtml(content)
@@ -7672,6 +7708,19 @@ class ControlWindow(QMainWindow):
             self._service_view_on = False
             try: self._service_view_btn.setChecked(False)
             except Exception: pass
+        # Curăță marcajele reziduale de import (VideoPsalm) din slide-uri pt. afișare.
+        try:
+            from importer import clean_imported_lyrics as _cil
+            _cleaned = []
+            for s in slides:
+                if isinstance(s, dict) and isinstance(s.get("text"), str):
+                    s = {**s, "text": _cil(s["text"])}
+                elif isinstance(s, str):
+                    s = _cil(s)
+                _cleaned.append(s)
+            slides = _cleaned
+        except Exception:
+            pass
         self.current_slides = slides
         # Track the "source" slide list for arrangements. When slides change for
         # a real reason (song load / text edit) — not an arrangement view — this
@@ -7760,13 +7809,17 @@ class ControlWindow(QMainWindow):
             else:
                 self.slides_grid.addWidget(thumb, i // cols, i % cols)
 
-        # ── List view — full text via custom delegate ─────────────────────────
+        # ── List view — full text + etichetă via custom delegate ──────────────
         self._slide_list_widget.clear()
         for i, slide in enumerate(slides):
             item = QListWidgetItem()          # delegate does all painting
             item.setData(Qt.ItemDataRole.UserRole,
                          self._slide_text(slide))               # full text (never a dict)
             item.setData(Qt.ItemDataRole.UserRole + 1, i + 1)   # 1-based number
+            _lbl = smart_labels[i] if i < len(smart_labels) else ""
+            item.setData(Qt.ItemDataRole.UserRole + 2, _lbl)    # eticheta
+            item.setData(Qt.ItemDataRole.UserRole + 3,
+                         db.get_label_color(_lbl) if _lbl else "")  # culoare
             self._slide_list_widget.addItem(item)
 
         # Install delegate once (idempotent)
@@ -7868,7 +7921,13 @@ class ControlWindow(QMainWindow):
 
     # ── Arrangements (verse/chorus sequences, ProPresenter-style) ────────────
     def _slide_text(self, slide):
-        return slide.get("text", "") if isinstance(slide, dict) else str(slide)
+        txt = slide.get("text", "") if isinstance(slide, dict) else str(slide)
+        # Curăță marcajele reziduale de import (VideoPsalm <s1076>…</s>) la afișare.
+        try:
+            from importer import clean_imported_lyrics
+            return clean_imported_lyrics(txt)
+        except Exception:
+            return txt
 
     # ── Italic per-selectie din editor -> marcaje pentru output (#6) ───────────
     @staticmethod

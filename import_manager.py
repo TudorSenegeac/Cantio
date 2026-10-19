@@ -17,6 +17,29 @@ from PyQt6.QtGui import QFont, QColor, QIcon
 
 import database as db
 from translations import t
+from importer import clean_imported_lyrics
+
+
+def _clean_import_song(s: dict):
+    """Curăță marcajele reziduale (VideoPsalm <s1076>…</s>) din conținut + slide-uri."""
+    try:
+        if isinstance(s.get("content"), str):
+            s["content"] = clean_imported_lyrics(s["content"])
+        sl = s.get("slides")
+        if isinstance(sl, list):
+            out = []
+            for item in sl:
+                if isinstance(item, str):
+                    out.append(clean_imported_lyrics(item))
+                elif isinstance(item, dict) and isinstance(item.get("text"), str):
+                    item = dict(item)
+                    item["text"] = clean_imported_lyrics(item["text"])
+                    out.append(item)
+                else:
+                    out.append(item)
+            s["slides"] = out
+    except Exception:
+        pass
 
 
 # ── Import history ─────────────────────────────────────────────────────────────
@@ -105,6 +128,7 @@ class ImportWorker(QThread):
                 total = len(songs)
                 for i, s in enumerate(songs):
                     try:
+                        _clean_import_song(s)
                         db.add_song(
                             s["title"], s["content"], s["slides"],
                             s.get("author", ""), s.get("category", "General"),
@@ -531,6 +555,7 @@ class ImportManagerWindow(QDialog):
                 result = import_file(filepath)
                 if result["type"] == "songs":
                     for s in result["data"]:
+                        _clean_import_song(s)
                         db.add_song(
                             s["title"], s["content"], s["slides"],
                             s.get("author", ""), s.get("category", "General"),

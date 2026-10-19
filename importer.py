@@ -11,6 +11,37 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
+# ── Curățare text importat (VideoPsalm etc.) ──────────────────────────────────
+# Marcaje VideoPsalm care nu trebuie afișate: <s1076>, </s>, <sb>, <chorus> etc.
+_VP_TAG_RE = re.compile(r"</?\s*(?:s\d*|sb|chorus|verse|bridge|tag|c\d*)\s*>",
+                        re.IGNORECASE)
+# Numere de verset de tip "<1076>" sau coduri izolate.
+_VP_NUMTAG_RE = re.compile(r"<\s*\d+\s*>")
+
+
+def clean_imported_lyrics(text: str) -> str:
+    """Șterge marcajele reziduale din import (VideoPsalm etc.) — ex. <s1076>,
+    </s>, <sb>. NU atinge marcajele de repetare bisericesc /: … :/ și nici
+    etichetele R:/C:/B:. Returnează textul curat (sau cel original dacă nu e str)."""
+    if not isinstance(text, str) or not text:
+        return text
+    _s = text.lstrip()
+    if _s.startswith("<!DOCTYPE") or _s.startswith("<html"):
+        return text   # document HTML rich (din editor) — nu are marcaje VideoPsalm
+    cleaned = _VP_TAG_RE.sub("", text)
+    cleaned = _VP_NUMTAG_RE.sub("", cleaned)
+    # curăță spațiile goale rămase la capete de linie
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    return cleaned
+
+
+def has_import_artifacts(text: str) -> bool:
+    """Adevărat dacă textul conține marcaje reziduale de import (de curățat)."""
+    if not isinstance(text, str) or not text:
+        return False
+    return bool(_VP_TAG_RE.search(text) or _VP_NUMTAG_RE.search(text))
+
+
 # ── Encoding detection ────────────────────────────────────────────────────────
 
 def detect_encoding(filepath):
