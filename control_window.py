@@ -8330,17 +8330,29 @@ class ControlWindow(QMainWindow):
         self._push_stage_state()
         # Selecting a slide makes the slides the active target → blue selection.
         self._set_slides_selection_active(True)
-        # Take keyboard focus AWAY from the lyrics editor so Page Up/Down and the
-        # arrow keys navigate slides (handled in keyPressEvent) instead of moving
-        # the text caret. Clearing focus routes key events to the main window.
+        # Ia focusul de la ORICE control care NU e în zona de slide-uri (lista de
+        # cântări, lista de serviciu, editor, butoane) ca săgețile/PageUp/Down să
+        # navigheze SLIDE-urile (via keyPressEvent al ferestrei principale), nu
+        # lista. Fără focus pe un widget, tastele ajung la fereastra principală.
         fw = QApplication.focusWidget()
-        from PyQt6.QtWidgets import QLineEdit as _QLE, QTextEdit as _QTE, QPlainTextEdit as _QPTE
-        if isinstance(fw, (_QLE, _QTE, _QPTE)):
+        if (fw is not None and fw is not self
+                and not self._widget_is_in(fw, getattr(self, "_slides_stack", None))):
             fw.clearFocus()
         # Ignore the brief focus churn that follows so the selection stays blue.
         self._slide_just_selected = True
         QTimer.singleShot(120, lambda: setattr(self, "_slide_just_selected", False))
         self.activateWindow()
+
+    def _focus_slides(self):
+        """Rutează tastatura spre zona de slide-uri: ia focusul de la orice control
+        care nu e în zona de slide-uri, ca săgețile să navigheze slide-urile."""
+        try:
+            fw = QApplication.focusWidget()
+            if (fw is not None and fw is not self
+                    and not self._widget_is_in(fw, getattr(self, "_slides_stack", None))):
+                fw.clearFocus()
+        except Exception:
+            pass
 
     def _select_slide_silent(self, idx: int):
         """Select a slide by index WITHOUT calling setFocus() or activateWindow().
@@ -9788,6 +9800,8 @@ class ControlWindow(QMainWindow):
     # ── Display ───────────────────────────────────────────────────────────────
 
     def _go_live(self):
+        # Dupa GO LIVE, sagetile trebuie sa navigheze slide-urile (nu lista).
+        self._focus_slides()
         if self._is_frozen:
             self._toasts.warning("Proiectorul este oprit (Freeze). Apasă 🔓 Unfreeze.")
             return
@@ -9881,6 +9895,7 @@ class ControlWindow(QMainWindow):
                 dw.canvas.set_frame(pixmap)   # no-op in v4 DisplayCanvas
 
     def _black_screen(self):
+        self._focus_slides()
         for dw in self.display_windows:
             dw.black_screen()
         self._preview_cmd("black_screen")
@@ -12008,6 +12023,7 @@ class ControlWindow(QMainWindow):
 
     def _clear_text(self):
         """Clear text from all displays without affecting background."""
+        self._focus_slides()
         for dw in self.display_windows:
             if hasattr(dw, "clear_text"):
                 dw.clear_text()
@@ -12023,6 +12039,7 @@ class ControlWindow(QMainWindow):
         self._update_status(slide_msg="Text cleared")
 
     def _toggle_freeze(self, checked):
+        self._focus_slides()
         self._is_frozen = checked
         for dw in self.display_windows:
             if checked:
