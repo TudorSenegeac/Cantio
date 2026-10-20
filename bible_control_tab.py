@@ -159,7 +159,9 @@ class BibleControlTab(QWidget):
         self.current_verse_label = QTextEdit()
         self.current_verse_label.setReadOnly(True)
         self.current_verse_label.setPlainText(t("bible_no_verse"))
-        self.current_verse_label.setMinimumHeight(70)
+        # Înălțime FIXĂ -> un verset lung NU mărește caseta, ci derulează intern,
+        # iar lista versetelor de deasupra rămâne mare.
+        self.current_verse_label.setFixedHeight(92)
         self.current_verse_label.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self.current_verse_label.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded)
