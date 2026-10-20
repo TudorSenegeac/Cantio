@@ -154,8 +154,13 @@ def render_text_on_painter(
     out_c     = QColor(str(s.get("outline_color", "#000000") or "#000000"))
     lsp       = float(s.get("line_spacing", 1.4) or 1.4)
     uppercase = s.get("uppercase", "false") in ("true", True)
-    valign    = str(s.get("text_valign", s.get("valign", "center")) or "center")
-    align_str = str(s.get("text_align", "center") or "center")
+    # Normalizare aliniere (acceptă română Sus/Centru/Jos/Stânga/Dreapta și engleză).
+    _va = str(s.get("text_valign", s.get("valign", "center")) or "center").lower()
+    valign = ("top" if _va in ("top", "sus") else
+              "bottom" if _va in ("bottom", "jos") else "center")
+    _ha = str(s.get("text_align", "center") or "center").lower()
+    align_str = ("left" if _ha in ("left", "stanga", "stânga") else
+                 "right" if _ha in ("right", "dreapta") else "center")
 
     # Margin: < 2 → fraction of min(w, h);  ≥ 2 → 1920-space pixels → scaled
     raw_margin = float(s.get("margin", 0.06) or 0.06)

@@ -1818,6 +1818,20 @@ function processText(text, s) {
 // Textul NORMAL (fara aceste marcaje) merge pe calea rapida clasica din drawText.
 const _MARK_RE = /\[\[\/?[ihus]/;
 
+// Aliniere verticala — accepta si romana (Sus/Centru/Jos) si engleza (top/center/bottom).
+function _normValign(v) {
+  const x = String(v || '').toLowerCase();
+  if (x === 'top' || x === 'sus') return 'top';
+  if (x === 'bottom' || x === 'jos') return 'bottom';
+  return 'center';
+}
+function _normAlign(v) {
+  const x = String(v || '').toLowerCase();
+  if (x === 'left' || x === 'stanga' || x === 'stânga') return 'left';
+  if (x === 'right' || x === 'dreapta') return 'right';
+  return 'center';
+}
+
 function _parseStyledRuns(raw) {
   const runs = [];
   let italic = false, underline = false, strike = false, hl = null, buf = '';
@@ -1959,13 +1973,13 @@ function drawStyledText(rawText, opacity, dx, dy) {
     currentSize -= 2;
   }
 
-  const valign = s.text_valign || s.valign || 'center';
+  const valign = _normValign(s.text_valign || s.valign);
   let startY;
   if (valign === 'top')         startY = margin + _reserveTop + currentSize * 0.85;
   else if (valign === 'bottom') startY = h - margin - _reserveBottom - totalH + currentSize * 0.85;
   else                          startY = margin + _reserveTop + (maxH - totalH) / 2 + currentSize * 0.85;
 
-  const align = s.text_align || 'center';
+  const align = _normAlign(s.text_align);
 
   ctxC.save();
   ctxC.globalAlpha = Math.max(0, Math.min(1, opacity));
@@ -2141,7 +2155,7 @@ function drawText(text, opacity, dx, dy) {
     'lines:', lines.length, 'bold:', bold, 'color:', color);
 
   // ── Vertical alignment ─────────────────────────────────────────────────────
-  const valign = s.text_valign || s.valign || 'center';
+  const valign = _normValign(s.text_valign || s.valign);
   let startY;
   if (valign === 'top') {
     startY = margin + _reserveTop + currentSize * 0.85;
@@ -2152,7 +2166,7 @@ function drawText(text, opacity, dx, dy) {
   }
 
   // ── Horizontal alignment ───────────────────────────────────────────────────
-  const align = s.text_align || 'center';
+  const align = _normAlign(s.text_align);
   ctxC.textAlign    = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
   ctxC.textBaseline = 'alphabetic';
   const baseX = align === 'left' ? margin
