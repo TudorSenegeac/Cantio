@@ -477,6 +477,26 @@
     stops.forEach(s => { try { grad.addColorStop(clamp(s.pos, 0, 1), s.color); } catch (e) {} });
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
+
+    // ── "sweep": bandă de lumină care traversează CONTINUU (god-rays, fără cut).
+    // Banda e complet în afara ecranului la capete -> bucla e perfect continuă.
+    if (mode === 'sweep' || mode === 'shine') {
+      const pos = (t * sp * 0.5) % 1;           // 0..1 continuu
+      const band = Math.max(W, H) * 0.35;
+      const cx = pos * (W + band * 2) - band;   // de la -band la W+band
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const diag = (mode === 'shine');
+      const bg = diag
+        ? ctx.createLinearGradient(cx - band, -band, cx + band, H + band)
+        : ctx.createLinearGradient(cx - band, 0, cx + band, 0);
+      bg.addColorStop(0,   'rgba(255,255,255,0)');
+      bg.addColorStop(0.5, 'rgba(255,255,255,0.16)');
+      bg.addColorStop(1,   'rgba(255,255,255,0)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+    }
   }
 
   // ── Gradient presets (20+) ──────────────────────────────────────────────────
@@ -522,6 +542,17 @@
     'Verde smarald':{ type:'radial', angle:90,  mode:'pulse', speed:0.3,  colors:['#d8f3dc','#74c69d','#2d6a4f','#081c15'] },
     'Soare':        { type:'radial', angle:90,  mode:'pulse', speed:0.4,  colors:['#fff7d6','#ffd60a','#ff9e00','#ff5400'] },
     'Galaxie':      { type:'linear', angle:120, mode:'aurora',speed:0.28, colors:['#03001e','#7303c0','#ec38bc','#fdeff9'] },
+    // ── Noi — lumină continuă (sweep/shine) și combinații scenice ──
+    'Raze de har':  { type:'linear', angle:90,  mode:'sweep', speed:0.6,  colors:['#1a1200','#3a2a00','#7a5a00','#ffcf5a'] },
+    'Lumină divină':{ type:'radial', angle:90,  mode:'shine', speed:0.5,  colors:['#2a1a00','#5a3a00','#b07a10','#fff3c0'] },
+    'Val de lumină':{ type:'linear', angle:90,  mode:'sweep', speed:0.7,  colors:['#021226','#063a66','#0a69a8','#49b6e6'] },
+    'Nord':         { type:'linear', angle:90,  mode:'aurora',speed:0.3,  colors:['#001014','#0b5e5e','#13ce9a','#7affe0'] },
+    'Amurg auriu':  { type:'linear', angle:110, mode:'flow',  speed:0.22, colors:['#0b1026','#3a1f4a','#b5532a','#ffb86b'] },
+    'Safir adânc':  { type:'linear', angle:135, mode:'mesh',  speed:0.18, colors:['#00030f','#0a1a52','#1746a0','#4f86e6'] },
+    'Răsărit':      { type:'linear', angle:90,  mode:'sweep', speed:0.5,  colors:['#241026','#7a2a4a','#ff8a5c','#ffe0a3'] },
+    'Eter':         { type:'linear', angle:120, mode:'aurora',speed:0.26, colors:['#05021a','#2a1a7a','#4ad0ff','#c08aff'] },
+    'Perla':        { type:'linear', angle:135, mode:'shine', speed:0.4,  colors:['#141420','#30303f','#6a6a88','#e8e8f4'] },
+    'Flacără vie':  { type:'radial', angle:90,  mode:'pulse', speed:0.55, colors:['#1a0500','#6a1500','#ff5e00','#ffd27a'] },
   };
 
   function applyGradientPreset(L, name) {
@@ -1077,7 +1108,7 @@
   const BgEngine = {
     uid, defaultBackground, newLayer, render, registerMedia,
     SHAPE_LIST, GRADIENT_PRESETS, applyGradientPreset, drawShapeIcon,
-    GRADIENT_MODES: ['none','rotate','shift','cycle','flow','mesh','aurora','waves','pulse'],
+    GRADIENT_MODES: ['none','rotate','shift','cycle','flow','mesh','aurora','waves','pulse','sweep','shine'],
     // Live audio reactivity + lyric reveal (set each frame by display.js).
     setAudio(a) { if (a) _audio = { level: a.level || 0, bass: a.bass || 0, mid: a.mid || 0, treble: a.treble || 0 }; },
     setReveal(p) { _reveal = (p == null) ? 1 : Math.max(0, Math.min(1, p)); },
