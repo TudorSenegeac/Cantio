@@ -694,6 +694,31 @@ def has_structure_markers(slides: list) -> bool:
     return False
 
 
+def split_slides_by_lines(slides: list, labels: list, n: int):
+    """Împarte fiecare slide la câte `n` rânduri. Bucățile păstrează eticheta
+    strofei cu sub-număr (ex. 'Strofa 1' -> 'Strofa 1/1', 'Strofa 1/2').
+    Nu împarte slide-urile rich HTML. Returnează (slides_noi, labels_noi)."""
+    if n <= 0:
+        return slides, labels
+    new_slides, new_labels = [], []
+    for i, s in enumerate(slides):
+        lbl = labels[i] if i < len(labels) else ""
+        is_dict = isinstance(s, dict)
+        text = s.get("text", "") if is_dict else str(s or "")
+        if isinstance(text, str) and text.lstrip().startswith(("<!DOCTYPE", "<html")):
+            new_slides.append(s); new_labels.append(lbl); continue
+        lines = text.split("\n")
+        chunks = [lines[k:k + n] for k in range(0, len(lines), n)]
+        if len(chunks) <= 1:
+            new_slides.append(s); new_labels.append(lbl); continue
+        total = len(chunks)
+        for ci, chunk in enumerate(chunks, 1):
+            ctext = "\n".join(chunk)
+            new_slides.append({**s, "text": ctext} if is_dict else ctext)
+            new_labels.append(f"{lbl}/{ci}" if lbl else "")
+    return new_slides, new_labels
+
+
 def _normalize_slide_text(slide) -> str:
     """Normalize a slide's text for repeat-detection (lowercase, strip
     punctuation/accents-insensitive-ish, collapse whitespace)."""
@@ -7772,6 +7797,14 @@ class ControlWindow(QMainWindow):
             smart_labels = detect_smart_labels(slides, use_markers=use_markers)
         except Exception:
             smart_labels = [""] * len(slides)
+        # Împărțire pe N rânduri (din tema activă) — sub-etichete Strofa 1/1, 1/2…
+        try:
+            _lps = int(_theme_s.get("lines_per_slide", 0) or 0)
+            if _lps > 0:
+                slides, smart_labels = split_slides_by_lines(slides, smart_labels, _lps)
+                self.current_slides = slides
+        except Exception:
+            pass
         _row = 0
         _col = 0
         _prev_label = None
@@ -9376,6 +9409,12 @@ class ControlWindow(QMainWindow):
             merged["bg_fundal_file"]  = bg.get("fundal_file", "")
 
         # ── Layout ────────────────────────────────────────────────────────────
+        try:
+            _lps = int(theme.get("lines_per_slide", 0) or 0)
+            if _lps > 0:
+                merged["lines_per_slide"] = _lps
+        except Exception:
+            pass
         if l.get("margin"):
             merged["margin"]       = str(l["margin"])
         if l.get("valign"):

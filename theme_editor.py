@@ -1584,6 +1584,15 @@ class ThemeVisualEditor(QMainWindow):
         self.l_valign.currentIndexChanged.connect(self._update_canvas)
         form.addRow("V-Align:", self.l_valign)
 
+        # Împărțire automată a slide-urilor pe N rânduri (0 = oprit). Fiecare
+        # bucată păstrează eticheta strofei cu sub-număr (ex. Strofa 1/1, 1/2).
+        self.l_lines_per_slide = QSpinBox()
+        self.l_lines_per_slide.setRange(0, 12)
+        self.l_lines_per_slide.setValue(int(self.theme_data.get("lines_per_slide", 0) or 0))
+        self.l_lines_per_slide.setToolTip("0 = oprit. Împarte fiecare slide la câte N rânduri.")
+        self.l_lines_per_slide.setSpecialValueText("Oprit")
+        form.addRow("Rânduri / slide:", self.l_lines_per_slide)
+
         if self.theme_data.get("type") in ("bible", "both"):
             bg = QGroupBox("Zone Biblie")
             bf = QFormLayout(bg)
@@ -1763,6 +1772,7 @@ class ThemeVisualEditor(QMainWindow):
         elif bg_type == "fundal":
             d["background"]["fundal_file"] = self.bg_fundal_combo.currentData() or ""
 
+        d["lines_per_slide"] = int(self.l_lines_per_slide.value())
         d["layout"] = {
             "margin": str(self.l_margin.value()),
             "valign": self.l_valign.currentText(),
