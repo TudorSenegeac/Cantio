@@ -750,6 +750,22 @@ app.whenReady().then(() => {
     }
   );
 
+  // YouTube embed într-o pagină file:// nu trimite Referer → „Eroare 153".
+  // Setăm un Referer/Origin valid pentru cererile YouTube ca player-ul să meargă.
+  try {
+    session.defaultSession.webRequest.onBeforeSendHeaders(
+      { urls: [
+          '*://*.youtube.com/*', '*://*.youtube-nocookie.com/*',
+          '*://*.ytimg.com/*', '*://*.googlevideo.com/*', '*://*.ggpht.com/*',
+      ] },
+      (details, cb) => {
+        details.requestHeaders['Referer'] = 'https://www.youtube.com/';
+        details.requestHeaders['Origin']  = 'https://www.youtube.com';
+        cb({ requestHeaders: details.requestHeaders });
+      }
+    );
+  } catch (e) { console.error('[YT referer]', e); }
+
   if (_bgEditorOnly) {
     const file = decodeURIComponent(_bgEditorArg.slice('--bg-editor='.length));
     openBgEditor(file);

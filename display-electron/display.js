@@ -1009,7 +1009,8 @@ function _toEmbedUrl(url) {
     if (!url) return '';
     url = url.trim();
     const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
-    if (m) return 'https://www.youtube.com/embed/' + m[1] + '?autoplay=1&rel=0&modestbranding=1';
+    if (m) return 'https://www.youtube.com/embed/' + m[1]
+      + '?autoplay=1&rel=0&modestbranding=1&playsinline=1&origin=https://www.youtube.com';
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     return url;   // any other link loads as-is
   } catch (e) { return url; }
