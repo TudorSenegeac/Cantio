@@ -100,6 +100,11 @@ except Exception:
                 self.colorChanged.emit(self._color)
 
 
+# Etichete canonice pentru fundalul per-etichetă (trebuie să corespundă cu
+# control_window.LABEL_BG_KEYS / _canon_label).
+_THEME_LABEL_KEYS = ["Strofă", "Refren", "Pre-refren", "Punte", "Cor", "Final", "Intro"]
+
+
 class CollapsibleSection(QWidget):
     """Collapsible panel with a coloured header button and a QFormLayout body."""
 
@@ -1457,7 +1462,116 @@ class ThemeVisualEditor(QMainWindow):
         self.bg_stack.addWidget(fw)
 
         layout.addWidget(self.bg_stack, 1)
+
+        # ── Fundal per etichetă (strofă/refren/…) ─────────────────────────────
+        self._lbl_bg_group = QGroupBox("Fundal per etichetă")
+        _lbgl = QVBoxLayout(self._lbl_bg_group)
+        _mode_row = QFormLayout()
+        self.bg_mode_combo = QComboBox()
+        self.bg_mode_combo.addItem("Unic (fundalul de mai sus)", "single")
+        self.bg_mode_combo.addItem("Fundal diferit per etichetă", "per_label")
+        self.bg_mode_combo.currentIndexChanged.connect(self._on_bg_mode_changed)
+        _mode_row.addRow("Mod fundal:", self.bg_mode_combo)
+        _lbgl.addLayout(_mode_row)
+
+        self._lbl_bg_panel = QWidget()
+        _panel_form = QFormLayout(self._lbl_bg_panel)
+        _panel_form.setContentsMargins(0, 4, 0, 0)
+        self.label_bg_combos = {}
+        _existing = (self.theme_data.get("label_backgrounds") or {})
+        for key in _THEME_LABEL_KEYS:
+            row = QWidget(); rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(4)
+            combo = QComboBox(); combo.setMinimumWidth(170)
+            self._fill_label_bg_combo(combo, _existing.get(key))
+            combo.currentIndexChanged.connect(self._update_canvas)
+            btn = QPushButton("📁"); btn.setFixedWidth(34)
+            btn.setToolTip("Alege o imagine sau un videoclip")
+            btn.clicked.connect(lambda _=False, k=key: self._pick_label_bg_file(k))
+            rl.addWidget(combo, 1); rl.addWidget(btn)
+            self.label_bg_combos[key] = combo
+            _panel_form.addRow(f"{key}:", row)
+        _hint = QLabel("Lăsă pe „Moștenește” ca să folosească fundalul unic de mai sus.")
+        _hint.setStyleSheet("color:#6c7086; font-size:10px;")
+        _hint.setWordWrap(True)
+        _panel_form.addRow(_hint)
+        _lbgl.addWidget(self._lbl_bg_panel)
+        layout.addWidget(self._lbl_bg_group)
+
+        # Stare inițială din temă (fără a declanșa _update_canvas în construcție)
+        _mode = self.theme_data.get("bg_mode", "single")
+        i = self.bg_mode_combo.findData(_mode)
+        if i >= 0:
+            self.bg_mode_combo.blockSignals(True)
+            self.bg_mode_combo.setCurrentIndex(i)
+            self.bg_mode_combo.blockSignals(False)
+        self._lbl_bg_panel.setVisible(self.bg_mode_combo.currentData() == "per_label")
         return w
+
+    def _fill_label_bg_combo(self, combo: QComboBox, entry: dict | None):
+        """Umple un combo de fundal-per-etichetă: Moștenește + fundalurile animate
+        (+ eventual fișierul imagine/video deja ales)."""
+        import os, json as _json
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("— Moștenește —", {"kind": "inherit"})
+        try:
+            for fn in sorted(os.listdir(self._fundal_dir())):
+                if not fn.lower().endswith(".json"):
+                    continue
+                path = os.path.join(self._fundal_dir(), fn)
+                name = fn[:-5]
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        name = _json.load(f).get("name", name)
+                except Exception:
+                    pass
+                combo.addItem(f"🎨 {name}", {"kind": "fundal", "value": path})
+        except Exception:
+            pass
+        # Selectează intrarea existentă (sau adaugă fișierul imagine/video ales)
+        if entry and entry.get("kind") not in (None, "", "inherit"):
+            kind, val = entry.get("kind"), entry.get("value", "")
+            if kind == "fundal":
+                idx = -1
+                for n in range(combo.count()):
+                    d = combo.itemData(n)
+                    if isinstance(d, dict) and d.get("kind") == "fundal" and d.get("value") == val:
+                        idx = n; break
+                if idx < 0:  # fundal lipsă acum — îl adăugăm ca intrare brută
+                    combo.addItem(f"🎨 {os.path.basename(val)}",
+                                  {"kind": "fundal", "value": val})
+                    idx = combo.count() - 1
+                combo.setCurrentIndex(idx)
+            elif kind in ("image", "video"):
+                icon = "🖼️" if kind == "image" else "🎬"
+                combo.addItem(f"{icon} {os.path.basename(val)}",
+                              {"kind": kind, "value": val})
+                combo.setCurrentIndex(combo.count() - 1)
+        combo.blockSignals(False)
+
+    def _pick_label_bg_file(self, key: str):
+        """Alege o imagine/video pentru o etichetă și îl pune în combo."""
+        import os
+        path, _ = QFileDialog.getOpenFileName(
+            self, f"Fundal pentru „{key}”", "",
+            "Media (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.mp4 *.webm *.mov *.mkv)")
+        if not path:
+            return
+        ext = os.path.splitext(path)[1].lower()
+        kind = "video" if ext in (".mp4", ".webm", ".mov", ".mkv", ".avi") else "image"
+        combo = self.label_bg_combos.get(key)
+        if combo is None:
+            return
+        icon = "🖼️" if kind == "image" else "🎬"
+        combo.addItem(f"{icon} {os.path.basename(path)}", {"kind": kind, "value": path})
+        combo.setCurrentIndex(combo.count() - 1)
+        self._update_canvas()
+
+    def _on_bg_mode_changed(self, *_):
+        if hasattr(self, "_lbl_bg_panel"):
+            self._lbl_bg_panel.setVisible(self.bg_mode_combo.currentData() == "per_label")
+        self._update_canvas()
 
     def _fundal_dir(self) -> str:
         # Per-profile — must match media_tab._bg_dir() and background-editor.js
@@ -1800,6 +1914,15 @@ class ThemeVisualEditor(QMainWindow):
             "x": int(self.l_tb_x.value()), "y": int(self.l_tb_y.value()),
             "w": int(self.l_tb_w.value()), "h": int(self.l_tb_h.value()),
         }
+        # Fundal per etichetă (#8)
+        if hasattr(self, "bg_mode_combo"):
+            d["bg_mode"] = self.bg_mode_combo.currentData() or "single"
+            lbg = {}
+            for key, combo in getattr(self, "label_bg_combos", {}).items():
+                data = combo.currentData()
+                if isinstance(data, dict) and data.get("kind") not in (None, "", "inherit"):
+                    lbg[key] = data
+            d["label_backgrounds"] = lbg
         d["layout"] = {
             "margin": str(self.l_margin.value()),
             "valign": self.l_valign.currentText(),
@@ -1848,6 +1971,10 @@ class ThemeVisualEditor(QMainWindow):
         self._update_canvas()
 
     def _update_canvas(self):
+        # În timpul construcției UI unele semnale pot ajunge aici înainte ca
+        # pânza (sau restul widget-urilor) să existe — ignorăm până e gata.
+        if getattr(self, "canvas", None) is None:
+            return
         self.canvas.update_theme(self._collect_theme())
 
     def _save_theme(self):

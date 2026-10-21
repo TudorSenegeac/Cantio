@@ -685,6 +685,33 @@ def _marker_label(raw: str) -> str:
     return ""
 
 
+# Etichete canonice pentru fundalul per-etichetă (teme + override per cântare).
+LABEL_BG_KEYS = ["Strofă", "Refren", "Pre-refren", "Punte", "Cor", "Final", "Intro"]
+
+
+def _canon_label(lbl: str) -> str:
+    """Reduce o etichetă ('Strofa 2', 'Refren 1/2', 'Bridge') la o categorie
+    canonică din LABEL_BG_KEYS. Șir gol dacă nu se potrivește (⇒ moștenește)."""
+    s = (lbl or "").strip().lower()
+    if not s:
+        return ""
+    if s.startswith("pre"):
+        return "Pre-refren"
+    if s.startswith(("strofa", "strofă", "vers")):
+        return "Strofă"
+    if s.startswith("refren"):
+        return "Refren"
+    if s.startswith(("punte", "bridge")):
+        return "Punte"
+    if s.startswith("cor"):
+        return "Cor"
+    if s.startswith(("final", "outro", "încheiere", "incheiere")):
+        return "Final"
+    if s.startswith("intro"):
+        return "Intro"
+    return ""
+
+
 def has_structure_markers(slides: list) -> bool:
     """Adevarat daca macar un slide incepe cu un marcaj R./numerotat."""
     for s in slides:
@@ -7805,6 +7832,8 @@ class ControlWindow(QMainWindow):
                 self.current_slides = slides
         except Exception:
             pass
+        # Reținem etichetele pentru fundalul per etichetă la go-live.
+        self.current_smart_labels = list(smart_labels)
         _row = 0
         _col = 0
         _prev_label = None
@@ -9221,6 +9250,71 @@ class ControlWindow(QMainWindow):
         if getattr(self, "_active_bg_path", None) and getattr(self, "_bg_from_theme", False):
             self._clear_background_live()
 
+    def _song_label_bg(self, song_id) -> dict:
+        """Override per cântare al fundalului pe etichete (#7). Stocat în
+        themes.json sub 'song_label_bg'[song_id] = {eticheta: {kind, value}}."""
+        if song_id is None:
+            return {}
+        import os, json
+        try:
+            p = self._get_themes_path()
+            if not os.path.exists(p):
+                return {}
+            with open(p, "r", encoding="utf-8") as f:
+                themes = json.load(f)
+            return (themes.get("song_label_bg", {}) or {}).get(str(song_id), {}) or {}
+        except Exception:
+            return {}
+
+    def _apply_label_bg_override(self, settings: dict, song_id, label: str):
+        """Dacă tema (sau cântarea) are fundal per etichetă, rescrie cheile bg_*
+        din `settings` pentru eticheta slide-ului curent. Override per cântare
+        (#7) are prioritate peste cel din temă (#8). Modifică `settings` pe loc."""
+        if settings.get("label_bg_mode") != "per_label":
+            # Chiar fără temă per-etichetă, cântarea poate avea override propriu.
+            song_map = self._song_label_bg(song_id)
+            if not song_map:
+                return
+        canon = _canon_label(label)
+        if not canon:
+            return
+        import json
+        theme_map = {}
+        try:
+            theme_map = json.loads(settings.get("label_bg_map") or "{}")
+        except Exception:
+            theme_map = {}
+        song_map = self._song_label_bg(song_id)
+        entry = song_map.get(canon) or theme_map.get(canon)
+        if not entry:
+            return
+        kind = entry.get("kind") or ""
+        val  = entry.get("value") or ""
+        if kind in ("", "inherit"):
+            return
+        if kind == "fundal":
+            settings["bg_type"] = "fundal"
+            settings["bg_fundal_file"] = val
+        elif kind == "image":
+            settings["bg_type"] = "image"
+            settings["bg_image"] = val
+            settings["bg_video"] = ""
+        elif kind == "video":
+            settings["bg_type"] = "video"
+            settings["bg_image"] = val
+            settings["bg_video"] = ""
+
+    def _cur_slide_label(self) -> str:
+        """Eticheta inteligentă a slide-ului curent (pentru fundal per etichetă)."""
+        try:
+            labels = getattr(self, "current_smart_labels", None)
+            idx = self.current_slide_idx
+            if labels and 0 <= idx < len(labels):
+                return labels[idx] or ""
+        except Exception:
+            pass
+        return ""
+
     def _reset_manual_bg(self):
         """Drop any MANUALLY-sent background (media single-click / YouTube / a fundal
         design sent by hand) so the selected song slide's look background wins.
@@ -9423,6 +9517,16 @@ class ControlWindow(QMainWindow):
             merged["free_box_y"] = int(_fb.get("y", 60))
             merged["free_box_w"] = int(_fb.get("w", 80))
             merged["free_box_h"] = int(_fb.get("h", 30))
+
+        # Fundal per etichetă (strofă/refren/…). Harta e dusă mai departe în
+        # settings ca să poată fi aplicată per-slide la go-live, în funcție de
+        # eticheta slide-ului curent. (bg-ul 'single' rămâne cel de mai sus.)
+        if theme.get("bg_mode") == "per_label":
+            _lbg = theme.get("label_backgrounds") or {}
+            if _lbg:
+                import json as _json2
+                merged["label_bg_mode"] = "per_label"
+                merged["label_bg_map"]  = _json2.dumps(_lbg, ensure_ascii=False)
         if l.get("margin"):
             merged["margin"]       = str(l["margin"])
         if l.get("valign"):
@@ -9897,6 +10001,9 @@ class ControlWindow(QMainWindow):
             _live_settings = self._resolve_settings(
                 source="songs", song_id=self.current_song_id
             )
+            # Fundal per etichetă (#8) / override per cântare (#7)
+            self._apply_label_bg_override(
+                _live_settings, self.current_song_id, self._cur_slide_label())
             _rich = self._send_rich_slide_live(self.current_slide_idx)
             if not _rich:
                 self._apply_custom_bg_from_settings(_live_settings)
