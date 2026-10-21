@@ -54,6 +54,27 @@ const IS_PREVIEW = new URLSearchParams(location.search).get('preview') === '1';
 const PREVIEW_W = 1920, PREVIEW_H = 1080;
 
 // ── Resize ────────────────────────────────────────────────────────────────────
+// În preview randăm la o rezoluție FIXĂ (PREVIEW_W×H) și afișăm pânzele
+// LETTERBOX (păstrând proporția, centrate) — nu întinse pe tot panoul. Așa, la
+// redimensionarea panoului, previzualizarea NU se mai lungește / „trage".
+function _applyPreviewFit() {
+  if (!IS_PREVIEW) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (vw <= 0 || vh <= 0) return;
+  const scale = Math.min(vw / PREVIEW_W, vh / PREVIEW_H);
+  const dw = Math.round(PREVIEW_W * scale), dh = Math.round(PREVIEW_H * scale);
+  const left = Math.round((vw - dw) / 2), top = Math.round((vh - dh) / 2);
+  [cvBg, cvBg2, cvPrev, cvCurr, cvOver, bgImage].forEach(el => {
+    if (!el) return;
+    el.style.width  = dw + 'px';
+    el.style.height = dh + 'px';
+    el.style.left   = left + 'px';
+    el.style.top    = top + 'px';
+    el.style.right  = 'auto';
+    el.style.bottom = 'auto';
+  });
+}
+
 function resize() {
   if (!cvPrev || !cvCurr) return;
   const W = IS_PREVIEW ? PREVIEW_W : window.innerWidth;
@@ -63,8 +84,9 @@ function resize() {
   if (cvBg)  { cvBg.width  = W; cvBg.height  = H; }
   if (cvBg2) { cvBg2.width = W; cvBg2.height = H; }
   if (cvOver) { cvOver.width = W; cvOver.height = H; }
+  _applyPreviewFit();
   console.log('[Display.js] Resize:', cvCurr.width, 'x', cvCurr.height,
-              IS_PREVIEW ? '(preview, CSS-scaled)' : '');
+              IS_PREVIEW ? '(preview, letterbox)' : '');
 }
 
 window.addEventListener('resize', () => { resize(); renderCurrent(); });
