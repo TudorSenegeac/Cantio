@@ -69,7 +69,8 @@ class OverlaysTab(QWidget):
         layout.addLayout(top)
 
         info = QLabel("Dublu-click = editează (editor de fundaluri) • «Trimite live» = "
-                      "afișează pe ecranul ales, fără fereastra live.")
+                      "afișează PESTE fereastra live (ceas, ticker, text, logo…). "
+                      "Mai multe pot fi active simultan.")
         info.setStyleSheet("color:#666; font-size:10px;")
         info.setWordWrap(True)
         layout.addWidget(info)
@@ -83,16 +84,12 @@ class OverlaysTab(QWidget):
         self._list.currentRowChanged.connect(self._on_selection)
         layout.addWidget(self._list, 1)
 
-        # Screen picker for the selected overlay
-        srow = QHBoxLayout()
-        srow.addWidget(QLabel("Ecran:"))
-        self._screen_combo = QComboBox()
-        for i, scr in enumerate(QApplication.screens()):
-            g = scr.geometry()
-            self._screen_combo.addItem(f"Ecran {i+1} ({g.width()}×{g.height()})", i)
-        self._screen_combo.currentIndexChanged.connect(self._on_screen_changed)
-        srow.addWidget(self._screen_combo, 1)
-        layout.addLayout(srow)
+        # Opțiune per overlay: auto-ascundere când se suprapune cu textul slide-ului
+        from PyQt6.QtWidgets import QCheckBox
+        self._hide_chk = QCheckBox("Ascunde automat când se suprapune cu textul de pe slide")
+        self._hide_chk.setStyleSheet("color:#bbb; font-size:11px;")
+        self._hide_chk.toggled.connect(self._on_hide_toggled)
+        layout.addWidget(self._hide_chk)
 
         brow = QHBoxLayout()
         self._send_btn = QPushButton("📺 Trimite live")
@@ -128,15 +125,15 @@ class OverlaysTab(QWidget):
     def _overlay_path(self, name: str) -> str:
         return os.path.join(_overlays_dir(), f"{_safe_name(name)}.json")
 
-    def _screens_map(self) -> dict:
+    def _hideontext_map(self) -> dict:
         try:
-            return json.loads(db.get_settings().get("overlay_screens", "{}") or "{}")
+            return json.loads(db.get_settings().get("overlay_hideontext", "{}") or "{}")
         except Exception:
             return {}
 
-    def _save_screens_map(self, m: dict):
+    def _save_hideontext_map(self, m: dict):
         try:
-            db.save_setting("overlay_screens", json.dumps(m))
+            db.save_setting("overlay_hideontext", json.dumps(m))
         except Exception:
             pass
 
@@ -157,10 +154,9 @@ class OverlaysTab(QWidget):
         name = self._selected_name()
         if not name:
             return
-        idx = self._screens_map().get(name, 0)
-        self._screen_combo.blockSignals(True)
-        self._screen_combo.setCurrentIndex(min(int(idx), self._screen_combo.count() - 1))
-        self._screen_combo.blockSignals(False)
+        self._hide_chk.blockSignals(True)
+        self._hide_chk.setChecked(bool(self._hideontext_map().get(name, False)))
+        self._hide_chk.blockSignals(False)
         self._update_send_btn()
 
     def _update_send_btn(self):
@@ -168,16 +164,16 @@ class OverlaysTab(QWidget):
         live = name in self._live_overlays if name else False
         self._send_btn.setText("⏹ Oprește" if live else "📺 Trimite live")
 
-    def _on_screen_changed(self, _i):
+    def _on_hide_toggled(self, on: bool):
         name = self._selected_name()
         if not name:
             return
-        m = self._screens_map()
-        m[name] = self._screen_combo.currentData() or 0
-        self._save_screens_map(m)
-        # If it's live, move it to the new screen.
+        m = self._hideontext_map()
+        m[name] = bool(on)
+        self._save_hideontext_map(m)
+        # Dacă e live, re-trimite setul ca să se aplice imediat.
         if name in self._live_overlays:
-            self._send_overlay_live(name, restart=True)
+            self._push_live_overlays()
 
     # ── CRUD ───────────────────────────────────────────────────────────────────
     def _new_overlay(self):
@@ -244,34 +240,50 @@ class OverlaysTab(QWidget):
         except Exception:
             return None
 
-    def _send_overlay_live(self, name, restart=False):
-        mgr = getattr(self._control, "electron_display", None) if self._control else None
-        if mgr is None:
-            return
+    def _overlay_doc(self, name) -> dict | None:
+        """Întoarce doc-ul bg-engine (layerele) pentru un overlay salvat."""
         design = self._load_design(name)
         if design is None:
-            return
-        # bg-engine renders a single slide's layers.
+            return None
+        # Un design salvat în editor are slides[0].layers; acceptăm și {layers:[]}.
+        if isinstance(design.get("layers"), list):
+            return {"layers": design["layers"]}
         slide = (design.get("slides") or [{}])[0]
-        screen = int(self._screens_map().get(name, 0))
-        oid = _safe_name(name)
+        return {"layers": slide.get("layers", [])}
+
+    def _push_live_overlays(self):
+        """Compune TOATE overlay-urile active și le trimite peste fereastra live."""
+        mgr = getattr(self._control, "electron_display", None) if self._control else None
+        if mgr is None or not hasattr(mgr, "set_overlays"):
+            return
+        hmap = self._hideontext_map()
+        payload = []
+        for name in self._live_overlays:
+            doc = self._overlay_doc(name)
+            if doc is None:
+                continue
+            payload.append({
+                "id": _safe_name(name),
+                "name": name,
+                "doc": doc,
+                "hideOnText": bool(hmap.get(name, False)),
+            })
         try:
-            if restart:
-                mgr.close_overlay(oid)
-            mgr.open_overlay(oid, screen, slide)
-            self._live_overlays.add(name)
+            mgr.set_overlays(payload)
         except Exception:
             pass
 
+    def _send_overlay_live(self, name, restart=False):
+        self._live_overlays.add(name)
+        self._push_live_overlays()
+
     def _stop_overlay_live(self, name):
-        mgr = getattr(self._control, "electron_display", None) if self._control else None
-        if mgr is not None:
-            try:
-                mgr.close_overlay(_safe_name(name))
-            except Exception:
-                pass
         self._live_overlays.discard(name)
+        self._push_live_overlays()
 
     def showEvent(self, event):
         super().showEvent(event)
         self._refresh_list()   # pick up overlays saved in the editor
+        # Reaplică overlay-urile active (preia modificările făcute în editor).
+        if self._live_overlays:
+            self._push_live_overlays()
