@@ -6743,6 +6743,9 @@ class ControlWindow(QMainWindow):
         menu.addAction("🗑️ Șterge", self._delete_song)
         menu.addAction(f"+ {t('service')}", self._add_to_playlist)
         menu.addSeparator()
+        menu.addAction("🎞️ Fundal pe secțiuni…",
+                       lambda checked=False, sid=song_id: self._edit_song_section_bg(sid))
+        menu.addSeparator()
 
         # ── Move to category sub-menu ──────────────────────────────────────
         move_menu = menu.addMenu("📁 Mută în categorie")
@@ -9265,6 +9268,138 @@ class ControlWindow(QMainWindow):
             return (themes.get("song_label_bg", {}) or {}).get(str(song_id), {}) or {}
         except Exception:
             return {}
+
+    def _bg_fundal_dir(self) -> str:
+        """Folderul cu fundaluri animate al profilului activ (ca theme_editor)."""
+        import os
+        try:
+            prof = db.get_active_profile() or "Default"
+        except Exception:
+            prof = "Default"
+        base = os.path.join(os.path.expanduser("~"), "Cantio",
+                            "profiles", prof, "backgrounds")
+        try:
+            os.makedirs(base, exist_ok=True)
+        except Exception:
+            pass
+        return base
+
+    def _edit_song_section_bg(self, song_id):
+        """Dialog: fundal per secțiune DOAR pentru această cântare (#7). Suprascrie
+        fundalul per etichetă din temă (#8). Salvat în themes.json/song_label_bg."""
+        import os, json
+        from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QHBoxLayout,
+                                     QComboBox, QPushButton, QLabel, QDialogButtonBox,
+                                     QWidget, QFileDialog)
+
+        existing = self._song_label_bg(song_id)
+
+        def fill(combo: QComboBox, entry):
+            combo.blockSignals(True); combo.clear()
+            combo.addItem("— Moștenește (din temă) —", {"kind": "inherit"})
+            try:
+                for fn in sorted(os.listdir(self._bg_fundal_dir())):
+                    if not fn.lower().endswith(".json"):
+                        continue
+                    path = os.path.join(self._bg_fundal_dir(), fn)
+                    name = fn[:-5]
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            name = json.load(f).get("name", name)
+                    except Exception:
+                        pass
+                    combo.addItem(f"🎨 {name}", {"kind": "fundal", "value": path})
+            except Exception:
+                pass
+            if entry and entry.get("kind") not in (None, "", "inherit"):
+                kind, val = entry.get("kind"), entry.get("value", "")
+                if kind == "fundal":
+                    sel = -1
+                    for n in range(combo.count()):
+                        d = combo.itemData(n)
+                        if isinstance(d, dict) and d.get("kind") == "fundal" and d.get("value") == val:
+                            sel = n; break
+                    if sel < 0:
+                        combo.addItem(f"🎨 {os.path.basename(val)}", {"kind": "fundal", "value": val})
+                        sel = combo.count() - 1
+                    combo.setCurrentIndex(sel)
+                elif kind in ("image", "video"):
+                    icon = "🖼️" if kind == "image" else "🎬"
+                    combo.addItem(f"{icon} {os.path.basename(val)}", {"kind": kind, "value": val})
+                    combo.setCurrentIndex(combo.count() - 1)
+            combo.blockSignals(False)
+
+        def pick(combo: QComboBox):
+            path, _ = QFileDialog.getOpenFileName(
+                dlg, "Fundal (imagine/video)", "",
+                "Media (*.png *.jpg *.jpeg *.webp *.gif *.bmp *.mp4 *.webm *.mov *.mkv)")
+            if not path:
+                return
+            ext = os.path.splitext(path)[1].lower()
+            kind = "video" if ext in (".mp4", ".webm", ".mov", ".mkv", ".avi") else "image"
+            icon = "🖼️" if kind == "image" else "🎬"
+            combo.addItem(f"{icon} {os.path.basename(path)}", {"kind": kind, "value": path})
+            combo.setCurrentIndex(combo.count() - 1)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Fundal pe secțiuni — această cântare")
+        dlg.setMinimumWidth(420)
+        v = QVBoxLayout(dlg)
+        info = QLabel("Alege un fundal pentru fiecare secțiune. „Moștenește” "
+                      "folosește fundalul din temă.")
+        info.setWordWrap(True); info.setStyleSheet("color:#9399b2; font-size:11px;")
+        v.addWidget(info)
+        form = QFormLayout(); combos = {}
+        for key in LABEL_BG_KEYS:
+            row = QWidget(); rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0); rl.setSpacing(4)
+            combo = QComboBox(); combo.setMinimumWidth(220)
+            fill(combo, existing.get(key))
+            btn = QPushButton("📁"); btn.setFixedWidth(34)
+            btn.setToolTip("Alege o imagine sau un videoclip")
+            btn.clicked.connect(lambda _=False, c=combo: pick(c))
+            rl.addWidget(combo, 1); rl.addWidget(btn)
+            combos[key] = combo
+            form.addRow(f"{key}:", row)
+        v.addLayout(form)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Save |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+        v.addWidget(bb)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        result = {}
+        for key, combo in combos.items():
+            data = combo.currentData()
+            if isinstance(data, dict) and data.get("kind") not in (None, "", "inherit"):
+                result[key] = data
+        # Salvează în themes.json
+        try:
+            p = self._get_themes_path()
+            themes = {}
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    themes = json.load(f)
+            slb = themes.setdefault("song_label_bg", {})
+            if result:
+                slb[str(song_id)] = result
+            else:
+                slb.pop(str(song_id), None)
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(themes, f, ensure_ascii=False, indent=2)
+            try:
+                self._toasts.success("Fundal pe secțiuni salvat.")
+            except Exception:
+                pass
+            # Dacă e cântarea curentă pe ecran, reaplică imediat.
+            if getattr(self, "current_song_id", None) == song_id and self._is_live:
+                self._go_live()
+        except Exception as e:
+            try: self._toasts.error(f"Eroare la salvare: {e}")
+            except Exception: pass
 
     def _apply_label_bg_override(self, settings: dict, song_id, label: str):
         """Dacă tema (sau cântarea) are fundal per etichetă, rescrie cheile bg_*
