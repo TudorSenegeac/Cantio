@@ -25,6 +25,8 @@ const cvBg2   = document.getElementById('canvas-bg2');
 const bgVideo = document.getElementById('bg-video');
 const bgImage = document.getElementById('bg-image');
 const ctxBg   = cvBg  ? cvBg.getContext('2d')  : null;
+const cvOver  = document.getElementById('canvas-overlay');
+const ctxOver = cvOver ? cvOver.getContext('2d') : null;
 const ctxBg2  = cvBg2 ? cvBg2.getContext('2d') : null;
 
 if (!cvPrev || !cvCurr) {
@@ -60,6 +62,7 @@ function resize() {
   cvPrev.height = cvCurr.height = H;
   if (cvBg)  { cvBg.width  = W; cvBg.height  = H; }
   if (cvBg2) { cvBg2.width = W; cvBg2.height = H; }
+  if (cvOver) { cvOver.width = W; cvOver.height = H; }
   console.log('[Display.js] Resize:', cvCurr.width, 'x', cvCurr.height,
               IS_PREVIEW ? '(preview, CSS-scaled)' : '');
 }
@@ -104,6 +107,7 @@ let state = {
   presMode:     false,   // true → show presentation slide via JSON
   presSlide:    null,    // current presentation slide data dict
   bgDoc:        null,    // active custom background (bg-engine JSON), or null
+  overlays:     [],      // overlay-uri active [{id,name,doc,hideOnText}] peste text
   dim:          { black: 0, text: 0, logo: 0, bg: 0 },  // per-layer hide (0..1)
 };
 
@@ -145,6 +149,77 @@ function bgEngineLoop(ts) {
   requestAnimationFrame(bgEngineLoop);
 }
 requestAnimationFrame(bgEngineLoop);
+
+// ── Overlays (compuse PESTE textul live, stil FreeShow) ──────────────────────
+// state.overlays = [{ id, name, doc(bg-engine JSON), hideOnText }] — mai multe
+// pot fi active simultan. Fiecare se randează pe canvas-overlay (z-index 5).
+let _overStart = 0;
+let _lastTextBounds = null;      // {x0,y0,x1,y1} px — setat de drawText (auto-hide)
+const _overFade = {};            // id -> factor curent 0..1 (tranziție auto-hide)
+
+function _rectsIntersect(a, b) {
+  return a && b && a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+}
+
+function _overlayBBox(doc, W, H) {
+  // Uniunea casetelor layerelor (aproximativ); layerele full-bleed sunt ignorate.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, any = false;
+  (doc.layers || []).forEach(L => {
+    if (!L || L.visible === false) return;
+    let lx0, ly0, lx1, ly1;
+    if (L.type === 'ticker') {
+      lx0 = 0; lx1 = W;
+      const cy = (L.y != null ? L.y : 0.92) * H;
+      ly0 = cy - H * 0.07; ly1 = cy + H * 0.07;
+    } else if (L.type === 'gradient' || L.type === 'particles' || L.type === 'scripture') {
+      return; // full-bleed — nu intră în calculul de suprapunere
+    } else {
+      const cx = (L.x != null ? L.x : 0.5) * W, cy = (L.y != null ? L.y : 0.5) * H;
+      const w = (L.w != null ? L.w : 0.3) * W, h = (L.h != null ? L.h : 0.2) * H;
+      lx0 = cx - w / 2; lx1 = cx + w / 2; ly0 = cy - h / 2; ly1 = cy + h / 2;
+    }
+    x0 = Math.min(x0, lx0); y0 = Math.min(y0, ly0);
+    x1 = Math.max(x1, lx1); y1 = Math.max(y1, ly1); any = true;
+  });
+  return any ? { x0, y0, x1, y1 } : null;
+}
+
+function overlayLoop(ts) {
+  if (ctxOver && cvOver) {
+    const act = (state.overlays && state.overlays.length) ? state.overlays : null;
+    if (act && typeof BgEngine !== 'undefined') {
+      if (!_overStart) _overStart = ts;
+      const t = ts - _overStart;
+      if (cvOver.style.display === 'none') cvOver.style.display = 'block';
+      ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
+      for (const ov of act) {
+        if (!ov || !ov.doc) continue;
+        // auto-ascundere opțională dacă overlay-ul se suprapune cu textul slide-ului
+        let target = 1;
+        if (ov.hideOnText && _lastTextBounds) {
+          const bb = _overlayBBox(ov.doc, cvOver.width, cvOver.height);
+          if (_rectsIntersect(bb, _lastTextBounds)) target = 0;
+        }
+        const cur = _overFade[ov.id] != null ? _overFade[ov.id] : 1;
+        let next = cur + (target - cur) * 0.12;   // ease ~ câteva sutimi
+        if (Math.abs(next - target) < 0.01) next = target;
+        _overFade[ov.id] = next;
+        if (next <= 0.01) continue;
+        ov.doc._lyrics = null;
+        try {
+          BgEngine.render(ctxOver, cvOver.width, cvOver.height, ov.doc, t,
+                          { alpha: next, noClear: true });
+        } catch (e) { /* keep looping */ }
+      }
+    } else if (cvOver.style.display !== 'none') {
+      ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
+      cvOver.style.display = 'none';
+      _overStart = 0;
+    }
+  }
+  requestAnimationFrame(overlayLoop);
+}
+requestAnimationFrame(overlayLoop);
 
 // ── Dynamic presentation: audio playback + Web Audio analyser + auto-advance ──
 // A self-contained mode: the audio is the clock. Each frame we read the track's
@@ -564,6 +639,26 @@ function handleMessage(msg) {
     case 'freeze': {
       state.frozen = true;
       console.log('[Display.js] Display FROZEN — canvas locked');
+      break;
+    }
+
+    // ── Overlays (compuse peste textul live) ──────────────────────────────────
+    case 'set_overlays': {
+      // msg.overlays = [{id, name, doc, hideOnText}]
+      const arr = Array.isArray(msg.overlays) ? msg.overlays : [];
+      state.overlays = arr.map(o => ({
+        id: String(o.id != null ? o.id : (o.name || Math.random())),
+        name: o.name || '',
+        doc: o.doc || { layers: [] },
+        hideOnText: !!o.hideOnText,
+      }));
+      // curăță factorii de fade pentru overlay-uri care nu mai există
+      const ids = new Set(state.overlays.map(o => o.id));
+      Object.keys(_overFade).forEach(k => { if (!ids.has(k)) delete _overFade[k]; });
+      break;
+    }
+    case 'clear_overlays': {
+      state.overlays = [];
       break;
     }
 
@@ -1998,6 +2093,19 @@ function drawStyledText(rawText, opacity, dx, dy) {
 
   const align = _normAlign(s.text_align);
 
+  // Caseta reală a textului (pentru auto-ascunderea overlay-urilor)
+  {
+    let maxLW = 0;
+    for (const runs of lines) { const lw = _lineW(ctxC, runs, bold, currentSize, family); if (lw > maxLW) maxLW = lw; }
+    const bx = _fb ? _fb.x : 0, bw = _fb ? _fb.w : w;
+    const cx0 = _fb ? bx : 0;
+    const tx0 = align === 'left' ? (cx0 + (_fb ? 0 : margin))
+              : align === 'right' ? (cx0 + bw - maxLW - (_fb ? 0 : margin))
+              : (cx0 + bw / 2 - maxLW / 2);
+    const ty0 = startY - currentSize * 0.85;
+    _lastTextBounds = { x0: tx0, y0: ty0, x1: tx0 + maxLW, y1: startY + (lines.length - 1) * lineH + currentSize * 0.25 };
+  }
+
   ctxC.save();
   ctxC.globalAlpha = Math.max(0, Math.min(1, opacity));
   if (dx) ctxC.translate(dx, 0);
@@ -2060,7 +2168,8 @@ function drawStyledText(rawText, opacity, dx, dy) {
 }
 
 function drawText(text, opacity, dx, dy) {
-  if (!text || opacity <= 0) return;
+  if (!text) { _lastTextBounds = null; return; }
+  if (opacity <= 0) return;
   if (!ctxC || !cvCurr) return;
   // Text cu marcaje de stil (italic / evidentiere) -> randare pe run-uri.
   if (_MARK_RE.test(text)) {
@@ -2200,6 +2309,15 @@ function drawText(text, opacity, dx, dy) {
     : (align === 'left' ? margin
        : align === 'right' ? w - margin
        : w / 2);
+
+  // ── Caseta reală a textului (pentru auto-ascunderea overlay-urilor) ─────────
+  {
+    let maxLW = 0;
+    for (const ln of lines) { const lw = ctxC.measureText(ln).width; if (lw > maxLW) maxLW = lw; }
+    const tx0 = align === 'left' ? baseX : align === 'right' ? baseX - maxLW : baseX - maxLW / 2;
+    const ty0 = startY - currentSize * 0.85;
+    _lastTextBounds = { x0: tx0, y0: ty0, x1: tx0 + maxLW, y1: startY + (lines.length - 1) * lineH + currentSize * 0.25 };
+  }
 
   // ── Echo: big faint copy of the text behind (concert "ghost lyric" look) ────
   if (s.text_echo === true || s.text_echo === 'true') {

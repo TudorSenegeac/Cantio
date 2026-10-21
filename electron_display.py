@@ -357,6 +357,15 @@ class ElectronDisplayManager:
     def clear_background(self, window_id: int = 0):
         self._enqueue({"type": "clear_background", "window_id": window_id})
 
+    def set_overlays(self, overlays: list, window_id: int = 0):
+        """Overlay-uri compuse peste textul live (stil FreeShow).
+        overlays = [{id, name, doc(bg-engine JSON), hideOnText}]."""
+        self._enqueue({"type": "set_overlays", "window_id": window_id,
+                       "overlays": overlays or []})
+
+    def clear_overlays(self, window_id: int = 0):
+        self._enqueue({"type": "clear_overlays", "window_id": window_id})
+
     def dim(self, target: str, value: float, window_id: int = 0):
         """Manual mixer fader — target = black|text|logo, value 0..1."""
         self._enqueue({"type": "dim", "window_id": window_id,

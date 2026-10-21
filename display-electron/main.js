@@ -249,6 +249,8 @@ function handleCommand(msg, ws) {
     case 'hide_ticker_effect':
     case 'show_background':
     case 'clear_background':
+    case 'set_overlays':
+    case 'clear_overlays':
     case 'show_presentation_slide':
     case 'clear_presentation':
     case 'dim':

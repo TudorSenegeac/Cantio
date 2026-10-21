@@ -205,13 +205,14 @@
   function render(ctx, W, H, bg, tMs, opts) {
     if (!bg) return;
     let alpha = 1, intro = null, outro = null;
+    let noClear = false;
     if (typeof opts === 'number') alpha = opts;
     else if (opts) {
       alpha = (opts.alpha != null ? opts.alpha : 1);
-      intro = opts.intro; outro = opts.outro;
+      intro = opts.intro; outro = opts.outro; noClear = !!opts.noClear;
     }
     const t = (tMs || 0) / 1000;
-    ctx.clearRect(0, 0, W, H);
+    if (!noClear) ctx.clearRect(0, 0, W, H);
     ctx.save();
     ctx.globalAlpha = clamp(alpha, 0, 1);
 
