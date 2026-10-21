@@ -758,9 +758,10 @@ function rebuildProps() {
   else if (L.type === 'image' || L.type === 'video') buildMediaProps(p, L);
   else if (L.type === 'camera') buildCameraProps(p, L);
   else if (L.type === 'ticker') buildTickerProps(p, L);
+  else if (L.type === 'scripture') buildScriptureProps(p, L);
 
-  // Common: position/size (skip for full-bleed gradient/particles)
-  if (L.type !== 'gradient' && L.type !== 'particles') {
+  // Common: position/size (skip for full-bleed gradient/particles/scripture)
+  if (L.type !== 'gradient' && L.type !== 'particles' && L.type !== 'scripture') {
     grpH(p, 'POZIȚIE & MĂRIME');
     p.appendChild(row('X %',  mkRange(L, 'x', 0, 1, 0.01)));
     p.appendChild(row('Y %',  mkRange(L, 'y', 0, 1, 0.01)));
@@ -1059,6 +1060,23 @@ function buildTickerProps(p, L) {
   p.appendChild(row('Activ', mkCheck(L, 'bgEnabled')));
   p.appendChild(row('Culoare', mkColor(L, 'bgColor')));
   p.appendChild(row('Opacitate', mkRange(L, 'bgOpacity', 0, 1, 0.05)));
+}
+
+function buildScriptureProps(p, L) {
+  if (!L.animate) L.animate = { mode: 'none', speed: 0.25 };
+  grpH(p, 'PAGINĂ DE BIBLIE');
+  const info = document.createElement('div');
+  info.style.cssText = 'font-size:10px;color:#888;margin-bottom:6px;';
+  info.textContent = 'Fundal cu coloane de text sacru (ca o pagină veche de Biblie).';
+  p.appendChild(info);
+  p.appendChild(row('Stil', mkSelect(L, 'variant', ['dark', 'parchment'])));
+  p.appendChild(row('Coloane', mkRange(L, 'columns', 1, 3, 1)));
+  p.appendChild(row('Mărime text', mkRange(L, 'size', 0.5, 2.5, 0.05)));
+  p.appendChild(row('Capitol start', mkRange(L, 'chapter', 1, 150, 1)));
+  p.appendChild(row('Culoare text', mkColor(L, 'color')));
+  p.appendChild(row('Culoare pagină', mkColor(L, 'color2')));
+  p.appendChild(row('Derulare', mkSelect(L.animate, 'mode', ['none', 'scroll'])));
+  p.appendChild(row('Viteză derulare', mkRange(L.animate, 'speed', 0.05, 2, 0.05)));
 }
 
 function buildCameraProps(p, L) {

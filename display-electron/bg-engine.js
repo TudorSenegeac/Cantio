@@ -148,6 +148,17 @@
         hlScale: 1.18, hlGlow: true, hlColor: '#ffffff',
         uppercase: true,
       });
+    } else if (type === 'scripture') {
+      Object.assign(base, {
+        name: 'Pagină de Biblie', x: 0.5, y: 0.5, w: 1, h: 1,
+        variant: 'dark',                 // dark | parchment
+        columns: 2,
+        size: 1.0,
+        chapter: 52,
+        color: '#cdbd93',               // cerneală
+        color2: '#0b0a07',              // pagina
+        animate: { mode: 'none', speed: 0.25 }, // none | scroll
+      });
     }
     return base;
   }
@@ -386,7 +397,8 @@
     if (pm) scale *= pm.scale;
 
     // Full-canvas layers (gradient/particles ignore positional transform)
-    const fullBleed = (L.type === 'gradient' || L.type === 'particles' || L.type === 'ticker');
+    const fullBleed = (L.type === 'gradient' || L.type === 'particles' ||
+                       L.type === 'ticker' || L.type === 'scripture');
 
     if (!fullBleed) {
       const cx = (L.x != null ? L.x : 0.5) * W + driftX + (pm ? pm.dx : 0);
@@ -407,6 +419,7 @@
       case 'camera':    drawVideoLayer(ctx, W, H, L, t); break;  // camera = live video element
       case 'ticker':    drawTicker(ctx, W, H, L, t); break;
       case 'lyrics':    drawLyrics(ctx, W, H, L, t, bg); break;
+      case 'scripture': drawScripture(ctx, W, H, L, t); break;
     }
     ctx.restore();
   }
@@ -834,6 +847,125 @@
   };
 
   const SHAPE_LIST = Object.keys(SHAPE_BUILDERS).concat(['line']);
+
+  // ── Scripture page (fundal „pagină de Biblie") ──────────────────────────────
+  // Coloane de text sacru, întunecat/atmosferic, cu titlu de capitol, număr de
+  // verset și inițială mare; opțional derulare lentă pe verticală.
+  const _SCRIPTURE_POOL = [
+    "La început era Cuvântul şi Cuvântul era cu Dumnezeu şi Cuvântul era Dumnezeu.",
+    "El era la început cu Dumnezeu. Toate lucrurile au fost făcute prin El.",
+    "Şi Cuvântul S-a făcut trup şi a locuit printre noi, plin de har şi de adevăr.",
+    "Domnul este păstorul meu: nu voi duce lipsă de nimic.",
+    "El mă paşte în păşuni verzi şi mă duce la ape de odihnă.",
+    "Îmi înviorează sufletul şi mă povăţuieşte pe cărări drepte.",
+    "Chiar dacă ar fi să umblu prin valea umbrei morţii, nu mă tem de niciun rău.",
+    "Cine a crezut în ceea ce ni se vestise? Şi cui s-a descoperit braţul Domnului?",
+    "Dispreţuit şi părăsit de oameni, om al durerii şi obişnuit cu suferinţa.",
+    "Dar El era străpuns pentru păcatele noastre, zdrobit pentru fărădelegile noastre.",
+    "Pedeapsa care ne dă pacea a căzut peste El şi prin rănile Lui suntem tămăduiţi.",
+    "Fiindcă atât de mult a iubit Dumnezeu lumea, că a dat pe singurul Lui Fiu.",
+    "Veniţi la Mine, toţi cei trudiţi şi împovăraţi, şi Eu vă voi da odihnă.",
+    "Dragostea este îndelung răbdătoare, este plină de bunătate.",
+    "Credinţa este o încredere neclintită în lucrurile nădăjduite.",
+    "Eu sunt lumina lumii; cine Mă urmează nu va umbla în întuneric.",
+  ];
+
+  function drawScripture(ctx, W, H, L, t) {
+    const dark    = (L.variant || 'dark') !== 'parchment';
+    const base    = L.color2 || (dark ? '#0b0a07' : '#efe6cf');
+    const ink     = L.color  || (dark ? '#cdbd93' : '#3a2f1c');
+    const cols    = Math.max(1, Math.min(3, parseInt(L.columns || 2)));
+    const scale   = (L.size || 1);
+    const fs      = Math.max(9, Math.round(15 * (H / 1080) * scale));
+    const lineH   = fs * 1.5;
+    const colGap  = W * 0.05;
+    const margin  = W * 0.06;
+    const colW    = (W - margin * 2 - colGap * (cols - 1)) / cols;
+    const serif   = '"Georgia","Times New Roman",serif';
+
+    // derulare lentă (dacă animate.mode === 'scroll')
+    const mode = (L.animate && L.animate.mode) || L.scroll || 'none';
+    const sp   = (L.animate && L.animate.speed != null ? L.animate.speed : 0.25);
+    const scrollY = (mode === 'scroll') ? (t * sp * 18) % lineH : 0;
+
+    // fundal + vignetă
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, W, H);
+
+    // wrap text pool o singură dată per lățime de coloană
+    if (!L._scrLines || L._scrW !== colW || L._scrFs !== fs) {
+      ctx.save();
+      ctx.font = `${fs}px ${serif}`;
+      const lines = [];
+      let vi = 1;
+      _SCRIPTURE_POOL.forEach((para, pi) => {
+        // marcaj de verset la începutul paragrafului
+        lines.push({ verse: vi++, text: para, first: true });
+        // wrap
+        const words = para.split(' ');
+        let cur = { text: '', first: true, verse: lines[lines.length - 1].verse };
+        lines.pop();
+        let buf = '';
+        let firstLine = true;
+        words.forEach(wd => {
+          const test = buf ? buf + ' ' + wd : wd;
+          if (ctx.measureText(test).width > colW - fs * 1.2 && buf) {
+            lines.push({ text: buf, verse: firstLine ? (vi - 1) : 0, first: firstLine });
+            buf = wd; firstLine = false;
+          } else buf = test;
+        });
+        if (buf) lines.push({ text: buf, verse: firstLine ? (vi - 1) : 0, first: firstLine });
+      });
+      L._scrLines = lines; L._scrW = colW; L._scrFs = fs;
+      ctx.restore();
+    }
+    const lines = L._scrLines;
+    const linesPerCol = Math.ceil(H / lineH) + 2;
+
+    ctx.save();
+    ctx.textBaseline = 'alphabetic';
+    for (let c = 0; c < cols; c++) {
+      const x0 = margin + c * (colW + colGap);
+      let y = margin + fs - scrollY;
+      // titlu de capitol
+      ctx.fillStyle = ink;
+      ctx.globalAlpha = 0.9;
+      ctx.font = `bold ${Math.round(fs * 1.15)}px ${serif}`;
+      ctx.textAlign = 'center';
+      ctx.fillText(`CAPITOLUL ${c + 1 + (L.chapter || 52)}`, x0 + colW / 2, y);
+      y += lineH * 1.6;
+      ctx.textAlign = 'left';
+      ctx.font = `${fs}px ${serif}`;
+      for (let i = 0; i < linesPerCol; i++) {
+        const ln = lines[(i + c * 7) % lines.length];
+        if (y > -lineH && y < H + lineH) {
+          let x = x0;
+          // număr de verset mic, ridicat
+          if (ln.verse) {
+            ctx.globalAlpha = 0.7;
+            ctx.font = `bold ${Math.round(fs * 0.62)}px ${serif}`;
+            ctx.fillText(String(ln.verse), x, y - fs * 0.35);
+            x += ctx.measureText(String(ln.verse)).width + fs * 0.22;
+            ctx.font = `${fs}px ${serif}`;
+          }
+          ctx.globalAlpha = 0.82;
+          ctx.fillText(ln.text, x, y);
+        }
+        y += lineH;
+      }
+    }
+    ctx.restore();
+
+    // vignetă pentru atmosferă (întunecă marginile)
+    if (dark) {
+      const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2,
+                                         W / 2, H / 2, Math.max(W, H) * 0.72);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, 'rgba(0,0,0,0.72)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
 
   // Draw a small shape icon centred in a boxW×boxH area (for the editor picker).
   function drawShapeIcon(ctx, shape, boxW, boxH, color) {
