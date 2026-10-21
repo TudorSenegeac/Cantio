@@ -52,8 +52,18 @@ html,body { height:100%; background:var(--bg-base); color:var(--text);
 /* Canvas stage */
 .stage { background:#0a0a0a; display:flex; align-items:center; justify-content:center;
   overflow:hidden; position:relative; }
-.stage .canvas-wrap { position:relative; box-shadow:0 0 0 1px #000, 0 8px 40px rgba(0,0,0,.6); }
-#preview { display:block; background:#000; }
+/* Carouri de transparență sub pânză: pentru overlay-uri (fără fundal) se vede
+   că nu au fundal; fundalurile opace acoperă complet caroul, deci arată la fel. */
+.stage .canvas-wrap { position:relative; box-shadow:0 0 0 1px #000, 0 8px 40px rgba(0,0,0,.6);
+  background-color:#2b2b2e;
+  background-image:
+    linear-gradient(45deg, #3a3a3f 25%, transparent 25%),
+    linear-gradient(-45deg, #3a3a3f 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #3a3a3f 75%),
+    linear-gradient(-45deg, transparent 75%, #3a3a3f 75%);
+  background-size:26px 26px;
+  background-position:0 0, 0 13px, 13px -13px, -13px 0; }
+#preview { display:block; background:transparent; }
 .stage .res-label { position:absolute; bottom:8px; left:10px; color:#555;
   font-size:11px; pointer-events:none; }
 

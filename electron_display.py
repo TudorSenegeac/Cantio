@@ -357,13 +357,14 @@ class ElectronDisplayManager:
     def clear_background(self, window_id: int = 0):
         self._enqueue({"type": "clear_background", "window_id": window_id})
 
-    def set_overlays(self, overlays: list, window_id: int = 0):
+    def set_overlays(self, overlays: list, window_id=None):
         """Overlay-uri compuse peste textul live (stil FreeShow).
-        overlays = [{id, name, doc(bg-engine JSON), hideOnText}]."""
+        overlays = [{id, name, doc(bg-engine JSON), hideOnText}].
+        window_id None ⇒ se difuzează pe TOATE ferestrele live (+ preview)."""
         self._enqueue({"type": "set_overlays", "window_id": window_id,
                        "overlays": overlays or []})
 
-    def clear_overlays(self, window_id: int = 0):
+    def clear_overlays(self, window_id=None):
         self._enqueue({"type": "clear_overlays", "window_id": window_id})
 
     def dim(self, target: str, value: float, window_id: int = 0):
