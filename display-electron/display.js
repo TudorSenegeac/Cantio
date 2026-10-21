@@ -1832,6 +1832,15 @@ function _normAlign(v) {
   if (x === 'right' || x === 'dreapta') return 'right';
   return 'center';
 }
+// Casetă text liberă: dreptunghi în care e constrâns textul (x/y/w/h în %).
+function _freeBox(s, w, h) {
+  if (!(s.free_box_enabled === 'true' || s.free_box_enabled === true)) return null;
+  const px = Math.max(0, Math.min(100, parseFloat(s.free_box_x != null ? s.free_box_x : 10)));
+  const py = Math.max(0, Math.min(100, parseFloat(s.free_box_y != null ? s.free_box_y : 60)));
+  const pw = Math.max(1, Math.min(100, parseFloat(s.free_box_w != null ? s.free_box_w : 80)));
+  const ph = Math.max(1, Math.min(100, parseFloat(s.free_box_h != null ? s.free_box_h : 30)));
+  return { x: px / 100 * w, y: py / 100 * h, w: pw / 100 * w, h: ph / 100 * h };
+}
 
 function _parseStyledRuns(raw) {
   const runs = [];
@@ -1945,19 +1954,20 @@ function drawStyledText(rawText, opacity, dx, dy) {
     return runs;
   });
 
-  const maxW = w - margin * 2;
+  const _fb = _freeBox(s, w, h);
+  const maxW = _fb ? _fb.w : (w - margin * 2);
   // banda referinta biblica (ca in drawText)
   let _reserveTop = 0, _reserveBottom = 0;
   const _isBible = (s.source === 'bible' || (state.metadata && state.metadata.source === 'bible'));
   const _hasRef = _isBible && ((state.metadata && state.metadata.reference) || s.bible_reference);
-  if (_hasRef && !(s.bible_ref_zone && typeof s.bible_ref_zone === 'object')) {
+  if (!_fb && _hasRef && !(s.bible_ref_zone && typeof s.bible_ref_zone === 'object')) {
     const _band = parseInt(s.ref_font_size || 24) +
                   parseInt(s.ref_padding != null ? s.ref_padding : 8) * 2 +
                   Math.round(Math.min(w, h) * 0.035);
     if ((s.ref_position || 'bottom_right').indexOf('top') === 0) _reserveTop = _band;
     else _reserveBottom = _band;
   }
-  const maxH = h - margin * 2 - _reserveTop - _reserveBottom;
+  const maxH = _fb ? _fb.h : (h - margin * 2 - _reserveTop - _reserveBottom);
 
   // shrink-to-fit
   let currentSize = size0, lines = [], lineH = 0, totalH = 0;
@@ -1974,11 +1984,17 @@ function drawStyledText(rawText, opacity, dx, dy) {
     currentSize -= 2;
   }
 
+  const _bx0 = _fb ? _fb.x : 0;
+  const _by0 = _fb ? _fb.y : 0;
   const valign = _normValign(s.text_valign || s.valign);
   let startY;
-  if (valign === 'top')         startY = margin + _reserveTop + currentSize * 0.85;
-  else if (valign === 'bottom') startY = h - margin - _reserveBottom - totalH + currentSize * 0.85;
-  else                          startY = margin + _reserveTop + (maxH - totalH) / 2 + currentSize * 0.85;
+  if (_fb) {
+    if (valign === 'top')         startY = _by0 + currentSize * 0.85;
+    else if (valign === 'bottom') startY = _by0 + _fb.h - totalH + currentSize * 0.85;
+    else                          startY = _by0 + (_fb.h - totalH) / 2 + currentSize * 0.85;
+  } else if (valign === 'top')    startY = margin + _reserveTop + currentSize * 0.85;
+  else if (valign === 'bottom')   startY = h - margin - _reserveBottom - totalH + currentSize * 0.85;
+  else                            startY = margin + _reserveTop + (maxH - totalH) / 2 + currentSize * 0.85;
 
   const align = _normAlign(s.text_align);
 
@@ -1993,7 +2009,9 @@ function drawStyledText(rawText, opacity, dx, dy) {
     if (!runs.length) return;
     const y  = startY + i * lineH;
     const lw = _lineW(ctxC, runs, bold, currentSize, family);
-    let x = align === 'left' ? margin : align === 'right' ? (w - margin - lw) : (w / 2 - lw / 2);
+    let x = _fb
+      ? (align === 'left' ? _bx0 : align === 'right' ? (_bx0 + _fb.w - lw) : (_bx0 + _fb.w / 2 - lw / 2))
+      : (align === 'left' ? margin : align === 'right' ? (w - margin - lw) : (w / 2 - lw / 2));
     for (const run of runs) {
       ctxC.font = _fontFor(run.italic, bold, currentSize, family);
       const rw = ctxC.measureText(run.text).width;
@@ -2086,7 +2104,8 @@ function drawText(text, opacity, dx, dy) {
     ctxC.rotate(Math.sin(ct * csp * 0.9) * 0.05);
   }
 
-  const maxW = w - margin * 2;
+  const _fb = _freeBox(s, w, h);
+  const maxW = _fb ? _fb.w : (w - margin * 2);
 
   // Bible: reserve a band so the VERSE never overlaps the reference. Applies to
   // the preset positions only — a custom bible_ref_zone means the operator has
@@ -2095,14 +2114,14 @@ function drawText(text, opacity, dx, dy) {
   const _isBible = (s.source === 'bible' ||
                     (state.metadata && state.metadata.source === 'bible'));
   const _hasRef = _isBible && ((state.metadata && state.metadata.reference) || s.bible_reference);
-  if (_hasRef && !(s.bible_ref_zone && typeof s.bible_ref_zone === 'object')) {
+  if (!_fb && _hasRef && !(s.bible_ref_zone && typeof s.bible_ref_zone === 'object')) {
     const _band = parseInt(s.ref_font_size || 24) +
                   parseInt(s.ref_padding != null ? s.ref_padding : 8) * 2 +
                   Math.round(Math.min(w, h) * 0.035);
     if ((s.ref_position || 'bottom_right').indexOf('top') === 0) _reserveTop = _band;
     else _reserveBottom = _band;
   }
-  const maxH = h - margin * 2 - _reserveTop - _reserveBottom;
+  const maxH = _fb ? _fb.h : (h - margin * 2 - _reserveTop - _reserveBottom);
 
   // ── Shrink font until everything fits ──────────────────────────────────────
   let currentSize = size;
@@ -2156,9 +2175,15 @@ function drawText(text, opacity, dx, dy) {
     'lines:', lines.length, 'bold:', bold, 'color:', color);
 
   // ── Vertical alignment ─────────────────────────────────────────────────────
+  const _bx0 = _fb ? _fb.x : 0;
+  const _by0 = _fb ? _fb.y : 0;
   const valign = _normValign(s.text_valign || s.valign);
   let startY;
-  if (valign === 'top') {
+  if (_fb) {
+    if (valign === 'top')         startY = _by0 + currentSize * 0.85;
+    else if (valign === 'bottom') startY = _by0 + _fb.h - totalH + currentSize * 0.85;
+    else                          startY = _by0 + (_fb.h - totalH) / 2 + currentSize * 0.85;
+  } else if (valign === 'top') {
     startY = margin + _reserveTop + currentSize * 0.85;
   } else if (valign === 'bottom') {
     startY = h - margin - _reserveBottom - totalH + currentSize * 0.85;
@@ -2170,9 +2195,11 @@ function drawText(text, opacity, dx, dy) {
   const align = _normAlign(s.text_align);
   ctxC.textAlign    = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
   ctxC.textBaseline = 'alphabetic';
-  const baseX = align === 'left' ? margin
-              : align === 'right' ? w - margin
-              : w / 2;
+  const baseX = _fb
+    ? (align === 'left' ? _bx0 : align === 'right' ? (_bx0 + _fb.w) : (_bx0 + _fb.w / 2))
+    : (align === 'left' ? margin
+       : align === 'right' ? w - margin
+       : w / 2);
 
   // ── Echo: big faint copy of the text behind (concert "ghost lyric" look) ────
   if (s.text_echo === true || s.text_echo === 'true') {

@@ -9415,6 +9415,14 @@ class ControlWindow(QMainWindow):
                 merged["lines_per_slide"] = _lps
         except Exception:
             pass
+        # Casetă text liberă (poziționare manuală a textului)
+        _fb = theme.get("free_box") or {}
+        if _fb.get("enabled"):
+            merged["free_box_enabled"] = "true"
+            merged["free_box_x"] = int(_fb.get("x", 10))
+            merged["free_box_y"] = int(_fb.get("y", 60))
+            merged["free_box_w"] = int(_fb.get("w", 80))
+            merged["free_box_h"] = int(_fb.get("h", 30))
         if l.get("margin"):
             merged["margin"]       = str(l["margin"])
         if l.get("valign"):

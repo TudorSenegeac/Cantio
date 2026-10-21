@@ -1593,6 +1593,28 @@ class ThemeVisualEditor(QMainWindow):
         self.l_lines_per_slide.setSpecialValueText("Oprit")
         form.addRow("Rânduri / slide:", self.l_lines_per_slide)
 
+        # ── Casetă text liberă (poziționezi textul oriunde pe ecran) ──────────
+        _tb = self.theme_data.get("free_box") or {}
+        self.l_tb_enabled = QCheckBox("Casetă text liberă (poziționare manuală)")
+        self.l_tb_enabled.setChecked(bool(_tb.get("enabled")))
+        self.l_tb_enabled.toggled.connect(self._on_textbox_toggled)
+        form.addRow("", self.l_tb_enabled)
+
+        def _pct(val, default):
+            sb = QSpinBox(); sb.setRange(0, 100); sb.setSuffix(" %")
+            sb.setValue(int(_tb.get(val, default)))
+            sb.valueChanged.connect(self._update_canvas)
+            return sb
+        self.l_tb_x = _pct("x", 10); self.l_tb_y = _pct("y", 60)
+        self.l_tb_w = _pct("w", 80); self.l_tb_h = _pct("h", 30)
+        self._tb_row_x = self.l_tb_x; self._tb_row_y = self.l_tb_y
+        form.addRow("Casetă X:", self.l_tb_x)
+        form.addRow("Casetă Y:", self.l_tb_y)
+        form.addRow("Casetă lățime:", self.l_tb_w)
+        form.addRow("Casetă înălțime:", self.l_tb_h)
+        # starea initiala (activate/dezactivate campurile)
+        self._set_textbox_fields_enabled(self.l_tb_enabled.isChecked())
+
         if self.theme_data.get("type") in ("bible", "both"):
             bg = QGroupBox("Zone Biblie")
             bf = QFormLayout(bg)
@@ -1773,6 +1795,11 @@ class ThemeVisualEditor(QMainWindow):
             d["background"]["fundal_file"] = self.bg_fundal_combo.currentData() or ""
 
         d["lines_per_slide"] = int(self.l_lines_per_slide.value())
+        d["free_box"] = {
+            "enabled": bool(self.l_tb_enabled.isChecked()),
+            "x": int(self.l_tb_x.value()), "y": int(self.l_tb_y.value()),
+            "w": int(self.l_tb_w.value()), "h": int(self.l_tb_h.value()),
+        }
         d["layout"] = {
             "margin": str(self.l_margin.value()),
             "valign": self.l_valign.currentText(),
@@ -1809,6 +1836,16 @@ class ThemeVisualEditor(QMainWindow):
             "transition_duration": str(self.o_duration.value()),
         }
         return d
+
+    def _set_textbox_fields_enabled(self, on: bool):
+        for w in (getattr(self, "l_tb_x", None), getattr(self, "l_tb_y", None),
+                  getattr(self, "l_tb_w", None), getattr(self, "l_tb_h", None)):
+            if w is not None:
+                w.setEnabled(on)
+
+    def _on_textbox_toggled(self, on: bool):
+        self._set_textbox_fields_enabled(on)
+        self._update_canvas()
 
     def _update_canvas(self):
         self.canvas.update_theme(self._collect_theme())
@@ -2243,8 +2280,23 @@ class ThemeCanvas(QWidget):
         uppercase = t.get("uppercase", "false") == "true"
 
         display_text = demo_text.upper() if uppercase else demo_text
-        max_w = W - margin * 2
-        max_h = H - margin * 2
+
+        # Casetă text liberă: dacă e activă, textul e constrâns într-o casetă
+        # poziționată manual (x/y/w/h în procente), nu pe toată suprafața.
+        fb = self.theme_data.get("free_box") or {}
+        fb_on = bool(fb.get("enabled"))
+        if fb_on:
+            bx0 = float(fb.get("x", 10)) / 100.0 * W
+            by0 = float(fb.get("y", 60)) / 100.0 * H
+            bw  = max(1.0, float(fb.get("w", 80)) / 100.0 * W)
+            bh  = max(1.0, float(fb.get("h", 30)) / 100.0 * H)
+            max_w = bw
+            max_h = bh
+        else:
+            bx0 = by0 = 0.0
+            bw = float(W); bh = float(H)
+            max_w = W - margin * 2
+            max_h = H - margin * 2
 
         # ── Auto-shrink loop (mirror of the JS while loop) ───────────────────
         cur = size
@@ -2289,7 +2341,15 @@ class ThemeCanvas(QWidget):
         # ── Vertical alignment ───────────────────────────────────────────────
         valign = l.get("valign", "Centru")
         v = str(valign).lower()
-        if v in ("sus", "top"):
+        if fb_on:
+            # În casetă liberă valign se raportează la casetă, nu la ecran.
+            if v in ("sus", "top"):
+                start_y = by0 + cur * 0.85
+            elif v in ("jos", "bottom"):
+                start_y = by0 + bh - total_h + cur * 0.85
+            else:
+                start_y = by0 + (bh - total_h) / 2 + cur * 0.85
+        elif v in ("sus", "top"):
             start_y = margin + cur * 0.85
         elif v in ("jos", "bottom"):
             start_y = H - margin - total_h + cur * 0.85
@@ -2298,7 +2358,14 @@ class ThemeCanvas(QWidget):
 
         # ── Horizontal alignment ──────────────────────────────────────────────
         align = t.get("text_align", "center")
-        if align == "left":
+        if fb_on:
+            if align == "left":
+                base_x = bx0
+            elif align == "right":
+                base_x = bx0 + bw
+            else:
+                base_x = bx0 + bw / 2
+        elif align == "left":
             base_x = margin
         elif align == "right":
             base_x = W - margin
@@ -2338,6 +2405,17 @@ class ThemeCanvas(QWidget):
             self._paint_cascade(painter, t, lines, family, bold, italic,
                                 cur, line_h, W, H)
             return
+
+        # ── Casetă text liberă: contur punctat ca ghid în previzualizare ──────
+        if fb_on:
+            painter.save()
+            pen = QPen(QColor(120, 200, 255, 160))
+            pen.setStyle(Qt.PenStyle.DashLine)
+            pen.setWidthF(max(1.0, W / 640.0))
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(int(bx0), int(by0), int(bw), int(bh))
+            painter.restore()
 
         # ── Text box background ───────────────────────────────────────────────
         tb = self.theme_data.get("text_box", {})
