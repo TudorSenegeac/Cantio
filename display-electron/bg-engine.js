@@ -679,6 +679,33 @@
         ctx.strokeStyle = L.color || '#7fd4ff';
         ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(p.x, p.y, p.sz * 6, 0, 7); ctx.stroke();
+      } else if (preset === 'matrix') {
+        // "Ploaie de cod" (Matrix): coloane de glife care cad, cu urmă estompată
+        // și caracterul-cap mai luminos. Bucla e continuă (dropul reapare sus).
+        const fs = Math.max(10, Math.round(22 * (H / 1080) * (L.size || 1)));
+        const trail = 18;
+        if (!p.glyphs) {
+          p.glyphs = [];
+          for (let k = 0; k < trail; k++) p.glyphs.push(0x30A0 + (Math.random() * 96 | 0));
+        }
+        if (ctx.font !== fs + 'px monospace') ctx.font = fs + 'px monospace';
+        ctx.textBaseline = 'top';
+        p.y += fs * sp * (0.5 + p.sz);
+        if (p.y > H + fs * trail) {
+          p.y = -fs * ((Math.random() * trail) | 0);
+          p.x = Math.random() * W;
+          for (let k = 0; k < trail; k++) p.glyphs[k] = 0x30A0 + (Math.random() * 96 | 0);
+        }
+        if (Math.random() < 0.04) p.glyphs[(Math.random() * trail) | 0] = 0x30A0 + (Math.random() * 96 | 0);
+        const headCol = L.color2 || '#e6ffe9';
+        const bodyCol = L.color  || '#00ff5a';
+        for (let k = 0; k < trail; k++) {
+          const yy = p.y - k * fs;
+          if (yy < -fs || yy > H) continue;
+          ctx.globalAlpha = (k === 0) ? 1 : Math.max(0, 1 - k / trail);
+          ctx.fillStyle = (k === 0) ? headCol : bodyCol;
+          ctx.fillText(String.fromCharCode(p.glyphs[k]), p.x, yy);
+        }
       } else { // bokeh
         const a = (Math.sin((t + p.seed) * 0.5) + 1) / 2;
         ctx.globalAlpha = 0.10 + a * 0.18;
