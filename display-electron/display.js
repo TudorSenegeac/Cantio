@@ -85,6 +85,7 @@ function resize() {
   if (cvBg2) { cvBg2.width = W; cvBg2.height = H; }
   if (cvOver) { cvOver.width = W; cvOver.height = H; }
   _applyPreviewFit();
+  try { _bgDirty = true; } catch (e) {}   // forțează re-desen după resize
   console.log('[Display.js] Resize:', cvCurr.width, 'x', cvCurr.height,
               IS_PREVIEW ? '(preview, letterbox)' : '');
 }
@@ -149,23 +150,59 @@ function _maxIntroMs(doc) {
   return m;
 }
 
+// ── GPU economy: nu redesenăm cadre identice ────────────────────────────────
+// Pe laptopuri cu grafică hibridă, compunerea canvas continuă la 60fps în
+// ferestrele live+preview ținea GPU-ul (de regulă cel integrat) la ~100% și
+// supraîncălzea laptopul. Randăm deci la ~30fps ȘI doar când chiar e nevoie:
+// fundalurile/overlay-urile STATICE se desenează o dată, apoi stau.
+const _FRAME_MS = 33;   // ~30 fps (cap)
+let _bgLastDraw = 0;
+let _bgDirty = true;    // forțează un re-desen (schimbare mesaj / resize / linii)
+let _bgLastLinesKey = '';
+
+function _layerAnimated(L) {
+  if (!L || L.visible === false) return false;
+  const t = L.type;
+  if (t === 'particles' || t === 'video' || t === 'camera' ||
+      t === 'ticker' || t === 'clock' || t === 'lyrics') return true;
+  if (t === 'gradient' && L.animate && L.animate.mode && L.animate.mode !== 'none') return true;
+  if (t === 'scripture' && L.animate && L.animate.mode === 'scroll') return true;
+  const a = L.anim || {};
+  if (['pulse', 'scale', 'float', 'spin', 'glow', 'chaos'].some(k => a[k] && a[k].enabled)) return true;
+  if (L.react && L.react.enabled) return true;
+  return false;
+}
+function _docNeedsAnimation(doc) {
+  return !!(doc && Array.isArray(doc.layers) && doc.layers.some(_layerAnimated));
+}
+
 function bgEngineLoop(ts) {
   if (state.bgDoc && ctxBg && cvBg && typeof BgEngine !== 'undefined') {
     if (!_bgStart) _bgStart = ts;
     const t = ts - _bgStart;
     // Feed the current lyrics into any lyrics layer
+    let linesKey = '';
     if (state.lines && state.lines.length) {
       state.bgDoc._lyrics = {
         lines: state.lines,
         index: Math.floor((state.lines.length - 1) / 2),
       };
+      linesKey = String(state.lines.length) + '|' + (state.lines[0] || '');
     } else {
       state.bgDoc._lyrics = null;
     }
-    // Play the slide's entrance animations for the first _maxIntroMs.
-    const opts = (ts < _bgIntroUntil) ? { intro: t } : 1;
-    try { BgEngine.render(ctxBg, cvBg.width, cvBg.height, state.bgDoc, t, opts); }
-    catch (e) { /* keep looping */ }
+    if (linesKey !== _bgLastLinesKey) { _bgLastLinesKey = linesKey; _bgDirty = true; }
+
+    const animated = _docNeedsAnimation(state.bgDoc);
+    const inIntro  = ts < _bgIntroUntil;
+    const due      = (ts - _bgLastDraw) >= _FRAME_MS;
+    if ((animated || inIntro || _bgDirty) && due) {
+      const opts = inIntro ? { intro: t } : 1;
+      try { BgEngine.render(ctxBg, cvBg.width, cvBg.height, state.bgDoc, t, opts); }
+      catch (e) { /* keep looping */ }
+      _bgLastDraw = ts;
+      if (!animated && !inIntro) _bgDirty = false;   // static: desenat o dată
+    }
   }
   _dynamicTick();
   requestAnimationFrame(bgEngineLoop);
@@ -206,6 +243,7 @@ function _overlayBBox(doc, W, H) {
   return any ? { x0, y0, x1, y1 } : null;
 }
 
+let _overLastDraw = 0;
 function overlayLoop(ts) {
   if (ctxOver && cvOver) {
     const act = (state.overlays && state.overlays.length) ? state.overlays : null;
@@ -213,25 +251,37 @@ function overlayLoop(ts) {
       if (!_overStart) _overStart = ts;
       const t = ts - _overStart;
       if (cvOver.style.display === 'none') cvOver.style.display = 'block';
-      ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
-      for (const ov of act) {
-        if (!ov || !ov.doc) continue;
-        // auto-ascundere opțională dacă overlay-ul se suprapune cu textul slide-ului
-        let target = 1;
-        if (ov.hideOnText && _lastTextBounds) {
-          const bb = _overlayBBox(ov.doc, cvOver.width, cvOver.height);
-          if (_rectsIntersect(bb, _lastTextBounds)) target = 0;
+      // Desenăm doar dacă e nevoie: vreun overlay animat, un fade în curs, sau
+      // o schimbare (_bgDirty acoperă și schimbarea textului pt. auto-ascundere).
+      const anyAnimated = act.some(ov => ov && ov.doc && _docNeedsAnimation(ov.doc));
+      const anyFading = act.some(ov => {
+        if (!ov) return false;
+        const f = _overFade[ov.id];
+        return f != null && f > 0.01 && f < 0.99;
+      });
+      const due = (ts - _overLastDraw) >= _FRAME_MS;
+      if ((anyAnimated || anyFading || _bgDirty) && due) {
+        ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
+        for (const ov of act) {
+          if (!ov || !ov.doc) continue;
+          // auto-ascundere opțională dacă overlay-ul se suprapune cu textul
+          let target = 1;
+          if (ov.hideOnText && _lastTextBounds) {
+            const bb = _overlayBBox(ov.doc, cvOver.width, cvOver.height);
+            if (_rectsIntersect(bb, _lastTextBounds)) target = 0;
+          }
+          const cur = _overFade[ov.id] != null ? _overFade[ov.id] : 1;
+          let next = cur + (target - cur) * 0.18;   // ease
+          if (Math.abs(next - target) < 0.01) next = target;
+          _overFade[ov.id] = next;
+          if (next <= 0.01) continue;
+          ov.doc._lyrics = null;
+          try {
+            BgEngine.render(ctxOver, cvOver.width, cvOver.height, ov.doc, t,
+                            { alpha: next, noClear: true });
+          } catch (e) { /* keep looping */ }
         }
-        const cur = _overFade[ov.id] != null ? _overFade[ov.id] : 1;
-        let next = cur + (target - cur) * 0.12;   // ease ~ câteva sutimi
-        if (Math.abs(next - target) < 0.01) next = target;
-        _overFade[ov.id] = next;
-        if (next <= 0.01) continue;
-        ov.doc._lyrics = null;
-        try {
-          BgEngine.render(ctxOver, cvOver.width, cvOver.height, ov.doc, t,
-                          { alpha: next, noClear: true });
-        } catch (e) { /* keep looping */ }
+        _overLastDraw = ts;
       }
     } else if (cvOver.style.display !== 'none') {
       ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
@@ -649,6 +699,10 @@ window._handleRender = function (msg) {
 function handleMessage(msg) {
   // Accept both "type" and "cmd"
   const type = msg.type || msg.cmd;
+
+  // Orice mesaj poate schimba fundalul/overlay-ul → forțează un re-desen (apoi,
+  // dacă e static, bucla intră iar în repaus).
+  try { _bgDirty = true; } catch (e) {}
 
   // ── Freeze guard: ignore all commands while frozen except unfreeze / quit ──
   if (state.frozen && type !== 'unfreeze' && type !== 'quit') {
