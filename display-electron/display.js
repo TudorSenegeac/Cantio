@@ -448,7 +448,14 @@ function loadDocMedia(doc) {
     if ((L.fillType === 'image' || L.fillType === 'video') && L.fillSrc) {
       const fkey = L.id + '|fill|' + L.fillSrc;
       const fcached = _bgMediaCache[fkey];
-      if (fcached) { BgEngine.registerMedia(L.id, fcached, 'fill'); }
+      if (fcached) {
+        // Re-pornim videoul la fiecare afișare (altfel, fără loop, rămâne pe
+        // ultimul cadru după prima rulare).
+        if (L.fillType === 'video') {
+          try { fcached.loop = (L.fillLoop !== false); fcached.currentTime = 0; fcached.play().catch(() => {}); } catch (e) {}
+        }
+        BgEngine.registerMedia(L.id, fcached, 'fill');
+      }
       else {
         const isVid = L.fillType === 'video';
         const fel = isVid ? document.createElement('video') : new Image();
@@ -486,7 +493,15 @@ function loadDocMedia(doc) {
     if (!src) return;
     const key = L.id + '|' + src;
     const cached = _bgMediaCache[key];
-    if (cached) { BgEngine.registerMedia(L.id, cached, L.type); return; }
+    if (cached) {
+      // Un videoclip fără loop rămânea pe ultimul cadru după prima rulare; la
+      // fiecare (re)afișare a fundalului îl re-pornim de la început.
+      if (L.type === 'video') {
+        try { cached.loop = (L.loop !== false); cached.currentTime = 0; cached.play().catch(() => {}); } catch (e) {}
+      }
+      BgEngine.registerMedia(L.id, cached, L.type);
+      return;
+    }
     const isVideo = L.type === 'video';
     const el = isVideo ? document.createElement('video') : new Image();
     if (isVideo) { el.loop = (L.loop !== false); el.muted = true; el.autoplay = true; el.playsInline = true; }
@@ -728,6 +743,8 @@ function handleMessage(msg) {
         doc: o.doc || { layers: [] },
         hideOnText: !!o.hideOnText,
       }));
+      // Încarcă media (logo/imagine/video/cameră) pentru fiecare overlay.
+      state.overlays.forEach(o => { try { loadDocMedia(o.doc); } catch (e) {} });
       // curăță factorii de fade pentru overlay-uri care nu mai există
       const ids = new Set(state.overlays.map(o => o.id));
       Object.keys(_overFade).forEach(k => { if (!ids.has(k)) delete _overFade[k]; });
