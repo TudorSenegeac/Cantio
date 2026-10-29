@@ -45,6 +45,9 @@ _state: dict = {
     "looks":              [],   # [{name, active}]
     "macros":             [],   # [{idx, name}]
     "overlays":           [],   # [{name, live}]
+    "bible_mode":         False,
+    "bible_ref":          "",
+    "bible_text":         "",
 }
 
 _command_queue: queue.Queue = queue.Queue()
@@ -499,6 +502,12 @@ body {
     -webkit-box-orient: vertical; overflow: hidden;
 }
 .slide-num { position: absolute; top: 3px; left: 4px; font-size: 8px; color: rgba(255,255,255,0.5); }
+.slide-edit {
+    position: absolute; bottom: 3px; right: 4px; z-index: 2;
+    background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 5px;
+    font-size: 13px; padding: 3px 7px; cursor: pointer;
+}
+.slide-edit:active { background: rgba(0,0,0,0.8); }
 .chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .chip {
     background: var(--surface); color: var(--text); border: 1px solid var(--surface2);
@@ -571,6 +580,7 @@ body {
 <div class="nav-tabs">
     <button class="nav-tab active" onclick="switchTab('control')">🎛 Control</button>
     <button class="nav-tab"        onclick="switchTab('slides')">🖼 Slide-uri</button>
+    <button class="nav-tab"        onclick="switchTab('bible')">📖 Biblie</button>
     <button class="nav-tab"        onclick="switchTab('service')">📋 Serviciu</button>
     <button class="nav-tab"        onclick="switchTab('songs')">🎵 Cântări</button>
     <button class="nav-tab"        onclick="switchTab('extras')">⚙ Extra</button>
@@ -606,6 +616,27 @@ body {
         <div style="color:var(--subtext);text-align:center;grid-column:1/-1;padding:20px;">
             Selectează o cântare
         </div>
+    </div>
+</div>
+
+<!-- BIBLIE -->
+<div id="tab-bible" class="tab-content">
+    <div class="live-preview" id="biblePreview" style="min-height:120px">
+        <div class="live-text" id="bibleText" style="font-size:15px">—</div>
+    </div>
+    <div id="bibleRef" style="text-align:center;color:var(--accent);font-size:13px;font-weight:600;margin:8px 0">—</div>
+    <div class="search-bar">
+        <input type="text" class="search-input" id="bibleRefInput"
+               placeholder="ex: Ioan 3:16  sau  Ps 23 1"
+               onkeydown="if(event.key==='Enter')bibleGo()">
+        <button class="search-btn" onclick="bibleGo()">📖</button>
+    </div>
+    <div class="nav-row">
+        <button class="nav-btn" onclick="cmd('bible_prev')">◄ Verset ant.</button>
+        <button class="nav-btn" onclick="cmd('bible_next')">Verset urm. ►</button>
+    </div>
+    <div style="color:var(--subtext);font-size:11px;text-align:center;margin-top:8px">
+        Scrie referința și apasă 📖, apoi navighează cu ◄ ►. Versetul se trimite live.
     </div>
 </div>
 
@@ -745,6 +776,27 @@ function updateUI() {
     updateSlidesGrid()
     updateServiceList()
     updateProductionControls()
+    updateBible()
+}
+
+function updateBible() {
+    const bt = document.getElementById('bibleText')
+    const br = document.getElementById('bibleRef')
+    const bp = document.getElementById('biblePreview')
+    if (!bt) return
+    const st = state.output_style || null
+    bt.textContent = state.bible_text || '—'
+    bt.style.cssText = textCss(st) + 'font-size:15px;width:100%'
+    br.textContent = state.bible_ref || '—'
+    bp.style.background = bgCss(st)
+    bp.style.justifyContent = hFlex(st)
+    bp.style.alignItems = vFlex(st)
+}
+function bibleGo() {
+    const ref = document.getElementById('bibleRefInput').value.trim()
+    if (!ref) return
+    socket.emit('cmd', { cmd: 'bible_go', ref: ref })
+    showToast('📖 ' + ref)
 }
 
 function updateProductionControls() {
@@ -795,6 +847,7 @@ function updateSlidesGrid() {
              style="background:${bg};display:flex;align-items:${vFlex(st)};justify-content:${hFlex(st)}" onclick="sendSlide(${i})">
             <span class="slide-num">${i+1}</span>
             ${s.label ? `<span class="slide-num" style="left:auto;right:4px;color:var(--accent)">${escHtml(s.label)}</span>` : ''}
+            <button class="slide-edit" onclick="event.stopPropagation();editSlide(${i})" title="Editează">✏</button>
             <div class="slide-thumb-text" style="${tcss}width:100%">${escHtml(s.text || '')}</div>
         </div>`).join('')
 }
@@ -824,6 +877,15 @@ function cmd(command, extra) {
 function sendSlide(idx) {
     socket.emit('cmd', { cmd: 'go_live', idx: idx })
     switchTab('control')
+}
+
+function editSlide(idx) {
+    const slides = state.slides || []
+    const cur = (slides[idx] && slides[idx].text) || ''
+    const nt = prompt('Editează textul strofei:', cur)
+    if (nt === null || nt === cur) return
+    socket.emit('cmd', { cmd: 'edit_slide', idx: idx, text: nt })
+    showToast('✏ Strofă actualizată')
 }
 
 function selectServiceItem(idx) {

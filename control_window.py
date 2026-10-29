@@ -12755,6 +12755,101 @@ class ControlWindow(QMainWindow):
                     except Exception:
                         pass
 
+            elif action == "bible_next":
+                self._remote_bible_nav(1)
+
+            elif action == "bible_prev":
+                self._remote_bible_nav(-1)
+
+            elif action == "bible_go":
+                self._remote_bible_go(cmd.get("ref", "") or "")
+
+            elif action == "edit_slide":
+                try:
+                    self._remote_edit_slide(int(cmd.get("idx", -1)), cmd.get("text", ""))
+                except Exception:
+                    pass
+
+    def _remote_bible_nav(self, delta: int):
+        """Prev/Next verset din telefon (trimite live prin Control Bible)."""
+        bt = getattr(self, "_bible_control_tab", None)
+        if bt is None:
+            return
+        try:
+            if delta > 0:
+                bt._next_verse()
+            elif delta < 0:
+                bt._prev_verse()
+        except Exception:
+            pass
+
+    def _remote_bible_go(self, ref: str):
+        """Caută o referință (ex. „Ioan 3:16") și trimite versetul live."""
+        ref = (ref or "").strip()
+        if not ref:
+            return
+        try:
+            if hasattr(self, "bible_quick_edit"):
+                self.bible_quick_edit.setText(ref)
+                self._bible_quick_search()
+                # După ce capitolul s-a încărcat și versetul s-a selectat, trimite-l live.
+                QTimer.singleShot(450, self._remote_bible_send_current)
+        except Exception:
+            pass
+
+    def _remote_bible_send_current(self):
+        bt = getattr(self, "_bible_control_tab", None)
+        if bt is None:
+            return
+        try:
+            if hasattr(bt, "verse_queue") and bt.verse_queue.currentItem() is not None:
+                bt._send_verse_live(bt.verse_queue.currentItem())
+        except Exception:
+            pass
+
+    def _remote_edit_slide(self, idx: int, new_text: str):
+        """Editează textul unei strofe/slide din telefon: live + în memorie, și
+        persistă în cântare dacă structura editorului se potrivește."""
+        if not (0 <= idx < len(self.current_slides)):
+            return
+        new_text = str(new_text)
+        s = self.current_slides[idx]
+        self.current_slides[idx] = ({**s, "text": new_text}
+                                    if isinstance(s, dict) else new_text)
+        # Persistă în cântare doar dacă editorul are același număr de blocuri
+        # (fără împărțire pe rânduri / aranjament activ — altfel ar fi ambiguu).
+        try:
+            if self.current_song_id and hasattr(self, "editor") and \
+                    not getattr(self, "_active_arrangement", None) and \
+                    int(getattr(self, "_applied_lps", 0)) == 0:
+                content = self.editor.toPlainText()
+                blocks = content.split("\n\n")
+                ne = [i for i, b in enumerate(blocks) if b.strip()]
+                if len(ne) == len(self.current_slides):
+                    blocks[ne[idx]] = new_text
+                    self.editor.blockSignals(True)
+                    self.editor.setPlainText("\n\n".join(blocks))
+                    self.editor.blockSignals(False)
+                    self._autosave_song()
+        except Exception:
+            pass
+        # Re-randează thumbnail-ul respectiv.
+        try:
+            th = self._thumbnails[idx] if idx < len(self._thumbnails) else None
+            if th is not None:
+                th.slide_text = new_text
+                th.update()
+        except Exception:
+            pass
+        # Dacă e slide-ul curent și e live, retrimite-l.
+        try:
+            if idx == self.current_slide_idx and self._is_live:
+                self._send_slide_to_live(idx)
+        except Exception:
+            pass
+        try: self._push_remote_state()
+        except Exception: pass
+
     def _select_service_item(self, idx: int):
         """Load service item at *idx* from the remote — same as double-click in UI."""
         if not hasattr(self, "_service_list"):
@@ -12866,6 +12961,18 @@ class ControlWindow(QMainWindow):
         except Exception:
             pass
 
+        # Stare Biblie curentă pentru remote (referință + text versetului live).
+        _bible_ref, _bible_text = "", ""
+        try:
+            _bt = getattr(self, "_bible_control_tab", None)
+            if _bt is not None:
+                _bible_ref = getattr(_bt, "_live_ref", "") or ""
+                _bible_text = getattr(_bt, "_live_verse_text", "") or ""
+            if not _bible_ref:
+                _bible_ref = (self._current_metadata or {}).get("reference", "") or ""
+        except Exception:
+            pass
+
         # Controale de producție pentru remote: Looks, Macros, Overlay-uri.
         looks_list, macros_list, overlays_list = [], [], []
         try:
@@ -12901,6 +13008,9 @@ class ControlWindow(QMainWindow):
             looks=looks_list,
             macros=macros_list,
             overlays=overlays_list,
+            bible_mode=self._is_bible_mode(),
+            bible_ref=_bible_ref,
+            bible_text=_bible_text,
             live_text=current_text,
             current_text=current_text,
             current_title=self.song_title_edit.text(),
