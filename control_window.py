@@ -12791,19 +12791,58 @@ class ControlWindow(QMainWindow):
             self._remote_songs_dirty = False
         song_list = getattr(self, "_remote_song_list", [])
 
-        # Theme colours so the phone's live preview approximates the projector.
+        # Stil de ieșire COMPLET, ca telefonul să arate slide-urile exact (text +
+        # fundal), nu doar o aproximare de culori.
+        import os as _os
+        output_style = {}
+        theme_bg, theme_text = "#000000", "#ffffff"
+        self._remote_bg_path = ""
         try:
             _ts = self._resolve_settings(
                 source=("bible" if self._is_bible_mode() else "songs"),
                 song_id=self.current_song_id)
             theme_bg   = _ts.get("bg_color", "#000000") or "#000000"
             theme_text = _ts.get("text_color", "#ffffff") or "#ffffff"
+
+            def _b(v, d="false"):
+                return str(_ts.get(v, d)).lower() in ("true", "1")
+            _bt = _ts.get("bg_type", "color") or "color"
+            _al = str(_ts.get("text_align", "center")).lower()
+            _al = ("left" if _al in ("left", "stanga", "stânga")
+                   else "right" if _al in ("right", "dreapta") else "center")
+            _va = str(_ts.get("text_valign", _ts.get("valign", "center"))).lower()
+            _va = ("top" if _va in ("top", "sus") else "bottom"
+                   if _va in ("bottom", "jos") else "center")
+            # Fundal imagine → îl servim telefonului; versiune pt. cache-busting.
+            _bgimg = _ts.get("bg_image", "") if _bt == "image" else ""
+            if _bgimg and _os.path.exists(_bgimg):
+                self._remote_bg_path = _bgimg
+            output_style = {
+                "bg_type":   _bt,
+                "bg_color":  theme_bg,
+                "grad_c1":   _ts.get("bg_grad_c1", "") or "",
+                "grad_c2":   _ts.get("bg_grad_c2", "") or "",
+                "grad_dir":  _ts.get("bg_grad_dir", "Sus→Jos") or "Sus→Jos",
+                "text_color": theme_text,
+                "font":      _ts.get("font_family", "Arial") or "Arial",
+                "bold":      _b("font_bold", "true"),
+                "italic":    _b("font_italic", "false"),
+                "uppercase": _b("uppercase", "false"),
+                "align":     _al,
+                "valign":    _va,
+                "shadow":    str(_ts.get("text_shadow", "true")).lower() != "false",
+                "has_bg_img": bool(self._remote_bg_path),
+                "bg_img_ver": (str(abs(hash(self._remote_bg_path)) % 100000)
+                               if self._remote_bg_path else "0"),
+            }
         except Exception:
-            theme_bg, theme_text = "#000000", "#ffffff"
+            pass
 
         rs.update_state(
             theme_bg=theme_bg,
             theme_text=theme_text,
+            output_style=output_style,
+            bg_img_path=self._remote_bg_path,
             live_text=current_text,
             current_text=current_text,
             current_title=self.song_title_edit.text(),

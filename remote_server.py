@@ -40,6 +40,8 @@ _state: dict = {
     "slides":             [],   # [{idx, text, label}, …]
     "display_open":       False,
     "current_song":       None, # {id, title, author}
+    "output_style":       {},   # stil complet de ieșire (fundal + text) pt. preview exact
+    "bg_img_path":        "",   # calea fundalului-imagine (servită prin /api/bg)
 }
 
 _command_queue: queue.Queue = queue.Queue()
@@ -152,7 +154,7 @@ def generate_qr(url: str) -> str:
 def _build_app():
     global _app, _socketio
     try:
-        from flask import Flask, render_template_string, jsonify, request, Response
+        from flask import Flask, render_template_string, jsonify, request, Response, send_file
         from flask_socketio import SocketIO, emit as sio_emit
     except ImportError:
         return None, None
@@ -181,6 +183,18 @@ def _build_app():
             json.dumps(dict(_state), ensure_ascii=False),
             mimetype="application/json",
         )
+
+    @app.route("/api/bg")
+    def api_bg():
+        # Servește fundalul-imagine curent (pt. previzualizare exactă pe telefon).
+        import os as _os
+        p = _state.get("bg_img_path", "") or ""
+        if p and _os.path.exists(p):
+            try:
+                return send_file(p)
+            except Exception:
+                pass
+        return Response(b"", status=404)
 
     @app.route("/api/songs")
     def api_songs():
@@ -639,8 +653,40 @@ function updateStatus(connected) {
     document.getElementById('statusText').textContent = connected ? 'Conectat' : 'Deconectat'
 }
 
+// ── Stil de ieșire exact (fundal + text) ────────────────────────────────────
+function gradDir(d) {
+    d = (d || '').toLowerCase()
+    if (d.includes('jos') && d.includes('sus')) return d.indexOf('jos') < d.indexOf('sus') ? 'to top' : 'to bottom'
+    if (d.includes('bottom')) return 'to top'
+    if (d.includes('stang') || d.includes('left')) return 'to right'
+    if (d.includes('dreapta') || d.includes('right')) return 'to left'
+    if (d.includes('diag')) return '135deg'
+    return 'to bottom'
+}
+function bgCss(st) {
+    if (!st) return '#000'
+    if (st.has_bg_img) return `center/cover no-repeat url(/api/bg?v=${st.bg_img_ver || 0})`
+    if (st.bg_type === 'gradient' && st.grad_c1)
+        return `linear-gradient(${gradDir(st.grad_dir)}, ${st.grad_c1}, ${st.grad_c2 || st.grad_c1})`
+    return st.bg_color || '#000'
+}
+function textCss(st) {
+    if (!st) return ''
+    let s = `color:${st.text_color || '#fff'};`
+    s += `font-family:"${(st.font || 'Arial').replace(/"/g, '')}",sans-serif;`
+    if (st.bold) s += 'font-weight:800;'
+    if (st.italic) s += 'font-style:italic;'
+    if (st.uppercase) s += 'text-transform:uppercase;'
+    s += `text-align:${st.align || 'center'};`
+    if (st.shadow) s += 'text-shadow:2px 2px 6px rgba(0,0,0,.8);'
+    return s
+}
+function vFlex(st) { const v = st && st.valign; return v === 'top' ? 'flex-start' : v === 'bottom' ? 'flex-end' : 'center' }
+function hFlex(st) { const a = st && st.align; return a === 'left' ? 'flex-start' : a === 'right' ? 'flex-end' : 'center' }
+
 function updateUI() {
-    // Live preview — approximate the projector using the active theme colours
+    const st = state.output_style || null
+    // Live preview — fundal + text EXACT (nu doar culori aproximate)
     const text = state.live_text || state.current_text || ''
     const liveTextEl = document.getElementById('liveText')
     liveTextEl.textContent = text || 'Niciun slide activ'
@@ -648,8 +694,10 @@ function updateUI() {
     document.getElementById('liveBadge').style.display = isLive ? 'block' : 'none'
     const lp = document.getElementById('livePreview')
     lp.className = 'live-preview' + (isLive ? ' active' : '')
-    if (state.theme_bg)   lp.style.background = state.theme_bg
-    if (state.theme_text) liveTextEl.style.color = state.theme_text
+    lp.style.background = bgCss(st)
+    lp.style.justifyContent = hFlex(st)
+    lp.style.alignItems = vFlex(st)
+    liveTextEl.style.cssText = textCss(st) + 'width:100%;'
 
     // Song info
     const si = document.getElementById('currentSongInfo')
@@ -688,14 +736,15 @@ function updateSlidesGrid() {
         grid.innerHTML = '<div style="color:var(--subtext);text-align:center;grid-column:1/-1;padding:20px;">Selectează o cântare</div>'
         return
     }
-    const bg = state.theme_bg || '#000'
-    const tc = state.theme_text || '#fff'
+    const st = state.output_style || null
+    const bg = bgCss(st)
+    const tcss = textCss(st)
     grid.innerHTML = slides.map((s, i) => `
         <div class="slide-thumb ${i===curIdx?'current':''} ${i===curIdx&&state.is_live?'live':''}"
-             style="background:${bg}" onclick="sendSlide(${i})">
+             style="background:${bg};display:flex;align-items:${vFlex(st)};justify-content:${hFlex(st)}" onclick="sendSlide(${i})">
             <span class="slide-num">${i+1}</span>
             ${s.label ? `<span class="slide-num" style="left:auto;right:4px;color:var(--accent)">${escHtml(s.label)}</span>` : ''}
-            <div class="slide-thumb-text" style="color:${tc}">${escHtml(s.text || '')}</div>
+            <div class="slide-thumb-text" style="${tcss}width:100%">${escHtml(s.text || '')}</div>
         </div>`).join('')
 }
 
