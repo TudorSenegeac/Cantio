@@ -42,6 +42,9 @@ _state: dict = {
     "current_song":       None, # {id, title, author}
     "output_style":       {},   # stil complet de ieșire (fundal + text) pt. preview exact
     "bg_img_path":        "",   # calea fundalului-imagine (servită prin /api/bg)
+    "looks":              [],   # [{name, active}]
+    "macros":             [],   # [{idx, name}]
+    "overlays":           [],   # [{name, live}]
 }
 
 _command_queue: queue.Queue = queue.Queue()
@@ -496,6 +499,15 @@ body {
     -webkit-box-orient: vertical; overflow: hidden;
 }
 .slide-num { position: absolute; top: 3px; left: 4px; font-size: 8px; color: rgba(255,255,255,0.5); }
+.chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.chip {
+    background: var(--surface); color: var(--text); border: 1px solid var(--surface2);
+    border-radius: 18px; padding: 9px 15px; font-size: 13px; cursor: pointer;
+    transition: all 0.12s; user-select: none;
+}
+.chip:active { transform: scale(0.95); }
+.chip.active { border-color: var(--accent); background: rgba(203,166,247,0.18); color: var(--accent); font-weight: 600; }
+.chip-empty { color: var(--subtext); font-size: 12px; padding: 4px 0; }
 .service-item {
     background: var(--surface); border-radius: 8px;
     padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
@@ -617,6 +629,12 @@ body {
 
 <!-- EXTRA -->
 <div id="tab-extras" class="tab-content">
+    <div class="section-title">🎨 Looks (teme active)</div>
+    <div id="looksList" class="chip-list"></div>
+    <div class="section-title">⚙ Macros</div>
+    <div id="macrosList" class="chip-list"></div>
+    <div class="section-title">🎬 Overlay-uri</div>
+    <div id="overlaysList" class="chip-list"></div>
     <div class="section-title">Ticker / Alertă</div>
     <div class="ticker-row">
         <input type="text" class="ticker-input" id="tickerText" placeholder="Text alertă...">
@@ -726,7 +744,40 @@ function updateUI() {
 
     updateSlidesGrid()
     updateServiceList()
+    updateProductionControls()
 }
+
+function updateProductionControls() {
+    // Looks
+    const lw = document.getElementById('looksList')
+    if (lw) {
+        const looks = state.looks || []
+        lw.innerHTML = looks.length
+            ? looks.map(l => `<div class="chip ${l.active?'active':''}" onclick="applyLook('${escAttr(l.name)}')">${escHtml(l.name)}</div>`).join('')
+            : '<div class="chip-empty">Niciun look salvat</div>'
+    }
+    // Macros
+    const mw = document.getElementById('macrosList')
+    if (mw) {
+        const macros = state.macros || []
+        mw.innerHTML = macros.length
+            ? macros.map(m => `<div class="chip" onclick="runMacro(${m.idx})">⚙ ${escHtml(m.name)}</div>`).join('')
+            : '<div class="chip-empty">Niciun macro</div>'
+    }
+    // Overlays
+    const ow = document.getElementById('overlaysList')
+    if (ow) {
+        const ovs = state.overlays || []
+        ow.innerHTML = ovs.length
+            ? ovs.map(o => `<div class="chip ${o.live?'active':''}" onclick="toggleOverlay('${escAttr(o.name)}')">${o.live?'🔴':'⚫'} ${escHtml(o.name)}</div>`).join('')
+            : '<div class="chip-empty">Niciun overlay</div>'
+    }
+}
+
+function escAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;') }
+function applyLook(name) { socket.emit('cmd', { cmd: 'apply_look', name: name }); showToast('🎨 Look: ' + name) }
+function runMacro(idx) { socket.emit('cmd', { cmd: 'run_macro', idx: idx }); showToast('⚙ Macro pornit') }
+function toggleOverlay(name) { socket.emit('cmd', { cmd: 'toggle_overlay', name: name }); showToast('🎬 ' + name) }
 
 function updateSlidesGrid() {
     const grid = document.getElementById('slidesGrid')

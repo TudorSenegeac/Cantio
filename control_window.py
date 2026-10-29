@@ -12727,6 +12727,34 @@ class ControlWindow(QMainWindow):
                 idx = cmd.get("index", cmd.get("idx", 0))
                 self._select_service_item(idx)
 
+            elif action == "apply_look":
+                name = cmd.get("name", "") or ""
+                # Comută look-ul: dacă e deja activ, îl oprești.
+                cur = (self.settings.get("active_look") or "").strip()
+                self._apply_look("" if name and name == cur else name)
+
+            elif action == "run_macro":
+                try:
+                    _idx = int(cmd.get("idx", cmd.get("index", -1)))
+                    _macros = self._load_macros()
+                    if 0 <= _idx < len(_macros):
+                        self._run_macro(_macros[_idx])
+                except Exception:
+                    pass
+
+            elif action == "toggle_overlay":
+                _ot = getattr(self, "_overlays_tab", None)
+                _nm = cmd.get("name", "")
+                if _ot is not None and _nm:
+                    try:
+                        if _nm in getattr(_ot, "_live_overlays", set()):
+                            _ot._stop_overlay_live(_nm)
+                        else:
+                            _ot._send_overlay_live(_nm)
+                        _ot._refresh_list()
+                    except Exception:
+                        pass
+
     def _select_service_item(self, idx: int):
         """Load service item at *idx* from the remote — same as double-click in UI."""
         if not hasattr(self, "_service_list"):
@@ -12838,11 +12866,41 @@ class ControlWindow(QMainWindow):
         except Exception:
             pass
 
+        # Controale de producție pentru remote: Looks, Macros, Overlay-uri.
+        looks_list, macros_list, overlays_list = [], [], []
+        try:
+            import json as _json3
+            _tp = self._get_themes_path()
+            if _os.path.exists(_tp):
+                with open(_tp, encoding="utf-8") as _f:
+                    _themes = _json3.load(_f)
+                _active_look = (self.settings.get("active_look") or "").strip()
+                for _nm in (_themes.get("list", {}) or {}).keys():
+                    looks_list.append({"name": _nm, "active": (_nm == _active_look)})
+        except Exception:
+            pass
+        try:
+            for _i, _m in enumerate(self._load_macros()):
+                macros_list.append({"idx": _i, "name": _m.get("name", f"Macro {_i+1}")})
+        except Exception:
+            pass
+        try:
+            _ot = getattr(self, "_overlays_tab", None)
+            if _ot is not None:
+                _live = getattr(_ot, "_live_overlays", set())
+                for _nm in _ot._list_overlays():
+                    overlays_list.append({"name": _nm, "live": (_nm in _live)})
+        except Exception:
+            pass
+
         rs.update_state(
             theme_bg=theme_bg,
             theme_text=theme_text,
             output_style=output_style,
             bg_img_path=self._remote_bg_path,
+            looks=looks_list,
+            macros=macros_list,
+            overlays=overlays_list,
             live_text=current_text,
             current_text=current_text,
             current_title=self.song_title_edit.text(),
