@@ -2622,8 +2622,11 @@ class ControlWindow(QMainWindow):
                 QMessageBox.warning(self, "Eroare", f"Nu s-a putut deschide serviciul:\n{e}")
 
     def _close_display(self):
-        for dw in list(self.display_windows):
-            dw.close()
+        # Închiderea (din meniu SAU din remote) trebuie să facă aceeași curățenie
+        # ca butonul Display: golește lista, actualizează butonul și anunță remote-ul.
+        # Altfel fereastra dispărea dar butonul rămânea „pornit" și nu se mai putea
+        # redeschide din telefon.
+        self._close_all_displays()
 
     def _close_stage_monitor(self):
         if self._stage_editor:
@@ -10448,6 +10451,9 @@ class ControlWindow(QMainWindow):
         self._display_aspect = 16 / 9
         if hasattr(self, 'preview'):
             self.preview.set_aspect_ratio(16 / 9)
+        # Anunță imediat remote-ul că display-ul s-a închis (buton sincronizat).
+        try: self._push_remote_state()
+        except Exception: pass
 
     def _push_initial_slide(self):
         """Push the selected slide content to newly-opened displays WITHOUT going live.
@@ -12511,6 +12517,30 @@ class ControlWindow(QMainWindow):
             "background: #1e1e2e; border-radius: 6px; padding: 10px;"
         )
         lay.addWidget(info)
+
+        # Adrese alternative: pe un router, adresa implicită poate să nu fie cea
+        # pe care o vede telefonul (sau un adaptor virtual fură ruta). Le listăm
+        # pe toate ca utilizatorul să încerce alta dacă prima nu merge.
+        try:
+            _port = rs.get_port()
+            _all = rs.get_all_local_ips() if hasattr(rs, "get_all_local_ips") else []
+            _others = [f"http://{ip}:{_port}" for ip in _all
+                       if f"http://{ip}:{_port}" != url]
+            if _others:
+                alt = QLabel("Nu merge pe router? Încearcă una dintre:\n" + "\n".join(_others))
+                alt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                alt.setWordWrap(True)
+                alt.setStyleSheet("color:#9399b2; font-size:11px;")
+                lay.addWidget(alt)
+        except Exception:
+            pass
+
+        fw = QLabel("Telefonul și laptopul trebuie pe aceeași rețea. Dacă tot nu merge "
+                    "pe router, permite „Python/CantioPresenter” în Firewall (rețea privată).")
+        fw.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fw.setWordWrap(True)
+        fw.setStyleSheet("color:#6c7086; font-size:10px;")
+        lay.addWidget(fw)
 
         hint = QLabel("Deschide link-ul sau scanează QR-ul de mai jos:")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)

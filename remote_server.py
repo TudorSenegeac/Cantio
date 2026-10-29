@@ -75,6 +75,33 @@ def get_local_ip() -> str:
         return "127.0.0.1"
 
 
+def _is_lan_ip(ip: str) -> bool:
+    return (ip.startswith("192.168.") or ip.startswith("10.") or
+            any(ip.startswith(f"172.{n}.") for n in range(16, 32)))
+
+
+def get_all_local_ips() -> list:
+    """Toate adresele IPv4 LAN ale laptopului (nu doar interfața implicită).
+    Pe un router, adresa spre internet poate diferi de cea pe care o vede
+    telefonul (sau un adaptor virtual Hyper-V/WSL fură ruta implicită), așa că
+    le oferim pe toate. Prima e cea mai probabil corectă (ruta implicită)."""
+    ips: list = []
+    primary = get_local_ip()
+    if primary and primary != "127.0.0.1":
+        ips.append(primary)
+    try:
+        host = socket.gethostname()
+        for info in socket.getaddrinfo(host, None, socket.AF_INET):
+            ip = info[4][0]
+            if ip and ip not in ips and _is_lan_ip(ip):
+                ips.append(ip)
+    except Exception:
+        pass
+    # Sortează: adresele LAN „reale" (192.168/10.x) înaintea celor de adaptor virtual.
+    ips.sort(key=lambda x: (0 if (x.startswith("192.168.") or x.startswith("10.")) else 1))
+    return ips or (["127.0.0.1"])
+
+
 def get_url() -> str:
     return f"http://{get_local_ip()}:{_server_port}"
 
