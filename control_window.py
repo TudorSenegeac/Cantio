@@ -5717,12 +5717,37 @@ class ControlWindow(QMainWindow):
 
     def _refresh_thumbnails_with_theme(self, song_id=None):
         """Re-apply theme settings to all visible thumbnails."""
+        # Dacă noua temă cere alt număr de rânduri/slide (sau îl oprește),
+        # re-împărțim slide-urile din sursa dinainte de split — altfel rămân
+        # lipite la valoarea temei anterioare.
+        self._resplit_for_active_theme()
         s = self._get_preview_settings(song_id)
         for thumb in self._thumbnails:
             if hasattr(thumb, "update_settings"):
                 thumb.update_settings(s)
             elif hasattr(thumb, "apply_settings"):
                 thumb.apply_settings(s)
+
+    def _resplit_for_active_theme(self):
+        """Re-aplică împărțirea pe rânduri când s-a schimbat tema activă
+        (lines_per_slide diferit), fără a reseta aranjamentul curent."""
+        base = getattr(self, "_presplit_slides", None)
+        if not base or not getattr(self, "current_slides", None):
+            return
+        try:
+            s = self._resolve_settings()
+            new_lps = int(s.get("lines_per_slide", 0) or 0)
+        except Exception:
+            return
+        if new_lps == getattr(self, "_applied_lps", 0):
+            return   # nimic de re-împărțit
+        self._applying_line_resplit = True
+        try:
+            self._set_slides(list(base))
+        except Exception:
+            pass
+        finally:
+            self._applying_line_resplit = False
 
     def _apply_current_song_theme_live(self):
         """Re-resolve the current song's theme and push it to preview, thumbnails
@@ -7780,7 +7805,8 @@ class ControlWindow(QMainWindow):
         # Track the "source" slide list for arrangements. When slides change for
         # a real reason (song load / text edit) — not an arrangement view — this
         # becomes the new base and the arrangement view resets to Original.
-        if not getattr(self, "_applying_arrangement", False):
+        if not getattr(self, "_applying_arrangement", False) and \
+                not getattr(self, "_applying_line_resplit", False):
             self._song_base_slides = list(slides)
             self._active_arrangement = None
             cmb = getattr(self, "_arrangement_combo", None)
@@ -7827,14 +7853,19 @@ class ControlWindow(QMainWindow):
             smart_labels = detect_smart_labels(slides, use_markers=use_markers)
         except Exception:
             smart_labels = [""] * len(slides)
+        # Reținem slide-urile ÎNAINTE de împărțirea pe rânduri, ca să le putem
+        # re-împărți corect când se schimbă tema (altă valoare / oprit).
+        self._presplit_slides = list(slides)
         # Împărțire pe N rânduri (din tema activă) — sub-etichete Strofa 1/1, 1/2…
+        _lps = 0
         try:
             _lps = int(_theme_s.get("lines_per_slide", 0) or 0)
             if _lps > 0:
                 slides, smart_labels = split_slides_by_lines(slides, smart_labels, _lps)
                 self.current_slides = slides
         except Exception:
-            pass
+            _lps = 0
+        self._applied_lps = _lps   # câte rânduri/slide sunt aplicate acum
         # Reținem etichetele pentru fundalul per etichetă la go-live.
         self.current_smart_labels = list(smart_labels)
         _row = 0
