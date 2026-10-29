@@ -207,11 +207,24 @@ def fill_missing_async(texts, lang: str, on_done=None):
                     res = _online(chunk, lang)
                 except Exception:
                     res = None
-                if res:
+                if res and len(res) == len(chunk):
                     with _lock:
                         for src, tr in zip(chunk, res):
                             _tm[lang][src] = (tr.strip() or src)
                     changed = True
+                else:
+                    # Batch-ul a eșuat (Google a schimbat numărul de linii) —
+                    # traducem fiecare șir SEPARAT ca să nu pierdem tot chunk-ul
+                    # și să evităm alinierea greșită (traducere pusă la altă cheie).
+                    for m in chunk:
+                        try:
+                            r1 = _online([m], lang)
+                        except Exception:
+                            r1 = None
+                        if r1:
+                            with _lock:
+                                _tm[lang][m] = (r1[0].strip() or m)
+                            changed = True
             for m in singles:
                 try:
                     res = _online([m], lang)
