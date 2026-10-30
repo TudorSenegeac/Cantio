@@ -116,6 +116,15 @@ def get_url() -> str:
     return f"http://{get_local_ip()}:{_server_port}"
 
 
+_output_frame = ""   # dataURL (PNG) al output-ului 1:1, actualizat ~2fps
+
+
+def set_output_frame(data_url: str):
+    """Setează ultima captură 1:1 a output-ului (apelat din firul WS Electron)."""
+    global _output_frame
+    _output_frame = data_url or ""
+
+
 def pop_command() -> Optional[dict]:
     """Called from Qt QTimer to drain the command queue (one call per tick)."""
     try:
@@ -191,6 +200,18 @@ def _build_app():
             json.dumps(dict(_state), ensure_ascii=False),
             mimetype="application/json",
         )
+
+    @app.route("/api/output.png")
+    def api_output():
+        # Captura 1:1 a output-ului (dataURL base64 PNG) → imagine servită telefonului.
+        du = _output_frame or ""
+        if du.startswith("data:image"):
+            try:
+                b64 = du.split(",", 1)[1]
+                return Response(base64.b64decode(b64), mimetype="image/png")
+            except Exception:
+                pass
+        return Response(b"", status=404)
 
     @app.route("/api/bg")
     def api_bg():
@@ -600,8 +621,9 @@ body {
 <!-- CONTROL -->
 <div id="tab-control" class="tab-content active">
     <div class="live-preview" id="livePreview">
+        <img id="liveFrame" alt="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1">
         <div class="live-text" id="liveText">Niciun slide activ</div>
-        <div class="live-badge" id="liveBadge" style="display:none">LIVE</div>
+        <div class="live-badge" id="liveBadge" style="display:none;z-index:2">LIVE</div>
     </div>
     <div class="ctrl-grid">
         <button class="ctrl-btn btn-live"    onclick="cmd('go_live')">▶ GO LIVE</button>
@@ -820,6 +842,21 @@ function bibleGo() {
     socket.emit('cmd', { cmd: 'bible_go', ref: ref })
     showToast('📖 ' + ref)
 }
+
+// Previzualizare 1:1 — reîmprospătează imaginea reală a output-ului (~2fps).
+(function () {
+    const img = document.getElementById('liveFrame')
+    if (!img) return
+    img.onload = () => { img.style.display = 'block' }
+    img.onerror = () => { img.style.display = 'none' }
+    setInterval(() => {
+        if (state && state.display_open) {
+            img.src = '/api/output.png?t=' + Date.now()
+        } else {
+            img.style.display = 'none'
+        }
+    }, 600)
+})()
 
 function updateProductionControls() {
     // Looks

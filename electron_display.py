@@ -903,6 +903,17 @@ class ElectronDisplayManager:
         auto-advances to a new slide (so the UI can follow it)."""
         self._dynamic_slide_cb = callback
 
+    def request_output_capture(self) -> None:
+        """Cere Electron-ului o captură 1:1 a output-ului (sosi via output_frame)."""
+        self._enqueue({"type": "capture_output"})
+
+    def set_output_frame_callback(self, callback) -> None:
+        """callback(dataURL:str) apelat când sosește o captură de output."""
+        self._output_frame_cb = callback
+
+    def get_output_frame(self) -> str:
+        return getattr(self, "_last_output_frame", "") or ""
+
     def set_thumb_callback(self, callback) -> None:
         """Register a callback(req_id:str, data_url:str) fired when a WYSIWYG
         thumbnail render is ready."""
@@ -966,6 +977,14 @@ class ElectronDisplayManager:
                     cb(int(msg.get("index")))
                 except Exception as e:
                     logger.debug("[ElectronDisplay] dynamic_slide callback error: %s", e)
+        elif mtype == "output_frame":
+            self._last_output_frame = msg.get("dataURL", "") or ""
+            cb = getattr(self, "_output_frame_cb", None)
+            if cb:
+                try:
+                    cb(self._last_output_frame)
+                except Exception:
+                    pass
         elif mtype == "thumb_result":
             cb = getattr(self, "_thumb_cb", None)
             if cb:

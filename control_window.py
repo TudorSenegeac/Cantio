@@ -12486,11 +12486,24 @@ class ControlWindow(QMainWindow):
         # Virtual cam output is handled via grab_frame → pyvirtualcam in a thread
         QMessageBox.information(self, "Virtual Cam", "Virtual Cam output via OBS Virtual Camera.\nFuncționalitate în dezvoltare.")
 
+    def _request_output_capture(self):
+        """Cere Electron-ului o captură 1:1 a output-ului (pt. preview exact pe telefon)."""
+        _ed = getattr(self, "electron_display", None)
+        if _ed is None:
+            return
+        if self.display_windows or getattr(self, "_electron_preview_on", False):
+            try:
+                _ed.request_output_capture()
+            except Exception:
+                pass
+
     def _toggle_remote(self):
         if self._remote_running:
             rs.stop_server()
             self._remote_running = False
             self._remote_timer.stop()
+            if hasattr(self, "_capture_timer"):
+                self._capture_timer.stop()
             self._update_btn_states()
             self._update_status(slide_msg="Remote oprit")
             return
@@ -12523,6 +12536,17 @@ class ControlWindow(QMainWindow):
         self._remote_running = True
         self._remote_songs_dirty = True   # build the remote song-list cache
         self._remote_timer.start(100)     # snappy: poll 10×/s (coalesced)
+        # Captură 1:1 a output-ului pentru previzualizarea identică pe telefon (~2fps).
+        _ed = getattr(self, "electron_display", None)
+        if _ed is not None:
+            try:
+                _ed.set_output_frame_callback(lambda data: rs.set_output_frame(data))
+            except Exception:
+                pass
+            if not hasattr(self, "_capture_timer"):
+                self._capture_timer = QTimer(self)
+                self._capture_timer.timeout.connect(self._request_output_capture)
+            self._capture_timer.start(500)
         self._remote_url = url
         self._update_btn_states()
         self._push_remote_state()

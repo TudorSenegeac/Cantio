@@ -217,6 +217,29 @@ function handleCommand(msg, ws) {
       return { type: 'ok' };
     }
 
+    case 'capture_output': {
+      // Capturează fereastra LIVE (sau preview) ca imagine 1:1 pentru remote.
+      let target = null;
+      for (const win of windows.values()) {
+        if (win && !win.isDestroyed()) { target = win; break; }
+      }
+      if (!target && previewWin && !previewWin.isDestroyed()) target = previewWin;
+      if (target) {
+        target.webContents.capturePage().then((img) => {
+          let out = img;
+          try { out = img.resize({ width: 480 }); } catch (e) {}
+          const url = out.toDataURL();
+          if (wss && url) {
+            const data = JSON.stringify({ type: 'output_frame', dataURL: url });
+            wss.clients.forEach(c => {
+              if (c.readyState === WebSocket.OPEN) { try { c.send(data); } catch {} }
+            });
+          }
+        }).catch(() => {});
+      }
+      return { type: 'ok' };
+    }
+
     case 'quit':
       setTimeout(() => app.quit(), 200);
       return { type: 'ok' };
