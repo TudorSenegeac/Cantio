@@ -76,6 +76,12 @@ def _set_app_icon(app: QApplication):
 
 def main():
     app = QApplication(sys.argv)
+    # Fonturile de brand (Poppins + Kaushan Script) pentru logo-ul „CantioPresenter".
+    try:
+        from branding import load_brand_fonts
+        load_brand_fonts()
+    except Exception:
+        pass
     app.setApplicationName("CantioPresenter")
     # NU setăm ApplicationDisplayName — Qt îl adaugă la fiecare titlu de fereastră
     # ca „ - CantioPresenter", deci apărea de două ori (ex. „CantioPresenter — Cantio - CantioPresenter").

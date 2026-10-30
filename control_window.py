@@ -1702,11 +1702,12 @@ class SlidesPlaceholder(QWidget):
         logo_lbl.setStyleSheet("color: #cba6f7; font-size: 42px; background: transparent;")
         layout.addWidget(logo_lbl)
 
-        title_lbl = QLabel("CantioPresenter")
+        title_lbl = QLabel()
+        title_lbl.setTextFormat(Qt.TextFormat.RichText)
+        from branding import brand_html as _bh
+        title_lbl.setText(_bh(30, color="#e0e0e0"))
         title_lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        title_lbl.setStyleSheet(
-            "color: #e0e0e0; font-size: 18px; font-weight: 700; background: transparent;"
-        )
+        title_lbl.setStyleSheet("background: transparent;")
         layout.addWidget(title_lbl)
 
         sub_lbl = QLabel("Selectează o cântare din listă pentru a începe")
@@ -2767,11 +2768,11 @@ class ControlWindow(QMainWindow):
             return b
 
         # ── Logo / Name ────────────────────────────────────────────────────
-        name_lbl = QLabel("  CantioPresenter  ")
-        name_lbl.setStyleSheet(
-            "color: #5294e2; font-weight: 700; font-size: 14px; "
-            "letter-spacing: 1px; padding: 0 6px;"
-        )
+        name_lbl = QLabel()
+        name_lbl.setTextFormat(Qt.TextFormat.RichText)
+        from branding import brand_html as _bh
+        name_lbl.setText(_bh(17, color="#5294e2"))
+        name_lbl.setStyleSheet("padding: 0 8px; background: transparent;")
         tb.addWidget(name_lbl)
 
         self._profile_btn = QPushButton(f"👤 {self._profile_name}")

@@ -197,10 +197,14 @@ class ProfileSelectDialog(QDialog):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(14)
 
-        logo = QLabel("CantioPresenter")
-        logo.setStyleSheet(
-            "color: #5294e2; font-size: 26px; font-weight: 700; letter-spacing: 2px;"
-        )
+        logo = QLabel()
+        logo.setTextFormat(Qt.TextFormat.RichText)
+        try:
+            from branding import brand_html as _bh
+            logo.setText(_bh(32, color="#5294e2"))
+        except Exception:
+            logo.setText("CantioPresenter")
+            logo.setStyleSheet("color:#5294e2; font-size:26px; font-weight:700;")
         logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(logo)
 
