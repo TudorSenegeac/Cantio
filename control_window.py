@@ -10283,6 +10283,11 @@ class ControlWindow(QMainWindow):
 
     def _open_display(self):
         """Open all active configured display windows."""
+        # Fereastra nouă NU are niciun fundal încă — resetăm starea „ce fundal e
+        # trimis" ca fundalul temei să fie RE-trimis la go-live (altfel garda
+        # _active_bg_path==f sărea trimiterea și fereastra rămânea neagră).
+        self._active_bg_path = None
+        self._bg_from_theme = False
         screens = QApplication.screens()
         configs = db.get_display_configs()
         active_configs = [c for c in configs if c.get("active", True)]
@@ -10442,6 +10447,16 @@ class ControlWindow(QMainWindow):
         active (altfel rămâneau doar în preview după redeschiderea display-ului)."""
         if not self.display_windows:
             return
+        # Re-aplică fundalul temei în fereastra nouă (altfel apărea doar textul
+        # pe negru până la o re-selectare de slide).
+        try:
+            if getattr(self, "_live_armed", False) and self.current_slide_idx >= 0:
+                _s = self._resolve_settings(
+                    source=("bible" if self._is_bible_mode() else "songs"),
+                    song_id=self.current_song_id)
+                self._apply_custom_bg_from_settings(_s)
+        except Exception:
+            pass
         try:
             if hasattr(self, "clock_btn") and self.clock_btn.isChecked():
                 self._toggle_clock(True)
