@@ -1982,4 +1982,10 @@ def available_languages() -> dict:
         "de": "Deutsch",
         "fr": "Français",
         "hu": "Magyar",
+        "es": "Español",
+        "it": "Italiano",
+        "ru": "Русский",
+        "uk": "Українська",
+        "pl": "Polski",
+        "pt": "Português",
     }
