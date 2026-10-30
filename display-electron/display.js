@@ -1197,8 +1197,10 @@ function _toEmbedUrl(url) {
     if (!url) return '';
     url = url.trim();
     const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([\w-]{11})/);
+    // Fără param `origin` (fals) — acela declanșa erorile 152/153 la YouTube.
+    // Doar ID-ul videoului (fără list=RD… care nu se poate încorpora).
     if (m) return 'https://www.youtube.com/embed/' + m[1]
-      + '?autoplay=1&rel=0&modestbranding=1&playsinline=1&origin=https://www.youtube.com';
+      + '?autoplay=1&mute=0&rel=0&modestbranding=1&playsinline=1';
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
     return url;   // any other link loads as-is
   } catch (e) { return url; }
