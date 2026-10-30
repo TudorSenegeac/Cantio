@@ -8,6 +8,14 @@
       "date": "2026-10-15",
       "type": "info",
       "url": ""
+    },
+    {
+      "id": "2026-10-16-versiunea-1-5-2-este-aici-urg1",
+      "title": "Versiunea 1.5.2 este aici!",
+      "body": "După aproximativ două luni versiunea 1.5.2 este aici. Erori reparate, funcții noi etc.",
+      "date": "2026-10-16",
+      "type": "info",
+      "url": "www.cantioapp.com"
     }
   ]
 }
