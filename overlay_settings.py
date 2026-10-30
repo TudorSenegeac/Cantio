@@ -137,6 +137,7 @@ _OVERLAY_DEFAULTS = {
         "border_radius": 4,
         "shadow": True,
         "size_pct": 8,
+        "auto_hide": False,
         "x_pct": None,
         "y_pct": None,
     },
@@ -376,6 +377,13 @@ class OverlaySettingsWidget(QWidget):
         self._ck_shadow.setChecked(ck["shadow"])
         gf.addRow("", self._ck_shadow)
 
+        self._ck_auto_hide = QCheckBox("Ascunde automat când textul se suprapune")
+        self._ck_auto_hide.setChecked(bool(ck.get("auto_hide", False)))
+        self._ck_auto_hide.setToolTip(
+            "Ceasul dispare (fade) când versurile/versetul trec peste el și "
+            "reapare când ecranul e gol.")
+        gf.addRow("", self._ck_auto_hide)
+
         self._ck_size_pct = QSpinBox()
         self._ck_size_pct.setRange(5, 20)
         self._ck_size_pct.setValue(ck["size_pct"])
@@ -568,6 +576,7 @@ class OverlaySettingsWidget(QWidget):
         ck["padding"] = self._ck_padding.value()
         ck["border_radius"] = self._ck_radius.value()
         ck["shadow"] = self._ck_shadow.isChecked()
+        ck["auto_hide"] = self._ck_auto_hide.isChecked()
         ck["size_pct"] = self._ck_size_pct.value()
         # Drag-positioned coordinates (None if a named position is used)
         picker = getattr(self, "_ck_pos_picker", None)

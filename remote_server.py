@@ -48,6 +48,7 @@ _state: dict = {
     "bible_mode":         False,
     "bible_ref":          "",
     "bible_text":         "",
+    "clock_active":       False,
 }
 
 _command_queue: queue.Queue = queue.Queue()
@@ -666,6 +667,10 @@ body {
     <div id="macrosList" class="chip-list"></div>
     <div class="section-title">🎬 Overlay-uri</div>
     <div id="overlaysList" class="chip-list"></div>
+    <div class="section-title">🕐 Ceas</div>
+    <div class="chip-list">
+        <div class="chip" id="clockChip" onclick="toggleClock()">🕐 Ceas</div>
+    </div>
     <div class="section-title">Ticker / Alertă</div>
     <div class="ticker-row">
         <input type="text" class="ticker-input" id="tickerText" placeholder="Text alertă...">
@@ -824,7 +829,11 @@ function updateProductionControls() {
             ? ovs.map(o => `<div class="chip ${o.live?'active':''}" onclick="toggleOverlay('${escAttr(o.name)}')">${o.live?'🔴':'⚫'} ${escHtml(o.name)}</div>`).join('')
             : '<div class="chip-empty">Niciun overlay</div>'
     }
+    // Clock
+    const cc = document.getElementById('clockChip')
+    if (cc) cc.classList.toggle('active', !!state.clock_active)
 }
+function toggleClock() { socket.emit('cmd', { cmd: 'toggle_clock' }); showToast('🕐 Ceas') }
 
 function escAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;') }
 function applyLook(name) { socket.emit('cmd', { cmd: 'apply_look', name: name }); showToast('🎨 Look: ' + name) }

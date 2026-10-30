@@ -3374,7 +3374,7 @@ function _roundRect(ctx, x, y, w, h, r) {
 function drawOverlays(ctx, W, H) {
   drawMetadata(ctx, W, H);
   if (state.tickerActive && state.tickerText) drawTicker(ctx, W, H);
-  if (state.clockActive)                      drawClock(ctx, W, H);
+  if (state.clockActive || _clockFadeV > 0.01) drawClock(ctx, W, H);
   if (state.timerActive)                      drawTimer(ctx, W, H);
   if (state.logoPath)                         drawLogo(ctx, W, H);
 }
@@ -3596,6 +3596,7 @@ function drawTicker(ctx, W, H) {
   ctx.globalAlpha = savedAlpha;
 }
 
+let _clockFadeV = 0;   // opacitate curentă a ceasului (fade in/out + auto-hide)
 function drawClock(ctx, W, H) {
   const clk = state.settings.clock || {};
   const s   = state.settings;
@@ -3645,6 +3646,19 @@ function drawClock(ctx, W, H) {
   else if (position === 'bottom_left')   { x = pad;                   y = H - pad;        }
   else if (position === 'bottom_center') { x = (W - textW) / 2;       y = H - pad;        }
   else                                   { x = W - textW - pad;       y = pad + fontSize; }  // top_right default
+
+  // ── Fade in/out + auto-ascundere când textul slide-ului se suprapune ────────
+  const autoHide = (clk.auto_hide === true || clk.auto_hide === 'true'
+                    || s.clock_auto_hide === 'true' || s.clock_auto_hide === true);
+  let target = state.clockActive ? 1 : 0;
+  if (target && autoHide && _lastTextBounds) {
+    const cb = { x0: x - pad, y0: y - fontSize, x1: x + textW + pad, y1: y + pad };
+    if (_rectsIntersect(cb, _lastTextBounds)) target = 0;   // se reafișează când e gol
+  }
+  _clockFadeV += (target - _clockFadeV) * 0.14;             // ease ~ fade lin
+  if (Math.abs(target - _clockFadeV) < 0.01) _clockFadeV = target;
+  if (_clockFadeV <= 0.01) { ctx.restore(); return; }
+  ctx.globalAlpha *= _clockFadeV;
 
   if (bgEnabled) {
     ctx.fillStyle = bgColor;
@@ -3874,7 +3888,7 @@ function mainLoop(ts) {
     needRedraw = true;
   }
 
-  if (state.clockActive || state.timerActive) needRedraw = true;
+  if (state.clockActive || state.timerActive || _clockFadeV > 0.01) needRedraw = true;
 
   // Chaotic text movement / animated text colour need continuous redraw
   const _s = state.settings;

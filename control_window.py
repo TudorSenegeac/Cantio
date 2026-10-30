@@ -10847,6 +10847,7 @@ class ControlWindow(QMainWindow):
             "bg_color":      ck.get("bg_color")   or self.settings.get("clock_bg_color",   "rgba(0,0,0,0.5)"),
             "shadow":        ck.get("shadow", True),
             "bold":          ck.get("bold", True),
+            "auto_hide":     bool(ck.get("auto_hide", False)),
         }
         # Custom drag-positioned clock (from ClockPositionPicker)
         if ck.get("x_pct") is not None and ck.get("y_pct") is not None:
@@ -12774,6 +12775,14 @@ class ControlWindow(QMainWindow):
                 except Exception:
                     pass
 
+            elif action == "toggle_clock":
+                try:
+                    _new = not self.clock_btn.isChecked()
+                    self.clock_btn.setChecked(_new)
+                    self._toggle_clock(_new)
+                except Exception:
+                    pass
+
     def _remote_bible_nav(self, delta: int):
         """Prev/Next verset din telefon (trimite live prin Control Bible)."""
         bt = getattr(self, "_bible_control_tab", None)
@@ -13015,6 +13024,8 @@ class ControlWindow(QMainWindow):
             bible_mode=self._is_bible_mode(),
             bible_ref=_bible_ref,
             bible_text=_bible_text,
+            clock_active=(self.clock_btn.isChecked()
+                          if hasattr(self, "clock_btn") else False),
             live_text=current_text,
             current_text=current_text,
             current_title=self.song_title_edit.text(),
