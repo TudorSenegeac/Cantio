@@ -48,6 +48,7 @@ _state: dict = {
     "bible_mode":         False,
     "bible_ref":          "",
     "bible_text":         "",
+    "bible_verses":       [],   # [{row, num, text, current}] capitolul întreg
     "clock_active":       False,
 }
 
@@ -518,6 +519,13 @@ body {
 .chip:active { transform: scale(0.95); }
 .chip.active { border-color: var(--accent); background: rgba(203,166,247,0.18); color: var(--accent); font-weight: 600; }
 .chip-empty { color: var(--subtext); font-size: 12px; padding: 4px 0; }
+.verse-row {
+    background: var(--surface); border: 1px solid var(--surface2); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 6px; font-size: 14px; line-height: 1.4; cursor: pointer;
+}
+.verse-row:active { background: var(--surface2); }
+.verse-row.current { border-color: var(--accent); background: rgba(203,166,247,0.12); }
+.verse-num { color: var(--accent); font-weight: 700; font-size: 12px; margin-right: 6px; vertical-align: top; }
 .service-item {
     background: var(--surface); border-radius: 8px;
     padding: 12px 14px; margin-bottom: 8px; cursor: pointer;
@@ -636,9 +644,8 @@ body {
         <button class="nav-btn" onclick="cmd('bible_prev')">◄ Verset ant.</button>
         <button class="nav-btn" onclick="cmd('bible_next')">Verset urm. ►</button>
     </div>
-    <div style="color:var(--subtext);font-size:11px;text-align:center;margin-top:8px">
-        Scrie referința și apasă 📖, apoi navighează cu ◄ ►. Versetul se trimite live.
-    </div>
+    <div class="section-title">Capitol întreg</div>
+    <div id="bibleChapter"></div>
 </div>
 
 <!-- SERVICIU -->
@@ -796,7 +803,17 @@ function updateBible() {
     bp.style.background = bgCss(st)
     bp.style.justifyContent = hFlex(st)
     bp.style.alignItems = vFlex(st)
+    // Capitolul întreg (tap pe un verset = îl trimite live)
+    const ch = document.getElementById('bibleChapter')
+    if (ch) {
+        const vs = state.bible_verses || []
+        ch.innerHTML = vs.length
+            ? vs.map(v => `<div class="verse-row ${v.current?'current':''}" onclick="bibleVerseAt(${v.row})">
+                   <span class="verse-num">${v.num}</span>${escHtml(v.text || '')}</div>`).join('')
+            : '<div class="chip-empty">Caută o referință ca să vezi capitolul</div>'
+    }
 }
+function bibleVerseAt(row) { socket.emit('cmd', { cmd: 'bible_verse_at', row: row }) }
 function bibleGo() {
     const ref = document.getElementById('bibleRefInput').value.trim()
     if (!ref) return

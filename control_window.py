@@ -12769,6 +12769,17 @@ class ControlWindow(QMainWindow):
             elif action == "bible_go":
                 self._remote_bible_go(cmd.get("ref", "") or "")
 
+            elif action == "bible_verse_at":
+                _bt = getattr(self, "_bible_control_tab", None)
+                if _bt is not None and hasattr(_bt, "verse_queue"):
+                    try:
+                        _r = int(cmd.get("row", -1))
+                        if 0 <= _r < _bt.verse_queue.count():
+                            _bt.verse_queue.setCurrentRow(_r)
+                            _bt._send_verse_live(_bt.verse_queue.currentItem())
+                    except Exception:
+                        pass
+
             elif action == "edit_slide":
                 try:
                     self._remote_edit_slide(int(cmd.get("idx", -1)), cmd.get("text", ""))
@@ -12974,13 +12985,26 @@ class ControlWindow(QMainWindow):
         except Exception:
             pass
 
-        # Stare Biblie curentă pentru remote (referință + text versetului live).
+        # Stare Biblie curentă pentru remote (referință + text + CAPITOL întreg).
         _bible_ref, _bible_text = "", ""
+        _bible_verses = []
         try:
             _bt = getattr(self, "_bible_control_tab", None)
             if _bt is not None:
                 _bible_ref = getattr(_bt, "_live_ref", "") or ""
                 _bible_text = getattr(_bt, "_live_verse_text", "") or ""
+                if hasattr(_bt, "verse_queue"):
+                    _cur_row = _bt.verse_queue.currentRow()
+                    for _vi in range(_bt.verse_queue.count()):
+                        _it = _bt.verse_queue.item(_vi)
+                        _v = _it.data(Qt.ItemDataRole.UserRole) if _it else None
+                        if _v:
+                            _bible_verses.append({
+                                "row": _vi,
+                                "num": _v.get("verse", _vi + 1),
+                                "text": _v.get("text", ""),
+                                "current": (_vi == _cur_row),
+                            })
             if not _bible_ref:
                 _bible_ref = (self._current_metadata or {}).get("reference", "") or ""
         except Exception:
@@ -13024,6 +13048,7 @@ class ControlWindow(QMainWindow):
             bible_mode=self._is_bible_mode(),
             bible_ref=_bible_ref,
             bible_text=_bible_text,
+            bible_verses=_bible_verses,
             clock_active=(self.clock_btn.isChecked()
                           if hasattr(self, "clock_btn") else False),
             live_text=current_text,
