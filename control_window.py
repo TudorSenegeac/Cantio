@@ -11859,11 +11859,24 @@ class ControlWindow(QMainWindow):
         Checks open display windows first; falls back to QScreen geometry
         for the secondary monitor, then to 1920×1080.
         """
-        # 1. Open Electron display window
+        from PyQt6.QtWidgets import QApplication
+        screens = QApplication.screens()
+
+        # 1. Ecranul CONFIGURAT pentru display (exact pe care se deschide fereastra
+        #    live). .screen() al proxy-ului Electron e nesigur (dă ecranul laptop-ului
+        #    → aspect 16:9 greșit), așa că folosim aceeași logică ca _open_display.
         if self.display_windows:
             try:
-                dw = self.display_windows[0]
-                scr = dw.screen()
+                configs = db.get_display_configs()
+                active = [c for c in configs if c.get("active", True)]
+                screen_idx = active[0].get("screen", 1) if active else 1
+                primary = QApplication.primaryScreen()
+                secondary = [s for s in screens if s is not primary]
+                scr = None
+                if screen_idx > 0 and secondary:
+                    scr = secondary[min(screen_idx - 1, len(secondary) - 1)]
+                elif screens:
+                    scr = screens[min(screen_idx, len(screens) - 1)]
                 if scr:
                     g = scr.geometry()
                     if g.width() > 0 and g.height() > 0:
@@ -11872,8 +11885,6 @@ class ControlWindow(QMainWindow):
                 pass
 
         # 2. Non-primary screen (the projector/TV)
-        from PyQt6.QtWidgets import QApplication
-        screens = QApplication.screens()
         for scr in screens:
             if scr is not QApplication.primaryScreen():
                 g = scr.geometry()
