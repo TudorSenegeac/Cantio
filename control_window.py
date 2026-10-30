@@ -2471,6 +2471,7 @@ class ControlWindow(QMainWindow):
         m_help = menubar.addMenu("❓ Ajutor")
         m_help.addAction(_act("Despre CantioPresenter",    self._show_about))
         m_help.addAction(_act("Scurtături Tastatură", self._show_shortcuts))
+        m_help.addAction(_act("Ghid rapid (10 pași)", self._show_guide))
         m_help.addAction(_act("Tutorial",             self._show_tutorial))
         m_help.addSeparator()
         m_help.addAction(_act("💬 Trimite Feedback",   self._show_feedback))
@@ -2688,6 +2689,14 @@ class ControlWindow(QMainWindow):
         try: self._update_btn_states()
         except Exception: pass
         self._push_stage_state()
+
+    def _show_guide(self):
+        """Mini-prezentare în 10 pași: cum se folosește corect aplicația."""
+        try:
+            from guide_dialog import GuideDialog
+            GuideDialog(self).exec()
+        except Exception as e:
+            print(f"[Guide] {e}")
 
     def _show_tutorial(self):
         """Launch the interactive tutorial overlay."""
