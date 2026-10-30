@@ -38,8 +38,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: Cantio-Setup-*.exe
-          if-no-files-found: warn
+          path: CantioPresenter-Setup-*.exe
+          if-no-files-found: error
 
   # ── macOS ──────────────────────────────────────────────────────────────────
   build-mac:
@@ -77,7 +77,9 @@ jobs:
   release:
     needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # Rulează la tag dacă build-ul Windows a reușit — chiar dacă macOS a eșuat
+    # (Windows e prioritatea; DMG-ul se adaugă doar dacă există).
+    if: always() && startsWith(github.ref, 'refs/tags/') && needs.build-windows.result == 'success'
     permissions:
       contents: write
     steps:
@@ -88,6 +90,7 @@ jobs:
           path: release-files
 
       - name: Download macOS artifact
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: mac-dmg
@@ -98,15 +101,24 @@ jobs:
           TAG="${{ github.ref_name }}"
           gh release create "$TAG" release-files/* \
             --repo "${{ github.repository }}" \
-            --title "Cantio $TAG" \
-            --notes "## Cantio $TAG
+            --title "CantioPresenter $TAG" \
+            --notes "## CantioPresenter $TAG
 
           ### Descărcare
-          - **Windows**: \`Cantio-Setup-*-Windows.exe\` — rulează ca Administrator
+          - **Windows**: \`CantioPresenter-Setup-*-Windows.exe\` — rulează ca Administrator
           - **macOS**: \`Cantio-*-macOS.dmg\` — trage în Applications (right-click → Open prima dată)
 
+          ### Noutăți 1.5.2
+          - Overlay-uri peste ecranul live (ceas, ticker, logo, forme)
+          - Control complet de pe telefon (Remote): previzualizare 1:1, Biblie, Looks, Macros
+          - Fundaluri & teme noi gata-făcute + casetă text liberă + fundal per etichetă
+          - Traducere mult mai bună (DeepL) + 10 limbi offline
+          - Performanță (GPU) + zeci de corecții
+
           ### Cerințe
-          - Windows 10/11 64-bit sau macOS 10.14+
-          - 4 GB RAM, 500 MB spațiu liber"
+          - Windows 10/11 64-bit (sau macOS 10.14+)
+          - 4 GB RAM, 500 MB spațiu liber
+
+          **Backup:** fă o copie a folderului \`Cantio\` înainte de instalare (cântările sunt păstrate oricum)."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

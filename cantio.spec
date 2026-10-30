@@ -84,6 +84,11 @@ hiddenimports = [
     'shutil',
     'tempfile',
     'platform',
+    # Module Cantio importate lazy (din funcții) — le listăm ca să fie sigur incluse
+    'asset_seed',
+    'branding',
+    'whats_new_dialog',
+    'guide_dialog',
 ]
 
 a = Analysis(
