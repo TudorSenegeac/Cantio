@@ -1791,6 +1791,22 @@ function drawFrame(ctx) {
 }
 
 // ── Smart word-wrap: balanced, no single-word lines, no mid-hyphen breaks ────
+// Wrap NORMAL (greedy): umple fiecare linie cât încape, apoi trece pe următoarea
+// — citire naturală (pt. Biblie / când text_wrap === 'normal'). Nu desparte cuvinte.
+function greedyWordWrap(rawLine, maxW, ctx) {
+  if (!rawLine || !rawLine.trim()) return [rawLine || ''];
+  const words = rawLine.match(/\S+/g) || [];
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (cur && ctx.measureText(test).width > maxW) { lines.push(cur); cur = w; }
+    else cur = test;
+  }
+  if (cur) lines.push(cur);
+  return lines.length ? lines : [rawLine];
+}
+
 function smartWordWrap(rawLine, maxW, ctx) {
   if (!rawLine || !rawLine.trim()) return [rawLine || ''];
 
@@ -2336,11 +2352,13 @@ function drawText(text, opacity, dx, dy) {
       `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${currentSize}px "${family}"`;
     ctxC.font = fontStr;
 
-    // ── Word-wrap each source line (smart balanced wrap) ───────────────────
+    // ── Word-wrap: normal (greedy) pt. Biblie / text_wrap=normal, altfel balansat ──
+    const _normalWrap = (s.source === 'bible') || (s.text_wrap === 'normal');
     lines = [];
     displayText.split('\n').forEach(rawLine => {
       if (!rawLine.trim()) { lines.push(''); return; }
-      const wrapped = smartWordWrap(rawLine, maxW, ctxC);
+      const wrapped = _normalWrap ? greedyWordWrap(rawLine, maxW, ctxC)
+                                  : smartWordWrap(rawLine, maxW, ctxC);
       wrapped.forEach(wl => {
         if (ctxC.measureText(wl).width <= maxW) {
           lines.push(wl);

@@ -196,13 +196,28 @@ def render_text_on_painter(
         font.setItalic(italic)
         fm = QFontMetrics(font)   # fm.horizontalAdvance() returns pixels ✓
 
+        # Biblie / text_wrap=normal → wrap greedy (ca în citire); altfel balansat.
+        _normal_wrap = (s.get("source") == "bible") or (s.get("text_wrap") == "normal")
+
+        def _greedy_wrap(line, maxw, fmetr):
+            words = line.split()
+            out, cur = [], ""
+            for w in words:
+                test = (cur + " " + w) if cur else w
+                if cur and fmetr.horizontalAdvance(test) > maxw:
+                    out.append(cur); cur = w
+                else:
+                    cur = test
+            if cur: out.append(cur)
+            return out or [line]
+
         lines = []
         for raw_line in display_text.split('\n'):
             if not raw_line.strip():
                 lines.append('')
                 continue
-            # Use smart_word_wrap for balanced line lengths
-            wrapped = smart_word_wrap(raw_line, max_w, fm)
+            wrapped = (_greedy_wrap(raw_line, max_w, fm) if _normal_wrap
+                       else smart_word_wrap(raw_line, max_w, fm))
             # If any single word is wider than max_w, char-split as fallback
             for wl in wrapped:
                 if fm.horizontalAdvance(wl) <= max_w:

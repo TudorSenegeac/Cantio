@@ -11115,6 +11115,10 @@ class ControlWindow(QMainWindow):
         # Resolve settings with bible theme
         live_settings = self._resolve_settings(source="bible")
         live_settings["source"] = "bible"
+        # Biblia are deja capitalizarea corectă — nu aplicăm cuvintele sacre din
+        # setări, și folosim wrap NORMAL (nu cel echilibrat), ca în citirea obișnuită.
+        live_settings["sacred_words_enabled"] = "false"
+        live_settings["text_wrap"] = "normal"
         if ref:
             live_settings["bible_reference"] = ref
         metadata = {"reference": ref, "source": "bible"}
