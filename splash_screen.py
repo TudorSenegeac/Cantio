@@ -89,10 +89,16 @@ class SplashScreen(QWidget):
         ov_layout.setContentsMargins(40, 20, 40, 28)
         ov_layout.addStretch()
 
-        # Version — bottom right
+        # Version — bottom right (dinamic: din QApplication, setat o singură dată
+        # în main.py prin setApplicationVersion → se actualizează singur la release).
+        try:
+            from PyQt6.QtWidgets import QApplication
+            _ver = (QApplication.applicationVersion() or "").strip()
+        except Exception:
+            _ver = ""
         version_row = QHBoxLayout()
         version_row.addStretch()
-        self.version_label = QLabel("v1.5.2")
+        self.version_label = QLabel(f"v{_ver}" if _ver else "v1.5.2")
         self.version_label.setStyleSheet(
             "color: rgba(255,255,255,0.6); font-size: 12px; font-family: 'Segoe UI';"
             "background: transparent;"
