@@ -201,12 +201,17 @@ def _online_deepl(lines: list, tl: str):
     # Cheile gratuite se termină în ':fx' → host api-free.
     host = ("https://api-free.deepl.com/v2/translate" if key.strip().endswith(":fx")
             else "https://api.deepl.com/v2/translate")
-    params = [("auth_key", key), ("source_lang", SOURCE_LANG.upper()),
+    params = [("source_lang", SOURCE_LANG.upper()),
               ("target_lang", _deepl_target(tl))]
     for ln in lines:
         params.append(("text", ln))
     body = urllib.parse.urlencode(params).encode("utf-8")
-    req = urllib.request.Request(host, data=body, headers={"User-Agent": "Cantio"})
+    # DeepL cere cheia în header-ul Authorization (param auth_key dă 403).
+    req = urllib.request.Request(host, data=body, headers={
+        "User-Agent": "Cantio/1.5.2",
+        "Authorization": "DeepL-Auth-Key " + key,
+        "Content-Type": "application/x-www-form-urlencoded",
+    })
     with urllib.request.urlopen(req, timeout=25) as r:
         res = json.loads(r.read().decode("utf-8", "replace"))
     trs = [t.get("text", "") for t in res.get("translations", [])]
