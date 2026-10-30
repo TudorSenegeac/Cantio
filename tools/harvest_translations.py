@@ -137,9 +137,10 @@ def harvest_all() -> list:
     return kept
 
 
-def build_lang(lang: str, strings: list):
+def build_lang(lang: str, strings: list, fresh: bool = False):
     out_path = os.path.join(LANGPACKS, f"{lang}.json")
-    existing = i18n._load_json(out_path)
+    # fresh=True → re-traducem TOT (ex. upgrade la DeepL), nu doar ce lipsește.
+    existing = {} if fresh else i18n._load_json(out_path)
     missing = [s for s in strings if s not in existing and "\n" not in s]
     singles = [s for s in strings if s not in existing and "\n" in s]
     print(f"[{lang}] total={len(strings)}  existente={len(existing)}  de_tradus={len(missing)+len(singles)}")
@@ -178,11 +179,13 @@ def build_lang(lang: str, strings: list):
 
 
 def main():
-    langs = sys.argv[1:] or ["en", "de", "fr", "hu"]
+    args = [a for a in sys.argv[1:] if a != "--fresh"]
+    fresh = "--fresh" in sys.argv
+    langs = args or ["en", "de", "fr", "hu"]
     strings = harvest_all()
-    print(f"Texte UI adunate: {len(strings)}")
+    print(f"Texte UI adunate: {len(strings)}  (fresh={fresh})")
     for lang in langs:
-        build_lang(lang, strings)
+        build_lang(lang, strings, fresh=fresh)
     print("GATA.")
 
 
