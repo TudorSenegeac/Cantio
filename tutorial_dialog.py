@@ -681,19 +681,18 @@ class InteractiveTutorial(QObject):
                 target_widget=None,
             ),
 
-            # PAS 12 — Final
+            # PAS 12 — Final + rețele sociale
             TutorialStep(
                 "✅ Ești gata să folosești CantioPresenter!",
                 "Ai parcurs tot tutorialul! 🎉\n\n"
                 "Resurse utile:\n"
-                "✔ Ajutor online:\n"
-                "   cantioapp.com/helpdesk\n"
-                "✔ Tutorial din nou:\n"
-                "   Ajutor → Tutorial\n"
-                "✔ Scurtături:\n"
-                "   Ajutor → Scurtături Tastatură\n\n"
-                "Mult succes la servicii! 🙏\n\n"
-                "— Creat cu ❤ de Senegeac Tudor",
+                "✔ Ajutor online: cantioapp.com/helpdesk\n"
+                "✔ Tutorial din nou: Ajutor → Tutorial\n"
+                "✔ Scurtături: Ajutor → Scurtături Tastatură\n\n"
+                "📣 Urmărește-ne pentru noutăți, sfaturi și ajutor:\n"
+                "   📘 Facebook   📸 Instagram   ✈ Telegram\n"
+                "   🌐 www.cantioapp.com\n\n"
+                "Mult succes la servicii! 🙏",
                 target_widget=None,
             ),
         ]
