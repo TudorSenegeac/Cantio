@@ -294,6 +294,11 @@ def copy_assets():
         shutil.copytree("langpacks", "dist/CantioPresenter/langpacks", dirs_exist_ok=True)
         print("  ✅ langpacks/")
 
+    # Fonturile de brand (Poppins + Kaushan Script) pt. logo-ul „CantioPresenter"
+    if os.path.exists("assets"):
+        shutil.copytree("assets", "dist/CantioPresenter/assets", dirs_exist_ok=True)
+        print("  ✅ assets/ (fonturi brand)")
+
 
 # ── Installer builders ────────────────────────────────────────────────────────
 
