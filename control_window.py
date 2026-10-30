@@ -10430,8 +10430,29 @@ class ControlWindow(QMainWindow):
         # Skip in Bible mode (bible content is handled by _send_bible_verse_live).
         if self.current_slide_idx >= 0 and not self._is_bible_mode():
             QTimer.singleShot(800, self._push_initial_slide)
+        # Restaurează overlay-urile persistente (ceas/ticker) în fereastra nouă —
+        # dacă erau pornite și s-a redeschis display-ul, trebuie să reapară cu el,
+        # nu doar în preview.
+        QTimer.singleShot(900, self._restore_persistent_overlays)
         # Notify remote clients that a display is now open
         self._push_remote_state()
+
+    def _restore_persistent_overlays(self):
+        """Re-trimite ceasul / tickerul în ferestrele live nou-deschise, dacă erau
+        active (altfel rămâneau doar în preview după redeschiderea display-ului)."""
+        if not self.display_windows:
+            return
+        try:
+            if hasattr(self, "clock_btn") and self.clock_btn.isChecked():
+                self._toggle_clock(True)
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_ticker_active", False) and \
+                    self.ticker_input.text().strip():
+                self._send_ticker()
+        except Exception:
+            pass
 
     def _close_all_displays(self):
         for dw in self.display_windows:
@@ -10656,10 +10677,12 @@ class ControlWindow(QMainWindow):
                 dw.show_ticker_advanced(text, ticker_settings)
             else:
                 dw.set_ticker(text, ticker_settings=ticker_settings)
+        self._ticker_active = True
         self._update_status(slide_msg="Ticker active")
 
     def _clear_ticker(self):
         self.ticker_input.clear()
+        self._ticker_active = False
         for dw in self.display_windows:
             dw.set_ticker("")
 
