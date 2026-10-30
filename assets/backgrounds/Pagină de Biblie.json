@@ -1,0 +1,88 @@
+{
+ "name": "Pagină de Biblie",
+ "format": {
+  "w": 1920,
+  "h": 1080
+ },
+ "transition": {
+  "in": "fade",
+  "out": "fade",
+  "duration": 600
+ },
+ "intro_stagger": 350,
+ "layers": [
+  {
+   "id": "s1",
+   "type": "scripture",
+   "visible": true,
+   "opacity": 1,
+   "x": 0.5,
+   "y": 0.5,
+   "w": 1,
+   "h": 1,
+   "rotation": 0,
+   "shadow": {
+    "enabled": false,
+    "color": "#000000",
+    "blur": 18,
+    "x": 0,
+    "y": 8
+   },
+   "blur": 0,
+   "anim": {
+    "pulse": {
+     "enabled": false,
+     "speed": 1,
+     "min": 0.85,
+     "max": 1.0
+    },
+    "scale": {
+     "enabled": false,
+     "speed": 1,
+     "min": 0.96,
+     "max": 1.04
+    },
+    "float": {
+     "enabled": false,
+     "speed": 1,
+     "amp": 0.02
+    },
+    "spin": {
+     "enabled": false,
+     "speed": 0.2
+    },
+    "glow": {
+     "enabled": false,
+     "speed": 1,
+     "min": 6,
+     "max": 28
+    },
+    "chaos": {
+     "enabled": false,
+     "speed": 1,
+     "amp": 0.04
+    }
+   },
+   "entrance": {
+    "type": "fade",
+    "duration": 700,
+    "delay": 0
+   },
+   "exit": {
+    "type": "fade",
+    "duration": 500,
+    "delay": 0
+   },
+   "variant": "dark",
+   "columns": 2,
+   "size": 1.0,
+   "chapter": 52,
+   "color": "#cdbd93",
+   "color2": "#0b0a07",
+   "animate": {
+    "mode": "none",
+    "speed": 0.25
+   }
+  }
+ ]
+}

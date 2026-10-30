@@ -1,0 +1,122 @@
+{
+ "Amurg": {
+  "type": "songs",
+  "text": {
+   "font_family": "Montserrat",
+   "font_size": "56",
+   "font_bold": "true",
+   "font_italic": "false",
+   "text_color": "#ffffff",
+   "text_shadow": "true",
+   "shadow_color": "#000000",
+   "outline_width": 0,
+   "outline_color": "#000000",
+   "line_spacing": 1.4,
+   "uppercase": "false",
+   "text_align": "center",
+   "color_type": "solid"
+  },
+  "background": {
+   "type": "gradient",
+   "color": "#000000",
+   "grad_color1": "#2b1055",
+   "grad_color2": "#7597de",
+   "grad_dir": "Sus→Jos"
+  },
+  "layout": {
+   "margin": "0.06",
+   "valign": "Centru"
+  },
+  "advanced": {}
+ },
+ "Cer senin": {
+  "type": "songs",
+  "text": {
+   "font_family": "Montserrat",
+   "font_size": "56",
+   "font_bold": "true",
+   "font_italic": "false",
+   "text_color": "#ffffff",
+   "text_shadow": "true",
+   "shadow_color": "#000000",
+   "outline_width": 0,
+   "outline_color": "#000000",
+   "line_spacing": 1.4,
+   "uppercase": "false",
+   "text_align": "center",
+   "color_type": "solid"
+  },
+  "background": {
+   "type": "gradient",
+   "color": "#000000",
+   "grad_color1": "#0f2027",
+   "grad_color2": "#2c5364",
+   "grad_dir": "Sus→Jos"
+  },
+  "layout": {
+   "margin": "0.06",
+   "valign": "Centru"
+  },
+  "advanced": {}
+ },
+ "Regal": {
+  "type": "songs",
+  "text": {
+   "font_family": "Montserrat",
+   "font_size": "56",
+   "font_bold": "true",
+   "font_italic": "false",
+   "text_color": "#ffe9a0",
+   "text_shadow": "true",
+   "shadow_color": "#000000",
+   "outline_width": 0,
+   "outline_color": "#000000",
+   "line_spacing": 1.4,
+   "uppercase": "false",
+   "text_align": "center",
+   "color_type": "solid"
+  },
+  "background": {
+   "type": "gradient",
+   "color": "#000000",
+   "grad_color1": "#20002c",
+   "grad_color2": "#cbb4d4",
+   "grad_dir": "Diagonală ↘"
+  },
+  "layout": {
+   "margin": "0.06",
+   "valign": "Centru"
+  },
+  "advanced": {}
+ },
+ "Auriu cald": {
+  "type": "songs",
+  "text": {
+   "font_family": "Montserrat",
+   "font_size": "56",
+   "font_bold": "true",
+   "font_italic": "false",
+   "text_color": "#1a1000",
+   "text_shadow": "false",
+   "shadow_color": "#000000",
+   "outline_width": 0,
+   "outline_color": "#000000",
+   "line_spacing": 1.4,
+   "uppercase": "false",
+   "text_align": "center",
+   "color_type": "solid"
+  },
+  "background": {
+   "type": "gradient",
+   "color": "#000000",
+   "grad_color1": "#3a1c00",
+   "grad_color2": "#f2994a",
+   "grad_dir": "Sus→Jos"
+  },
+  "layout": {
+   "margin": "0.06",
+   "valign": "Centru"
+  },
+  "advanced": {}
+ }
+}

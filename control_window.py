@@ -2217,6 +2217,13 @@ class ControlWindow(QMainWindow):
         self._embed_container = None
         self._dynamic_active = False
         self._profile_name = profile_name
+        # Teme + fundaluri livrate: adaugă-le în profil (fără a suprascrie / pierde
+        # ce a creat utilizatorul). Rulează ÎNAINTE de citirea temelor.
+        try:
+            from asset_seed import seed_bundled_assets
+            seed_bundled_assets(profile_name)
+        except Exception as _e:
+            print(f"[AssetSeed] {_e}")
         # Expose the active profile to the standalone bg-editor process (which
         # can't call Python) so its background picker reads the right profile dir.
         try:
