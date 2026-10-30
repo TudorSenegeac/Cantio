@@ -2325,6 +2325,7 @@ class ControlWindow(QMainWindow):
         QTimer.singleShot(250, self._restore_window_state)
         QTimer.singleShot(300, self._init_preview_aspect)
         QTimer.singleShot(500, self._check_tutorial)
+        QTimer.singleShot(650, self._check_whats_new)
         QTimer.singleShot(800, self._check_startup_profile)
         QTimer.singleShot(1500, self._check_reindex)
         # Operator preview defaults to the embedded HD (Electron) view
@@ -2693,6 +2694,16 @@ class ControlWindow(QMainWindow):
             from tutorial_dialog import InteractiveTutorial
             self._interactive_tutorial = InteractiveTutorial(self)
         self._interactive_tutorial.start()
+
+    def _check_whats_new(self):
+        """Arată „Ce e nou" dacă s-a instalat o versiune nouă peste una veche."""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            ver = (QApplication.applicationVersion() or "1.5.2").strip()
+            from whats_new_dialog import maybe_show_whats_new
+            maybe_show_whats_new(self, ver)
+        except Exception as e:
+            print(f"[WhatsNew] {e}")
 
     def _check_tutorial(self):
         """Show tutorial on first launch (after a short delay so UI is fully painted)."""
