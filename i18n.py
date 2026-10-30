@@ -169,8 +169,51 @@ def T(text: str) -> str:
 
 
 # ── Traducere online (Google, fără cheie) ────────────────────────────────────
-def _online(lines: list, tl: str):
-    """Traduce o listă de linii; întoarce listă de aceeași lungime sau None."""
+def _deepl_key() -> str:
+    """Cheia DeepL (calitate mult mai bună). Din setări (db) sau fișier."""
+    try:
+        import database as _db
+        k = (_db.get_settings().get("deepl_api_key", "") or "").strip()
+        if k:
+            return k
+    except Exception:
+        pass
+    try:
+        p = os.path.join(_DIR, "deepl_key.txt")
+        if os.path.exists(p):
+            return open(p, encoding="utf-8").read().strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _deepl_target(tl: str) -> str:
+    # DeepL folosește coduri majuscule, cu câteva specifice.
+    return {"en": "EN-US", "pt": "PT-PT", "zh": "ZH"}.get(tl, tl.upper())
+
+
+def _online_deepl(lines: list, tl: str):
+    """Traduce prin DeepL (API multi-text → fără misaliniere). None dacă n-are cheie
+    sau limba nu e suportată."""
+    key = _deepl_key()
+    if not key:
+        return None
+    # Cheile gratuite se termină în ':fx' → host api-free.
+    host = ("https://api-free.deepl.com/v2/translate" if key.strip().endswith(":fx")
+            else "https://api.deepl.com/v2/translate")
+    params = [("auth_key", key), ("source_lang", SOURCE_LANG.upper()),
+              ("target_lang", _deepl_target(tl))]
+    for ln in lines:
+        params.append(("text", ln))
+    body = urllib.parse.urlencode(params).encode("utf-8")
+    req = urllib.request.Request(host, data=body, headers={"User-Agent": "Cantio"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        res = json.loads(r.read().decode("utf-8", "replace"))
+    trs = [t.get("text", "") for t in res.get("translations", [])]
+    return trs if len(trs) == len(lines) else None
+
+
+def _online_google(lines: list, tl: str):
     q = "\n".join(lines)
     url = _ENDPOINT + "?" + urllib.parse.urlencode(
         {"client": "gtx", "sl": SOURCE_LANG, "tl": tl, "dt": "t", "q": q})
@@ -180,6 +223,21 @@ def _online(lines: list, tl: str):
     full = "".join(seg[0] for seg in data[0] if seg and seg[0])
     out = full.split("\n")
     return out if len(out) == len(lines) else None
+
+
+def _online(lines: list, tl: str):
+    """Traduce o listă de linii; întoarce listă de aceeași lungime sau None.
+    Preferă DeepL (calitate), cade pe Google dacă nu e cheie / eșuează."""
+    try:
+        d = _online_deepl(lines, tl)
+        if d is not None:
+            return d
+    except Exception:
+        pass
+    try:
+        return _online_google(lines, tl)
+    except Exception:
+        return None
 
 
 def fill_missing_async(texts, lang: str, on_done=None):

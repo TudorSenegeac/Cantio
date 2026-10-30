@@ -1131,6 +1131,22 @@ class SettingsDialog(QDialog):
         lg.addRow("", restart_lbl)
 
         layout.addWidget(lang_group)
+
+        # ── Traducere automată de calitate (DeepL) ──────────────────────────────
+        tr_group = QGroupBox("Traducere automată (calitate)")
+        tg = QFormLayout(tr_group)
+        self.deepl_key_edit = QLineEdit(self.s.get("deepl_api_key", "") or "")
+        self.deepl_key_edit.setPlaceholderText("Cheie DeepL (gratuită) — opțional")
+        self.deepl_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        tg.addRow("Cheie DeepL:", self.deepl_key_edit)
+        _tr_hint = QLabel("Cu o cheie DeepL gratuită (deepl.com/pro-api) traducerea e mult "
+                          "mai bună. Fără cheie se folosește Google. Limbile livrate merg "
+                          "oricum offline din prima.")
+        _tr_hint.setStyleSheet("color:#6c7086; font-size:11px;")
+        _tr_hint.setWordWrap(True)
+        tg.addRow("", _tr_hint)
+        layout.addWidget(tr_group)
+
         layout.addStretch()
         return self._scrollable(w)
 
@@ -1980,6 +1996,7 @@ class SettingsDialog(QDialog):
             "sacred_words_allcaps": "true" if self.sacred_allcaps.isChecked() else "false",
             "sacred_words": self._get_sacred_words_str(),
             "language": self.lang_combo.currentData() if hasattr(self, 'lang_combo') else get_language(),
+            "deepl_api_key": self.deepl_key_edit.text().strip() if hasattr(self, 'deepl_key_edit') else "",
             "copyright": self._collect_copyright(),
             "ref_font_size":  str(self.br_font_size.value()) if hasattr(self, 'br_font_size') else "24",
             "ref_color":      self.br_color.color()          if hasattr(self, 'br_color')     else "#aaaaaa",
