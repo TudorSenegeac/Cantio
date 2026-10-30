@@ -77,7 +77,8 @@ def _set_app_icon(app: QApplication):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("CantioPresenter")
-    app.setApplicationDisplayName("CantioPresenter")
+    # NU setăm ApplicationDisplayName — Qt îl adaugă la fiecare titlu de fereastră
+    # ca „ - CantioPresenter", deci apărea de două ori (ex. „CantioPresenter — Cantio - CantioPresenter").
     app.setOrganizationName("CantioPresenter")
     app.setApplicationVersion("1.5.2")
 

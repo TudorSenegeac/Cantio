@@ -247,39 +247,48 @@ let _overLastDraw = 0;
 function overlayLoop(ts) {
   if (ctxOver && cvOver) {
     const act = (state.overlays && state.overlays.length) ? state.overlays : null;
-    if (act && typeof BgEngine !== 'undefined') {
+    const hasOverlays = !!(act && typeof BgEngine !== 'undefined');
+    const clockOn = state.clockActive || _clockFadeV > 0.01;
+    if (hasOverlays || clockOn) {
       if (!_overStart) _overStart = ts;
       const t = ts - _overStart;
       if (cvOver.style.display === 'none') cvOver.style.display = 'block';
-      // Desenăm doar dacă e nevoie: vreun overlay animat, un fade în curs, sau
+      // Desenăm doar dacă e nevoie: overlay animat, fade în curs, ceas activ, sau
       // o schimbare (_bgDirty acoperă și schimbarea textului pt. auto-ascundere).
-      const anyAnimated = act.some(ov => ov && ov.doc && _docNeedsAnimation(ov.doc));
-      const anyFading = act.some(ov => {
+      const anyAnimated = hasOverlays && act.some(ov => ov && ov.doc && _docNeedsAnimation(ov.doc));
+      const anyFading = hasOverlays && act.some(ov => {
         if (!ov) return false;
         const f = _overFade[ov.id];
         return f != null && f > 0.01 && f < 0.99;
       });
       const due = (ts - _overLastDraw) >= _FRAME_MS;
-      if ((anyAnimated || anyFading || _bgDirty) && due) {
+      if ((anyAnimated || anyFading || clockOn || _bgDirty) && due) {
         ctxOver.clearRect(0, 0, cvOver.width, cvOver.height);
-        for (const ov of act) {
-          if (!ov || !ov.doc) continue;
-          // auto-ascundere opțională dacă overlay-ul se suprapune cu textul
-          let target = 1;
-          if (ov.hideOnText && _lastTextBounds) {
-            const bb = _overlayBBox(ov.doc, cvOver.width, cvOver.height);
-            if (_rectsIntersect(bb, _lastTextBounds)) target = 0;
+        if (hasOverlays) {
+          for (const ov of act) {
+            if (!ov || !ov.doc) continue;
+            // auto-ascundere opțională dacă overlay-ul se suprapune cu textul
+            let target = 1;
+            if (ov.hideOnText && _lastTextBounds) {
+              const bb = _overlayBBox(ov.doc, cvOver.width, cvOver.height);
+              if (_rectsIntersect(bb, _lastTextBounds)) target = 0;
+            }
+            const cur = _overFade[ov.id] != null ? _overFade[ov.id] : 1;
+            let next = cur + (target - cur) * 0.18;   // ease
+            if (Math.abs(next - target) < 0.01) next = target;
+            _overFade[ov.id] = next;
+            if (next <= 0.01) continue;
+            ov.doc._lyrics = null;
+            try {
+              BgEngine.render(ctxOver, cvOver.width, cvOver.height, ov.doc, t,
+                              { alpha: next, noClear: true });
+            } catch (e) { /* keep looping */ }
           }
-          const cur = _overFade[ov.id] != null ? _overFade[ov.id] : 1;
-          let next = cur + (target - cur) * 0.18;   // ease
-          if (Math.abs(next - target) < 0.01) next = target;
-          _overFade[ov.id] = next;
-          if (next <= 0.01) continue;
-          ov.doc._lyrics = null;
-          try {
-            BgEngine.render(ctxOver, cvOver.width, cvOver.height, ov.doc, t,
-                            { alpha: next, noClear: true });
-          } catch (e) { /* keep looping */ }
+        }
+        // Ceasul — pe canvas-overlay, deci NU face tranziția cu slide-ul; are
+        // propriul fade-in/out și auto-ascundere când textul îl acoperă.
+        if (clockOn) {
+          try { drawClock(ctxOver, cvOver.width, cvOver.height); } catch (e) {}
         }
         _overLastDraw = ts;
       }
@@ -3376,7 +3385,8 @@ function _roundRect(ctx, x, y, w, h, r) {
 function drawOverlays(ctx, W, H) {
   drawMetadata(ctx, W, H);
   if (state.tickerActive && state.tickerText) drawTicker(ctx, W, H);
-  if (state.clockActive || _clockFadeV > 0.01) drawClock(ctx, W, H);
+  // Ceasul NU se mai desenează aici — se randează pe canvas-overlay (cvOver),
+  // independent de tranziția slide-urilor (altfel făcea fade cu fiecare slide).
   if (state.timerActive)                      drawTimer(ctx, W, H);
   if (state.logoPath)                         drawLogo(ctx, W, H);
 }
@@ -3890,7 +3900,7 @@ function mainLoop(ts) {
     needRedraw = true;
   }
 
-  if (state.clockActive || state.timerActive || _clockFadeV > 0.01) needRedraw = true;
+  if (state.timerActive) needRedraw = true;   // ceasul e pe cvOver, nu mai cere redraw aici
 
   // Chaotic text movement / animated text colour need continuous redraw
   const _s = state.settings;
