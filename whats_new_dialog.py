@@ -145,8 +145,20 @@ def maybe_show_whats_new(parent, version: str) -> bool:
         cache = db.get_cache()
         seen = cache.get("whatsnew_seen_version")
         shown = False
-        # Afișăm doar dacă exista o versiune anterioară ȘI diferă (deci update).
-        if seen and seen != version and version in _CHANGELOG:
+        show_it = False
+        if seen != version and version in _CHANGELOG:
+            if seen:
+                # Versiune anterioară înregistrată și diferă → clar un update.
+                show_it = True
+            else:
+                # Nicio versiune înregistrată (ex. update DE LA o versiune veche care
+                # nu avea funcția asta): arătăm DOAR dacă utilizatorul are deja cântări
+                # (deci e un update, nu o instalare nouă unde se afișează tutorialul).
+                try:
+                    show_it = db.get_songs_count() > 0
+                except Exception:
+                    show_it = False
+        if show_it:
             try:
                 WhatsNewDialog(parent, version).exec()
                 shown = True
