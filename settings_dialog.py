@@ -1147,6 +1147,25 @@ class SettingsDialog(QDialog):
         tg.addRow("", _tr_hint)
         layout.addWidget(tr_group)
 
+        # ── Newsletter (Brevo) — pentru a trimite emailuri către abonați ─────────
+        nl_group = QGroupBox("Newsletter (Brevo)")
+        ng = QFormLayout(nl_group)
+        self.brevo_key_edit = QLineEdit(self.s.get("brevo_api_key", "") or "")
+        self.brevo_key_edit.setPlaceholderText("Cheie API Brevo (opțional)")
+        self.brevo_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        ng.addRow("Cheie API Brevo:", self.brevo_key_edit)
+        self.brevo_list_edit = QLineEdit(str(self.s.get("brevo_list_id", "") or ""))
+        self.brevo_list_edit.setPlaceholderText("ID listă (ex. 2)")
+        ng.addRow("ID listă:", self.brevo_list_edit)
+        _nl_hint = QLabel("Cu o cheie Brevo gratuită (brevo.com → SMTP & API → API Keys), "
+                          "abonații din aplicație intră automat într-o listă. Apoi trimiți "
+                          "newsletter la toți din panoul Brevo. Fără cheie, înscrierile ajung "
+                          "pe email (cantioapp@gmail.com).")
+        _nl_hint.setStyleSheet("color:#6c7086; font-size:11px;")
+        _nl_hint.setWordWrap(True)
+        ng.addRow("", _nl_hint)
+        layout.addWidget(nl_group)
+
         layout.addStretch()
         return self._scrollable(w)
 
@@ -1997,6 +2016,8 @@ class SettingsDialog(QDialog):
             "sacred_words": self._get_sacred_words_str(),
             "language": self.lang_combo.currentData() if hasattr(self, 'lang_combo') else get_language(),
             "deepl_api_key": self.deepl_key_edit.text().strip() if hasattr(self, 'deepl_key_edit') else "",
+            "brevo_api_key": self.brevo_key_edit.text().strip() if hasattr(self, 'brevo_key_edit') else "",
+            "brevo_list_id": self.brevo_list_edit.text().strip() if hasattr(self, 'brevo_list_edit') else "",
             "copyright": self._collect_copyright(),
             "ref_font_size":  str(self.br_font_size.value()) if hasattr(self, 'br_font_size') else "24",
             "ref_color":      self.br_color.color()          if hasattr(self, 'br_color')     else "#aaaaaa",

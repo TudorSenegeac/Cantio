@@ -20,6 +20,42 @@ except Exception:  # pragma: no cover
     _SendWorker = None
     FEEDBACK_EMAIL = "cantioapp@gmail.com"
 
+
+def _brevo_configured() -> bool:
+    try:
+        import database as db
+        return bool((db.get_settings().get("brevo_api_key", "") or "").strip())
+    except Exception:
+        return False
+
+
+def _brevo_add_contact(email: str, church: str = ""):
+    """Adaugă abonatul în lista Brevo (newsletter), dacă e configurată o cheie API.
+    Rulează pe un fir separat; nicio eroare nu iese afară."""
+    try:
+        import database as db, json, urllib.request
+        s = db.get_settings()
+        key = (s.get("brevo_api_key", "") or "").strip()
+        if not key or not email:
+            return
+        body = {"email": email, "updateEnabled": True}
+        if church:
+            body["attributes"] = {"CHURCH": church}
+        list_id = (s.get("brevo_list_id", "") or "").strip()
+        if list_id:
+            try:
+                body["listIds"] = [int(list_id)]
+            except Exception:
+                pass
+        req = urllib.request.Request(
+            "https://api.brevo.com/v3/contacts",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"api-key": key, "Content-Type": "application/json",
+                     "accept": "application/json"})
+        urllib.request.urlopen(req, timeout=15)
+    except Exception:
+        pass
+
 _STYLE = """
 QDialog { background:#181818; color:#e6e6ea; font-family:'Segoe UI'; font-size:13px; }
 QLabel#title { font-size:20px; font-weight:700; color:#cba6f7; }
@@ -102,7 +138,20 @@ class WelcomeDialog(QDialog):
             self._set_status("Introdu o adresă de e-mail validă.", "#f38ba8")
             self._email.setFocus()
             return
+        # Dacă e configurat Brevo (serviciu de newsletter), adaugă abonatul în listă
+        # ca administratorul să poată trimite campanii către toți. Rulează în fundal.
+        try:
+            import threading
+            threading.Thread(target=_brevo_add_contact,
+                             args=(email, self._church.text().strip()),
+                             daemon=True).start()
+        except Exception:
+            pass
         if _SendWorker is None:
+            # Fără FormSubmit, dar dacă Brevo e configurat tot am abonat utilizatorul.
+            if _brevo_configured():
+                self._on_done(True, "")
+                return
             self._set_status("Nu pot trimite acum. Încearcă mai târziu.", "#f38ba8")
             return
         payload = {
