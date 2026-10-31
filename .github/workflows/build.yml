@@ -69,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-dmg
-          path: Cantio-*-macOS.dmg
+          path: CantioPresenter-*-macOS.dmg
           if-no-files-found: warn
 
   # ── GitHub Release ─────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ jobs:
 
           ### Descărcare
           - **Windows**: \`CantioPresenter-Setup-*-Windows.exe\` — rulează ca Administrator
-          - **macOS**: \`Cantio-*-macOS.dmg\` — trage în Applications (right-click → Open prima dată)
+          - **macOS**: \`CantioPresenter-*-macOS.dmg\` — trage în Applications (right-click → Open prima dată)
 
           ### Noutăți 1.5.2
           - Overlay-uri peste ecranul live (ceas, ticker, logo, forme)
