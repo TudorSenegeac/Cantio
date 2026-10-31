@@ -44,6 +44,8 @@ jobs:
   # ── macOS ──────────────────────────────────────────────────────────────────
   build-mac:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +73,14 @@ jobs:
           name: mac-dmg
           path: CantioPresenter-*-macOS.dmg
           if-no-files-found: warn
+
+      # La rulare manuala (workflow_dispatch) ataseaza DMG-ul direct pe release-ul
+      # existent, fara descarcare locala. Se face pe runner-ul GitHub (retea rapida).
+      - name: Attach DMG to existing release (manual runs only)
+        if: github.event_name == 'workflow_dispatch'
+        run: gh release upload v1.5.2.1 CantioPresenter-*-macOS.dmg --repo "${{ github.repository }}" --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ── GitHub Release ─────────────────────────────────────────────────────────
   # Rulează doar la push de tag (nu la workflow_dispatch manual)
