@@ -24,7 +24,7 @@
    "grad_dir": "Sus→Jos"
   },
   "layout": {
-   "margin": "0.06",
+   "margin": "80",
    "valign": "Centru"
   },
   "advanced": {}
@@ -54,7 +54,7 @@
    "grad_dir": "Sus→Jos"
   },
   "layout": {
-   "margin": "0.06",
+   "margin": "80",
    "valign": "Centru"
   },
   "advanced": {}
@@ -84,7 +84,7 @@
    "grad_dir": "Diagonală ↘"
   },
   "layout": {
-   "margin": "0.06",
+   "margin": "80",
    "valign": "Centru"
   },
   "advanced": {}
@@ -114,7 +114,7 @@
    "grad_dir": "Sus→Jos"
   },
   "layout": {
-   "margin": "0.06",
+   "margin": "80",
    "valign": "Centru"
   },
   "advanced": {}

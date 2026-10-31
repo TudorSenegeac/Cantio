@@ -1128,7 +1128,15 @@ class SlideThumbnail(QWidget):
             font_family = s.get("font_family", "Arial")
             font_bold   = s.get("font_bold",   "true") == "true"
             font_italic = s.get("font_italic", "false") == "true"
-            margin3     = max(2 * SS, int(int(s.get("margin", 60)) * scale3))
+            # Marginea poate veni ca px ("80") sau fractie ("0.06"); niciodata
+            # sa nu crape randarea daca o tema aduce o valoare neasteptata.
+            try:
+                _mraw = float(s.get("margin", 60) or 60)
+            except (TypeError, ValueError):
+                _mraw = 60.0
+            if _mraw < 2:          # fractie din dimensiune -> px (ref. 1080)
+                _mraw *= 1080.0
+            margin3     = max(2 * SS, int(_mraw * scale3))
             avail_w3    = tw3 - 2 * margin3
             avail_h3    = th3 - 2 * margin3
 
