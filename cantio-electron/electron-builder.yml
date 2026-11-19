@@ -1,0 +1,31 @@
+appId: com.cantio.app
+productName: Cantio
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.js
+  - preload.js
+  - src/**/*
+  - display/**/*
+  - package.json
+win:
+  target:
+    - nsis
+  icon: src/assets/icon.ico
+mac:
+  target:
+    - dmg
+  icon: src/assets/icon.icns
+linux:
+  target:
+    - AppImage
+  icon: src/assets/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+extraResources:
+  - from: display/
+    to: display/

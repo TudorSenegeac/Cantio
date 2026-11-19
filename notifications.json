@@ -1,0 +1,29 @@
+{
+  "_comment": "Editeaza acest fisier si fa commit ca sa trimiti notificari utilizatorilor Cantio. Fiecare notificare are nevoie de un 'id' unic. Tipuri: info | update | db | warning.",
+  "notifications": [
+    {
+      "id": "2026-11-13-tu-folosesti-cantiopresenter-do17",
+      "title": "Tu folosești CantioPresenter? 👋",
+      "body": "Ne-ar bucura enorm să știm cine folosește CantioPresenter! Dacă aplicația te ajută duminica, spune-ne un „salut“:\n\n📸 Etichetează-ne pe Instagram: @cantiopresenter\n💬 Sau trimite-ne un mesaj (DM) pe Instagram\n📘 Scrie-ne pe pagina de Facebook „Cantio“\n📧 Sau un email scurt la cantioapp@gmail.com\n\nSpune-ne din ce biserică și oraș ești — abia așteptăm să te cunoaștem! 🙏",
+      "date": "2026-11-13",
+      "type": "info",
+      "url": "https://www.instagram.com/cantiopresenter"
+    },
+    {
+      "id": "2026-10-15-bun-venit",
+      "title": "Bun venit la notificările Cantio!",
+      "body": "De acum vei primi aici anunțuri despre versiuni noi, baze de date noi și noutăți. Mulțumim că folosești Cantio!",
+      "date": "2026-10-15",
+      "type": "info",
+      "url": ""
+    },
+    {
+      "id": "2026-10-16-versiunea-1-5-2-este-aici-urg1",
+      "title": "Versiunea 1.5.2 este aici!",
+      "body": "După aproximativ două luni versiunea 1.5.2 este aici. Erori reparate, funcții noi etc.",
+      "date": "2026-10-16",
+      "type": "info",
+      "url": "www.cantioapp.com"
+    }
+  ]
+}

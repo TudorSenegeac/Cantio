@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CantioPresenter Display</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #bg-video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 0;
+      transition: opacity 0.45s ease;
+    }
+    #bg-image {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      z-index: 0;
+      transition: opacity 0.45s ease;
+    }
+    #canvas-bg, #canvas-bg2, #canvas-prev, #canvas-curr, #canvas-overlay {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+    }
+    #canvas-bg   { z-index: 0; display: none; }
+    #canvas-bg2  { z-index: 0; display: none; }  /* old-bg snapshot for transitions */
+    #canvas-prev { z-index: 1; }
+    #canvas-curr { z-index: 2; }
+    #canvas-overlay { z-index: 5; display: none; pointer-events: none; }  /* overlays peste text live */
+  </style>
+</head>
+<body>
+  <video id="bg-video" autoplay loop muted playsinline></video>
+  <img    id="bg-image" alt="">
+  <canvas id="canvas-bg"></canvas>
+  <canvas id="canvas-bg2"></canvas>
+  <canvas id="canvas-prev"></canvas>
+  <canvas id="canvas-curr"></canvas>
+  <canvas id="canvas-overlay"></canvas>
+  <script src="fonts.js"></script>
+  <script src="bg-engine.js"></script>
+  <script src="display.js"></script>
+  <script>if (window.CantioFonts) CantioFonts.loadGoogleFonts(document);</script>
+</body>
+</html>
