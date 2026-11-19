@@ -120,7 +120,7 @@ jobs:
 
           ### Noutăți 1.5.2
           - Overlay-uri peste ecranul live (ceas, ticker, logo, forme)
-          - Control complet de pe telefon (Remote): previzualizare 1:1, Biblie, Looks, Macros
+          - Control complet de pe telefon (Remote): previzualizare 1:1, Looks, Macros
           - Fundaluri & teme noi gata-făcute + casetă text liberă + fundal per etichetă
           - Traducere mult mai bună (DeepL) + 10 limbi offline
           - Performanță (GPU) + zeci de corecții
