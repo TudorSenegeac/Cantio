@@ -208,7 +208,7 @@ def _online_deepl(lines: list, tl: str):
     body = urllib.parse.urlencode(params).encode("utf-8")
     # DeepL cere cheia în header-ul Authorization (param auth_key dă 403).
     req = urllib.request.Request(host, data=body, headers={
-        "User-Agent": "Cantio/1.5.2",
+        "User-Agent": "Cantio/1.5.3",
         "Authorization": "DeepL-Auth-Key " + key,
         "Content-Type": "application/x-www-form-urlencoded",
     })

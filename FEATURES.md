@@ -12,7 +12,6 @@
 3. [Renderer Partajat](#3-renderer-partajat)
 4. [Fereastra Principală de Control](#4-fereastra-principală-de-control)
 5. [Biblioteca de Cântări](#5-biblioteca-de-cântări)
-6. [Modulul Biblie](#6-modulul-biblie)
 7. [Ordinea Serviciului (Service Order)](#7-ordinea-serviciului-service-order)
 8. [Controale Live](#8-controale-live)
 9. [Ticker / Ceas / Cronometru (Overlay-uri)](#9-ticker--ceas--cronometru-overlay-uri)
@@ -113,7 +112,6 @@
 | `ControlWindow.__init__` | Inițializează fereastra principală; deschide display-urile; pornește remote server; inițializează toast, stage monitor, scurtături | — |
 | `ControlWindow._build_toolbar` | Construiește bara de instrumente cu butoane Import, Cântec Nou, Salvare Serviciu, Setări, Scurtături, Stage Monitor | — |
 | `ControlWindow._build_songs_tab` | Tab „Cântări": căutare, filtru categorie, listă cântări, thumbnails slide-uri, editor cântec | — |
-| `ControlWindow._build_bible_tab` | Tab „Biblie": selector carte/capitol/verset, previzualizare text, buton Trimite Live | — |
 | `ControlWindow._build_slides_tab` | Tab „Slide-uri": lista prezentărilor create, thumbnails; deschide editorul de prezentări | — |
 | `ControlWindow._search_songs` | Caută în baza de date după titlu sau conținut cu filtru de categorie | **Ctrl+F** |
 | `ControlWindow._load_song` | Încarcă cântecul selectat; populează panoul de slide-uri cu thumbnails | — |
@@ -157,24 +155,6 @@
 | `get_categories()` | Returnează lista categoriilor unice + categoriile built-in |
 
 **Categorii built-in:** All, General, Imnuri, Psalmi, Colinde, Laude, Rugăciuni, Recunoștință, Evanghelie, Copii
-
----
-
-## 6. Modulul Biblie
-
-**Fișier:** `database.py`
-
-| Funcție | Ce face |
-|---------|---------|
-| `get_bible_books()` | Returnează toate cărțile biblice ordonate |
-| `get_chapters(book_id)` | Returnează lista capitolelor dintr-o carte |
-| `get_verses(book_id, chapter)` | Returnează versetele unui capitol |
-| `get_verse(book_id, chapter, verse_num)` | Returnează un verset specific |
-| `search_bible_text(query, limit)` | Caută în textul versetelor (full-text LIKE, max 80 rezultate) |
-| `import_bible_data(books, verses)` | Importă o traducere biblică completă (șterge și reimportă) |
-| `has_bible()` | Returnează `True` dacă există o traducere importată |
-
----
 
 ## 7. Ordinea Serviciului (Service Order)
 
@@ -511,7 +491,7 @@
 | `get_recent_files()` / `add_recent_file(path)` | Gestionează lista ultimelor 20 fișiere deschise |
 | `get_stage_layouts()` / `save_stage_layout(name, data)` | Stochează/citește layout-urile Stage Monitor în `stage.json` |
 | `add_presentation` / `update_presentation` / `delete_presentation` / `get_all_presentations` / `get_presentation` | CRUD complet pentru prezentări în `presentations.json` |
-| `export_db_json(path)` | Exportă cântecele + biblia + prezentările într-un singur fișier JSON |
+| `export_db_json(path)` | Exportă cântecele + prezentările într-un singur fișier JSON |
 
 ---
 

@@ -447,7 +447,7 @@ class SettingsDialog(QDialog):
 
         hint = QLabel(
             "Setări globale = font, culoare etc. din Settings se aplică la toate.\n"
-            "Teme = personalizare avansată per gen, cântare sau tip (cântări/biblie)."
+            "Teme = personalizare avansată per gen sau cântare."
         )
         hint.setStyleSheet("color:#6c7086; font-size:11px;")
         hint.setWordWrap(True)

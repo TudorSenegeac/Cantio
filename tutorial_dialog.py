@@ -84,7 +84,7 @@ _STEPS = [
             "  ecou, cascadă, gradient, glow, haotic)\n"
             "• Setează o temă implicită sau <b>pe categorie</b>\n"
             "• <b>🎨 Look</b> (toolbar) — schimbă tema activă <b>live, cu un click</b>\n"
-            "  pe tot ce e afișat (cântări + Biblie)"
+            "  pe tot ce e afișat (cântări)"
         ),
     },
     {
@@ -121,11 +121,9 @@ _STEPS = [
         ),
     },
     {
-        "icon":  "📖",
-        "title": "Biblie & Telecomandă",
+        "icon":  "📱",
+        "title": "Aranjamente & Telecomandă",
         "text": (
-            "• Tab <b>Biblie</b> — caută rapid: <b>„ps23 3\"</b>, <b>„Ioan 3:16\"</b>\n"
-            "• Layout referință: sus/jos, verset care nu acoperă referința\n"
             "• <b>Aranjamente</b> — reordonează strofele (Refren/Strofă) live\n"
             "• <b>Remote</b> — scanează QR-ul și controlezi de pe telefon"
         ),

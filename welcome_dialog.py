@@ -73,7 +73,7 @@ QPushButton#go:disabled { background:#3a3550; color:#999; }
 
 
 class WelcomeDialog(QDialog):
-    def __init__(self, parent=None, app_version: str = "1.5.2"):
+    def __init__(self, parent=None, app_version: str = "1.5.3"):
         super().__init__(parent)
         self._app_version = app_version
         self._worker = None

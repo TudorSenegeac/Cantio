@@ -29,7 +29,6 @@ _SLIDES = [
      "Adaugă cântările în ordinea slujbei:\n\n"
      "• Selectează o cântare → <b>+ Serviciu</b>\n"
      "• Reordonează cu săgețile ▲ ▼ sau trage elementele\n"
-     "• Adaugă și versete din Biblie\n"
      "• <b>Ctrl+S</b> salvezi serviciul • <b>Ctrl+O</b> îl redeschizi"),
     ("📺", "3. Deschide proiectorul",
      "Conectează proiectorul/TV-ul, apoi:\n\n"
@@ -47,22 +46,16 @@ _SLIDES = [
      "• <b>Casetă text liberă</b> — poziționezi textul oriunde\n"
      "• <b>Fundal per etichetă</b> — alt fundal la strofă vs. refren\n"
      "• Un <b>Look</b> activ schimbă instant tema pe toate cântările"),
-    ("📖", "6. Biblia",
-     "Tab-ul <b>Control Bible</b>:\n\n"
-     "• Scrie o referință (ex. Ioan 3:16) sau caută un cuvânt\n"
-     "• Vezi tot capitolul; click pe verset = îl trimiți live\n"
-     "• Navighează cu ◀ ▶ între versete\n"
-     "• Poți evidenția o parte din verset pe ecran"),
-    ("🎬", "7. Overlay-uri & ceas",
+    ("🎬", "6. Overlay-uri & ceas",
      "Elemente afișate PESTE versuri (ca în FreeShow):\n\n"
      "• <b>Ceas</b> — colț, cu apariție lină; se ascunde când textul îl acoperă\n"
      "• <b>Ticker</b> — text derulant (anunțuri)\n"
      "• <b>Overlay-uri</b> — logo, text, forme, create în editorul de fundaluri\n"
      "• Le pornești/oprești din panoul dreapta sau din telefon"),
-    ("📱", "8. Controlează de pe telefon",
+    ("📱", "7. Controlează de pe telefon",
      "Apasă <b>Remote</b> (meniul de sus) → apare un cod QR.\n\n"
      "• Scanează-l cu telefonul (pe aceeași rețea Wi-Fi)\n"
-     "• De pe telefon: GO LIVE, slide-uri, Biblie, Looks, Macros, ceas\n"
+     "• De pe telefon: GO LIVE, slide-uri, Looks, Macros, ceas\n"
      "• Vezi o <b>previzualizare 1:1</b> cu proiectorul\n"
      "• Poți chiar edita strofele din telefon"),
     ("✅", "Gata — ești pregătit!",

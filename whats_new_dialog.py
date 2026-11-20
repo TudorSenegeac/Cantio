@@ -26,13 +26,12 @@ _SOCIAL = [
 
 # Changelog per versiune. Adaugă o intrare nouă sus la fiecare release.
 _CHANGELOG = {
-    "1.5.2": {
+    "1.5.3": {
         "Nou": [
             "🎬 Overlay-uri peste ecranul live (ceas, text derulant, logo, forme) — stil FreeShow",
             "📱 Telefon (Remote) complet: previzualizare 1:1 cu proiectorul, Looks, Macros, Overlay-uri",
-            "📖 Control Biblie din telefon — caută referința, navighează, vezi capitolul întreg",
             "✏️ Editezi strofele direct din telefon",
-            "🎨 Fundaluri noi: Pagină de Biblie, gradienturi continue, efect Matrix",
+            "🎨 Fundaluri noi: Pagină de carte, gradienturi continue, efect Matrix",
             "🖌️ Casetă text liberă + fundal diferit per etichetă (strofă/refren) în Teme",
             "🌍 Traducere mult mai bună (DeepL) + 10 limbi gata offline (en, de, fr, hu, es, it, ru, uk, pl, pt)",
         ],
@@ -53,7 +52,7 @@ _CHANGELOG = {
 
 
 class WhatsNewDialog(QDialog):
-    def __init__(self, parent=None, version: str = "1.5.2"):
+    def __init__(self, parent=None, version: str = "1.5.3"):
         super().__init__(parent)
         self.version = version
         self.setWindowTitle(f"Ce e nou — CantioPresenter v{version}")

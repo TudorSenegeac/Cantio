@@ -1064,10 +1064,10 @@ function buildTickerProps(p, L) {
 
 function buildScriptureProps(p, L) {
   if (!L.animate) L.animate = { mode: 'none', speed: 0.25 };
-  grpH(p, 'PAGINĂ DE BIBLIE');
+  grpH(p, 'PAGINĂ DE CARTE');
   const info = document.createElement('div');
   info.style.cssText = 'font-size:10px;color:#888;margin-bottom:6px;';
-  info.textContent = 'Fundal cu coloane de text sacru (ca o pagină veche de Biblie).';
+  info.textContent = 'Fundal decorativ cu coloane de text, ca o pagină veche de carte.';
   p.appendChild(info);
   p.appendChild(row('Stil', mkSelect(L, 'variant', ['dark', 'parchment'])));
   p.appendChild(row('Coloane', mkRange(L, 'columns', 1, 3, 1)));

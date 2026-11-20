@@ -171,7 +171,7 @@ class AboutDialog(QDialog):
         name_lbl.setStyleSheet("color: #cba6f7;")
         title_v.addWidget(name_lbl)
 
-        ver_lbl = QLabel("Versiunea 1.5.2 Stable")
+        ver_lbl = QLabel("Versiunea 1.5.3 Stable")
         ver_lbl.setStyleSheet("color: #6c7086; font-size: 12px;")
         title_v.addWidget(ver_lbl)
 
@@ -241,14 +241,13 @@ class AboutDialog(QDialog):
         <p><b style="color:#cba6f7;">CantioPresenter</b> este un software modern de prezentare
         destinat <b>bisericilor, corurilor și congregațiilor creștine</b>.</p>
 
-        <p>Conceput să simplifice afișarea versetelor biblice, imnurilor și prezentărilor
+        <p>Conceput să simplifice afișarea cântărilor, imnurilor și prezentărilor
         de serviciu pe ecrane multiple, CantioPresenter combină un editor intuitiv cu un
         motor de randare Electron de înaltă calitate.</p>
 
         <h4 style="color:#89b4fa;">Funcționalități principale</h4>
         <ul>
           <li>🎵 Biblioteca de cântece cu acorduri și diapozitive auto-split</li>
-          <li>📖 Versete biblice (multiple traduceri) cu randare live</li>
           <li>🎨 Editor de teme cu gradient, imagine, cameră și gradient animat</li>
           <li>📺 Suport multi-display cu tranziții și ticker</li>
           <li>🎭 Sistem de overlay-uri (logo, ceas, numărătoare, ticker avansat)</li>

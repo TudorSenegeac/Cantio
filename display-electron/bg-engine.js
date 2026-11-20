@@ -150,7 +150,7 @@
       });
     } else if (type === 'scripture') {
       Object.assign(base, {
-        name: 'Pagină de Biblie', x: 0.5, y: 0.5, w: 1, h: 1,
+        name: 'Pagină de carte', x: 0.5, y: 0.5, w: 1, h: 1,
         variant: 'dark',                 // dark | parchment
         columns: 2,
         size: 1.0,
@@ -849,7 +849,7 @@
 
   const SHAPE_LIST = Object.keys(SHAPE_BUILDERS).concat(['line']);
 
-  // ── Scripture page (fundal „pagină de Biblie") ──────────────────────────────
+  // ── Pagină de carte (fundal decorativ cu text pe coloane) ───────────────────
   // Coloane de text sacru, întunecat/atmosferic, cu titlu de capitol, număr de
   // verset și inițială mare; opțional derulare lentă pe verticală.
   const _SCRIPTURE_POOL = [

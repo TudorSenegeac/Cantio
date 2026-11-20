@@ -4,7 +4,6 @@ Church lyrics display software for Windows.
 
 ## Features
 - 🎵 Song library with search (SQLite database)
-- 📖 Bible verse display
 - 📺 Fullscreen display on projector/second monitor
 - 👁 Live preview in control window
 - ⬆ Import from: TXT, DOCX, PDF, VideoPsalm (.json/.xml), EasyWorship (.ewsx/.db)

@@ -380,7 +380,7 @@ class OverlaySettingsWidget(QWidget):
         self._ck_auto_hide = QCheckBox("Ascunde automat când textul se suprapune")
         self._ck_auto_hide.setChecked(bool(ck.get("auto_hide", False)))
         self._ck_auto_hide.setToolTip(
-            "Ceasul dispare (fade) când versurile/versetul trec peste el și "
+            "Ceasul dispare (fade) când versurile trec peste el și "
             "reapare când ecranul e gol.")
         gf.addRow("", self._ck_auto_hide)
 

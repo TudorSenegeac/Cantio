@@ -18,7 +18,6 @@ RESTRICTIONS: dict[str, str] = {
     "no_themes":         "Nu poate modifica Teme",
     "no_new_profile":    "Nu poate crea profile noi",
     "no_delete_profile": "Nu poate șterge profiluri",
-    "no_bible_import":   "Nu poate importa Biblia",
     "read_only":         "Mod doar citire (nu poate salva)",
 }
 

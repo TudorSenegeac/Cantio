@@ -152,7 +152,7 @@ class _SendWorker(QThread):
 class FeedbackDialog(QDialog):
     """Pagina de feedback din meniul Ajutor."""
 
-    def __init__(self, parent=None, app_version: str = "1.5.2"):
+    def __init__(self, parent=None, app_version: str = "1.5.3"):
         super().__init__(parent)
         self._app_version = app_version
         self._worker = None

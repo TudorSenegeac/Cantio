@@ -2701,7 +2701,7 @@ class ControlWindow(QMainWindow):
         """Arată „Ce e nou" dacă s-a instalat o versiune nouă peste una veche."""
         try:
             from PyQt6.QtWidgets import QApplication
-            ver = (QApplication.applicationVersion() or "1.5.2").strip()
+            ver = (QApplication.applicationVersion() or "1.5.3").strip()
             from whats_new_dialog import maybe_show_whats_new
             maybe_show_whats_new(self, ver)
         except Exception as e:
@@ -10521,7 +10521,7 @@ class ControlWindow(QMainWindow):
             pass
         try:
             from welcome_dialog import WelcomeDialog
-            ver = "1.5.2"
+            ver = "1.5.3"
             try:
                 app = QApplication.instance()
                 if app and app.applicationVersion():
@@ -10977,8 +10977,6 @@ class ControlWindow(QMainWindow):
                         "Temele nu pot fi modificate\nîn acest profil!",
                     "no_export":
                         "Exportul nu este permis\nîn acest profil!",
-                    "no_bible_import":
-                        "Importul Bibliei nu este permis\nîn acest profil!",
                     "read_only":
                         "Profilul este în modul\ndoar citire!",
                 }
@@ -11219,7 +11217,7 @@ class ControlWindow(QMainWindow):
 
     def _show_feedback(self):
         from feedback_dialog import FeedbackDialog
-        ver = "1.5.2"
+        ver = "1.5.3"
         try:
             app = QApplication.instance()
             if app and app.applicationVersion():
