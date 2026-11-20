@@ -78,7 +78,7 @@ jobs:
       # existent, fara descarcare locala. Se face pe runner-ul GitHub (retea rapida).
       - name: Attach DMG to existing release (manual runs only)
         if: github.event_name == 'workflow_dispatch'
-        run: gh release upload v1.5.2.1 CantioPresenter-*-macOS.dmg --repo "${{ github.repository }}" --clobber
+        run: gh release upload v1.5.3 CantioPresenter-*-macOS.dmg --repo "${{ github.repository }}" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -118,7 +118,7 @@ jobs:
           - **Windows**: \`CantioPresenter-Setup-*-Windows.exe\` — rulează ca Administrator
           - **macOS**: \`CantioPresenter-*-macOS.dmg\` — trage în Applications (right-click → Open prima dată)
 
-          ### Noutăți 1.5.2
+          ### Noutăți 1.5.3
           - Overlay-uri peste ecranul live (ceas, ticker, logo, forme)
           - Control complet de pe telefon (Remote): previzualizare 1:1, Looks, Macros
           - Fundaluri & teme noi gata-făcute + casetă text liberă + fundal per etichetă
