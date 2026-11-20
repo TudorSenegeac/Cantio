@@ -24,31 +24,9 @@ _SOCIAL = [
     ("✈  Telegram",   "https://t.me/cantio_comunitate"),
 ]
 
-# Changelog per versiune. Adaugă o intrare nouă sus la fiecare release.
-_CHANGELOG = {
-    "1.5.3": {
-        "Nou": [
-            "🎬 Overlay-uri peste ecranul live (ceas, text derulant, logo, forme) — stil FreeShow",
-            "📱 Telefon (Remote) complet: previzualizare 1:1 cu proiectorul, Looks, Macros, Overlay-uri",
-            "✏️ Editezi strofele direct din telefon",
-            "🎨 Fundaluri noi: Pagină de carte, gradienturi continue, efect Matrix",
-            "🖌️ Casetă text liberă + fundal diferit per etichetă (strofă/refren) în Teme",
-            "🌍 Traducere mult mai bună (DeepL) + 10 limbi gata offline (en, de, fr, hu, es, it, ru, uk, pl, pt)",
-        ],
-        "Îmbunătățit": [
-            "🕐 Ceasul: apariție lină (fade) și auto-ascundere când versurile îl acoperă",
-            "⚡ Consum GPU mult mai mic — nu mai supraîncălzește laptopul",
-            "📑 Împărțire automată a slide-urilor pe N rânduri din temă",
-        ],
-        "Reparat": [
-            "🖼️ Fundalul temei apare acum și pe proiector (nu doar în previzualizare)",
-            "📐 Forma previzualizării se potrivește cu fereastra live fullscreen",
-            "🎞️ Videoclipurile de fundal fără buclă pornesc de fiecare dată",
-            "📖 Biblia: fără cuvinte sacre din setări + împărțire normală a textului",
-            "➕ Zeci de alte corecții (YouTube, remote, titluri de ferestre, stabilitate)",
-        ],
-    },
-}
+# Changelog per versiune. Adaugă o intrare nouă aici (cheia = versiunea aplicației)
+# ca să apară fereastra „Ce e nou" la update. Gol = fereastra NU se afișează.
+_CHANGELOG = {}
 
 
 class WhatsNewDialog(QDialog):
