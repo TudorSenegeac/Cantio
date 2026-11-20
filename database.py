@@ -712,30 +712,8 @@ def init_db():
     ensure_fts_populated()
 
     # ── bible.db ──────────────────────────────────────────────────────────────
-    conn = get_bible_db()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS bible_books (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            abbreviation TEXT NOT NULL,
-            testament TEXT NOT NULL,
-            book_order INTEGER NOT NULL
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS bible_verses (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            book_id INTEGER NOT NULL,
-            chapter INTEGER NOT NULL,
-            verse INTEGER NOT NULL,
-            text TEXT NOT NULL,
-            translation TEXT DEFAULT 'VBA',
-            FOREIGN KEY (book_id) REFERENCES bible_books(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
+    # Fișierul bible.db NU se mai creează (funcția de Biblie a fost eliminată).
+    # purge_imported_bibles() șterge orice bible.db rămas de la versiuni vechi.
 
     # ── settings.json ─────────────────────────────────────────────────────────
     if not os.path.exists(_settings_path):
@@ -834,29 +812,8 @@ def _migrate_from_monolithic() -> bool:
             pass
 
         # ── bible ─────────────────────────────────────────────────────────────
-        try:
-            books = [_row(r) for r in old.execute("SELECT * FROM bible_books").fetchall()]
-            verses = [_row(r) for r in old.execute("SELECT * FROM bible_verses").fetchall()]
-            if books:
-                bible_conn = get_bible_db()
-                if bible_conn.execute("SELECT COUNT(*) FROM bible_books").fetchone()[0] == 0:
-                    for b in books:
-                        bible_conn.execute(
-                            "INSERT INTO bible_books (id, name, abbreviation, testament, book_order)"
-                            " VALUES (?,?,?,?,?)",
-                            (b["id"], b["name"], b["abbreviation"], b["testament"], b["book_order"])
-                        )
-                    for v in verses:
-                        bible_conn.execute(
-                            "INSERT INTO bible_verses (book_id, chapter, verse, text, translation)"
-                            " VALUES (?,?,?,?,?)",
-                            (v["book_id"], v["chapter"], v["verse"], v["text"],
-                             v.get("translation", "VBA"))
-                        )
-                    bible_conn.commit()
-                bible_conn.close()
-        except Exception:
-            pass
+        # Migrarea Bibliei a fost eliminată (funcția de Biblie nu mai există);
+        # conținutul biblic vechi nu se mai transferă.
 
         # ── playlist ──────────────────────────────────────────────────────────
         try:
@@ -1690,36 +1647,26 @@ def has_bible() -> bool:
 
 
 def purge_imported_bibles():
-    """Conformare (1.5.3): șterge conținutul biblic importat cu fosta funcție de
-    import din fișiere, din bible.db-ul FIECĂRUI profil. Rulează o singură dată
-    (marker), atinge DOAR tabelele de Biblie (cântările/setările NU sunt afectate)
-    și nu ridică niciodată excepție (nu poate strica pornirea aplicației)."""
-    import os as _os, sqlite3 as _sq, glob as _glob
+    """Conformare (1.5.3): ȘTERGE fișierul bible.db (conținutul biblic importat cu
+    fosta funcție de import) din FIECARE profil. Rulează o singură dată (marker),
+    atinge DOAR bible.db + temele de tip „bible" (cântările/setările NU sunt
+    afectate) și nu ridică niciodată excepție (nu poate strica pornirea)."""
+    import os as _os, glob as _glob
     try:
         base = _os.path.join(_os.path.expanduser("~"), "Cantio")
-        marker = _os.path.join(base, ".bibles_purged")
+        marker = _os.path.join(base, ".bible_db_removed")
         if _os.path.exists(marker):
             return
         targets = _glob.glob(_os.path.join(base, "profiles", "*", "bible.db"))
         targets.append(_os.path.join(base, "bible.db"))
         for p in targets:
-            if not _os.path.exists(p):
-                continue
-            try:
-                c = _sq.connect(p)
-                for tbl in ("bible_verses", "bible_books", "bible_translations"):
-                    try:
-                        c.execute("DELETE FROM " + tbl)
-                    except Exception:
-                        pass
-                c.commit()
+            # Șterge fișierul bible.db + eventualele fișiere auxiliare SQLite.
+            for f in (p, p + "-wal", p + "-shm", p + "-journal"):
                 try:
-                    c.execute("VACUUM")
+                    if _os.path.exists(f):
+                        _os.remove(f)
                 except Exception:
                     pass
-                c.close()
-            except Exception:
-                pass
         # Teme de tip „bible" din themes.json (fiecare profil) + bible_active.
         import json as _json
         for tp in _glob.glob(_os.path.join(base, "profiles", "*", "themes.json")):
