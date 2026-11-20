@@ -285,8 +285,8 @@ def copy_assets():
         else:
             print(f"  ⚠ Lipsă (skip): {asset}")
 
-    # mdbtools NU se mai include (era folosit doar pentru importul de biblii din
-    # fișiere, eliminat).
+    # mdbtools NU se mai include (era folosit doar pentru un import extern vechi,
+    # eliminat).
 
     # Pachete de limbă (traduceri OFFLINE gata de folosit)
     if os.path.exists("langpacks"):

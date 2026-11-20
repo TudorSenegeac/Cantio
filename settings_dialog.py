@@ -812,7 +812,7 @@ class SettingsDialog(QDialog):
         crf.addLayout(cr_form)
         layout.addWidget(cr_group)
 
-        # (Grupul „Stil referință Biblică" a fost eliminat.)
+        # (Un grup de setări vechi a fost eliminat.)
 
         # ── Advanced overlay personalization ──────────────────────────────────
         adv_lbl = QLabel("PERSONALIZARE AVANSATĂ OVERLAY-URI")

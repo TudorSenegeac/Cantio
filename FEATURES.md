@@ -467,7 +467,6 @@
 ```
 ~/Cantio/profiles/<Nume>/
 ├── songs.db          # SQLite — cântări
-├── bible.db          # SQLite — cărți și versete biblice
 ├── settings.json     # JSON  — setările aplicației
 ├── playlists.json    # JSON  — playlist / serviciu curent
 ├── presentations.json# JSON  — prezentări custom
@@ -588,7 +587,6 @@ main.py
         ├── remote_server.py                   ← Flask daemon thread
         └── database.py                        ← persistență
               ├── songs.db (SQLite)
-              ├── bible.db (SQLite)
               ├── settings.json
               ├── playlists.json
               ├── presentations.json

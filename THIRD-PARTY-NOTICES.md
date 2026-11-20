@@ -55,6 +55,6 @@ files (Google ships them with each family) alongside the WOFF2 files. Re-run
 
 ## Content note
 
-Bible translations, song lyrics, and imported media are NOT covered by this
+Song lyrics and imported media are NOT covered by this
 software license — you are responsible for the rights to any content you display
 or ship (e.g. CCLI reporting for copyrighted worship songs).

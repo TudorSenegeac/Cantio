@@ -22,7 +22,7 @@ for asset in ('GProICON.png', 'GProICON.ico', 'GProICON.icns',
 if os.path.exists('GPSPLASH-cutout.png'):
     datas.append(('GPSPLASH-cutout.png', '.'))
 
-# mdbtools eliminat din bundle (era doar pentru importul de biblii din fișiere).
+# mdbtools eliminat din bundle (era doar pentru un import extern vechi).
 
 # display-electron este compilat separat cu electron-packager → dist/CantioPresenter/CantioDisplay/
 # Nu se include în PyInstaller datas; build.py copiază executabilul compilat lângă CantioPresenter.exe.

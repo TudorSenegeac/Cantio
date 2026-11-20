@@ -65,7 +65,7 @@ def save_service(path: str, items: list[dict], profile_name: str = "Default") ->
     Save service order to a .gps file.
 
     items: list of dicts with keys:
-        type        - "song" | "bible" | "text"
+        type        - "song" | "text"
         title       - display title
         slides      - list[str] slide texts
         notes       - operator notes string

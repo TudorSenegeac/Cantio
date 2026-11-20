@@ -91,7 +91,7 @@ class ThemesTab(QWidget):
         type_row.addWidget(self.type_stage_btn)
         left_l.addLayout(type_row)
 
-        # Content stack: theme grid (songs/bible) + stage-arrangements list.
+        # Content stack: theme grid + stage-arrangements list.
         self._grid_stack = QStackedWidget()
         if _THEME_EDITOR_OK and ThemesGrid is not None:
             self.themes_grid = ThemesGrid()
